@@ -15,6 +15,8 @@ import {
 import { debugLog } from './log'
 import { validateAgentConfig, validateTransportConfig } from './validation'
 import { ObservabilityTracker } from './observability'
+import { BoundedExecutor } from './boundedExecutor'
+import { CircuitBreaker } from './circuitBreaker'
 
 export class AgentManager {
   private agent: Agent
@@ -27,6 +29,8 @@ export class AgentManager {
   private sendQueue: Promise<void> = Promise.resolve() // Concurrency protection
   private cleanupCalled = false // Prevent multiple cleanup calls
   private observabilityTracker: ObservabilityTracker
+  private boundedExecutor?: BoundedExecutor
+  private circuitBreaker?: CircuitBreaker
 
   constructor(
     agent: Agent, 
@@ -47,6 +51,20 @@ export class AgentManager {
       options.observability || {},
       options.debug || false
     )
+    
+    // Initialize bounded executor if resource limits are provided
+    if (options.resourceLimits) {
+      this.boundedExecutor = new BoundedExecutor(options.resourceLimits)
+    }
+    
+    // Initialize circuit breaker if enabled via feature flags
+    if (options.features?.enableCircuitBreaker) {
+      this.circuitBreaker = new CircuitBreaker({
+        ...options.circuitBreaker,
+        enabled: true,
+        name: `circuit-breaker-${this.agentId}-${this.transport.id}`
+      })
+    }
 
     debugLog.lifecycle('constructed', 'AgentManager', {
       agentId: this.agentId,
@@ -209,7 +227,38 @@ export class AgentManager {
       })
     }
 
-    // Queue this send operation to prevent race conditions, but isolate errors
+    // If bounded executor is enabled, use it for resource management
+    if (this.boundedExecutor) {
+      return this.boundedExecutor.execute(
+        `send-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        async () => {
+          // Wrap with circuit breaker if enabled
+          const operationFn = async () => {
+            return this.observabilityTracker.trackRequest(
+              'send',
+              this.agentId,
+              this.transport.id,
+              async (requestId) => {
+                await this.processSendOperation(input, requestId)
+              },
+              {
+                inputType: typeof input,
+                hasInput: input !== undefined && input !== null
+              }
+            )
+          }
+          
+          if (this.circuitBreaker) {
+            return this.circuitBreaker.execute(operationFn)
+          }
+          
+          return operationFn()
+        },
+        input // Pass input as payload for size validation
+      )
+    }
+
+    // Fallback to original queue-based approach for backward compatibility
     this.sendQueue = this.sendQueue
       .catch(() => {}) // Prevent error propagation from previous operations
       .then(async () => {
@@ -220,18 +269,27 @@ export class AgentManager {
           })
         }
 
-        await this.observabilityTracker.trackRequest(
-          'send',
-          this.agentId,
-          this.transport.id,
-          async (requestId) => {
-            await this.processSendOperation(input, requestId)
-          },
-          {
-            inputType: typeof input,
-            hasInput: input !== undefined && input !== null
-          }
-        )
+        // Wrap with circuit breaker if enabled
+        const operationFn = async () => {
+          return this.observabilityTracker.trackRequest(
+            'send',
+            this.agentId,
+            this.transport.id,
+            async (requestId) => {
+              await this.processSendOperation(input, requestId)
+            },
+            {
+              inputType: typeof input,
+              hasInput: input !== undefined && input !== null
+            }
+          )
+        }
+        
+        if (this.circuitBreaker) {
+          await this.circuitBreaker.execute(operationFn)
+        } else {
+          await operationFn()
+        }
       })
 
     return this.sendQueue

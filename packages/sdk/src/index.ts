@@ -271,3 +271,5 @@ export const AgentRegistryLegacy = {
   listTransports: () => defaultRegistry.listTransports()
 }
 export { AgentManager } from './AgentManager'
+export { BoundedExecutor } from './boundedExecutor'
+export { CircuitBreaker, CircuitState, CircuitBreakerError } from './circuitBreaker'
