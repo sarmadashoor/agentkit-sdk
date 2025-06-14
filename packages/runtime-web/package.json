@@ -22,6 +22,10 @@
     "build": "tsc",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
+    "test:browser": "playwright test",
+    "test:browser:headed": "playwright test --headed",
+    "test:all": "npm run test && npm run test:browser",
+    "serve:test": "node tests/test-server.js",
     "clean": "rm -rf dist"
   },
   "keywords": [
@@ -42,7 +46,9 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0",
     "vitest": "^1.6.0",
-    "@vitest/coverage-v8": "^1.6.0"
+    "@vitest/coverage-v8": "^1.6.0",
+    "@playwright/test": "^1.40.0",
+    "happy-dom": "^12.10.0"
   },
   "peerDependencies": {
     "@agentkit/sdk": "workspace:*"

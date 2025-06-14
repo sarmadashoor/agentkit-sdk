@@ -44,6 +44,31 @@ export interface ErrorContext {
   context?: Record<string, unknown>
 }
 
+export interface ResourceLimits {
+  /** Maximum number of concurrent requests allowed */
+  maxConcurrentRequests?: number
+  /** Maximum number of requests that can be queued */
+  maxQueueSize?: number
+  /** Request timeout in milliseconds */
+  requestTimeoutMs?: number
+  /** Maximum payload size in bytes */
+  maxPayloadSize?: number
+}
+
+export interface CircuitBreakerConfig {
+  /** Number of failures before opening the circuit */
+  failureThreshold?: number
+  /** Timeout in milliseconds before transitioning to half-open */
+  timeout?: number
+  /** Name for logging and metrics */
+  name?: string
+}
+
+export interface FeatureFlags {
+  /** Enable circuit breaker for fault tolerance */
+  enableCircuitBreaker?: boolean
+}
+
 export interface ConnectAgentOptions {
   agent: string | Agent
   transport: string | Transport
@@ -60,6 +85,12 @@ export interface ConnectAgentOptions {
   onCleanup?: (agentId: string) => void
   // Observability hooks
   observability?: ObservabilityHooks
+  // Resource limits for resilience
+  resourceLimits?: ResourceLimits
+  // Circuit breaker configuration
+  circuitBreaker?: CircuitBreakerConfig
+  // Feature flags
+  features?: FeatureFlags
 }
 
 export interface AgentRuntimeHandle {
@@ -126,6 +157,23 @@ const ObservabilityHooksSchema = z.object({
   onError: z.function().args(z.instanceof(Error), ErrorContextSchema).returns(z.void()).optional()
 }).optional()
 
+const ResourceLimitsSchema = z.object({
+  maxConcurrentRequests: z.number().int().min(1).optional(),
+  maxQueueSize: z.number().int().min(0).optional(),
+  requestTimeoutMs: z.number().int().min(1).optional(),
+  maxPayloadSize: z.number().int().min(1).optional()
+}).optional()
+
+const CircuitBreakerConfigSchema = z.object({
+  failureThreshold: z.number().int().min(1).optional(),
+  timeout: z.number().int().min(1).optional(),
+  name: z.string().optional()
+}).optional()
+
+const FeatureFlagsSchema = z.object({
+  enableCircuitBreaker: z.boolean().optional()
+}).optional()
+
 export const ConnectAgentOptionsSchema = z.object({
   agent: z.union([z.string(), AgentSchema]),
   transport: z.union([z.string(), TransportSchema]),
@@ -141,7 +189,13 @@ export const ConnectAgentOptionsSchema = z.object({
   onError: z.function().args(z.instanceof(Error)).returns(z.void()).optional(),
   onCleanup: z.function().args(z.string()).returns(z.void()).optional(),
   // Observability hooks
-  observability: ObservabilityHooksSchema
+  observability: ObservabilityHooksSchema,
+  // Resource limits
+  resourceLimits: ResourceLimitsSchema,
+  // Circuit breaker configuration
+  circuitBreaker: CircuitBreakerConfigSchema,
+  // Feature flags
+  features: FeatureFlagsSchema
 })
 
 export const AgentMetadataSchema = z.object({

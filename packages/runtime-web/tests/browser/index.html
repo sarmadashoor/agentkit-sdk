@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentKit Browser Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .logs {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AgentKit Browser Transport Tests</h1>
+        <p>Testing AgentKit runtime-web in browser environments</p>
+        
+        <!-- Browser Environment Info -->
+        <div class="test-section">
+            <h3>Browser Environment</h3>
+            <div id="browser-info"></div>
+        </div>
+
+        <!-- Polyfill Status -->
+        <div class="test-section">
+            <h3>Browser API Availability</h3>
+            <div id="polyfill-status"></div>
+        </div>
+
+        <!-- Transport Tests -->
+        <div class="test-section">
+            <h3>Transport Lifecycle Tests</h3>
+            <button onclick="testTransportLifecycle()">Test Transport Lifecycle</button>
+            <div id="lifecycle-results"></div>
+        </div>
+
+        <!-- Error Recovery Tests -->
+        <div class="test-section">
+            <h3>Error Recovery Tests</h3>
+            <button onclick="testErrorRecovery()">Test Error Recovery</button>
+            <div id="error-results"></div>
+        </div>
+
+        <!-- Timeout Tests -->
+        <div class="test-section">
+            <h3>Timeout Behavior Tests</h3>
+            <button onclick="testTimeoutBehavior()">Test Timeouts</button>
+            <div id="timeout-results"></div>
+        </div>
+
+        <!-- Large Payload Tests -->
+        <div class="test-section">
+            <h3>Large Payload Serialization</h3>
+            <button onclick="testLargePayloads()">Test Large Payloads</button>
+            <div id="payload-results"></div>
+        </div>
+
+        <!-- Hook Invocation Tests -->
+        <div class="test-section">
+            <h3>Hook Invocation Tests</h3>
+            <button onclick="testHookInvocation()">Test Hooks</button>
+            <div id="hook-results"></div>
+        </div>
+
+        <!-- Test Logs -->
+        <div class="test-section">
+            <h3>Test Logs</h3>
+            <button onclick="clearLogs()">Clear Logs</button>
+            <div class="logs" id="test-logs"></div>
+        </div>
+    </div>
+
+    <!-- Browser-safe polyfills -->
+    <script>
+        // Polyfill for older browsers that don't have AbortController
+        if (typeof AbortController === 'undefined') {
+            window.AbortController = class AbortController {
+                constructor() {
+                    this.signal = {
+                        aborted: false,
+                        addEventListener: () => {},
+                        removeEventListener: () => {}
+                    }
+                }
+                abort() {
+                    this.signal.aborted = true
+                }
+            }
+            log('Polyfill: Added AbortController')
+        }
+
+        // Polyfill for fetch if not available (very old browsers)
+        if (typeof fetch === 'undefined') {
+            window.fetch = function(url, options = {}) {
+                return new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest()
+                    xhr.open(options.method || 'GET', url)
+                    
+                    // Set headers
+                    if (options.headers) {
+                        Object.entries(options.headers).forEach(([key, value]) => {
+                            xhr.setRequestHeader(key, value)
+                        })
+                    }
+                    
+                    xhr.onload = () => {
+                        resolve({
+                            ok: xhr.status >= 200 && xhr.status < 300,
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            json: () => Promise.resolve(JSON.parse(xhr.responseText)),
+                            text: () => Promise.resolve(xhr.responseText)
+                        })
+                    }
+                    
+                    xhr.onerror = () => reject(new Error('Network error'))
+                    xhr.ontimeout = () => reject(new Error('Timeout'))
+                    
+                    if (options.signal) {
+                        options.signal.addEventListener('abort', () => {
+                            xhr.abort()
+                            reject(new Error('Request aborted'))
+                        })
+                    }
+                    
+                    xhr.send(options.body)
+                })
+            }
+            log('Polyfill: Added fetch using XMLHttpRequest')
+        }
+
+        // Promise polyfill for very old browsers
+        if (typeof Promise === 'undefined') {
+            log('ERROR: Promise not available - browser too old for testing')
+        }
+
+        // JSON polyfill check
+        if (typeof JSON === 'undefined') {
+            log('ERROR: JSON not available - browser too old for testing')
+        }
+
+        // Logging utility
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString()
+            const logElement = document.getElementById('test-logs')
+            const logLine = document.createElement('div')
+            logLine.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black'
+            logLine.textContent = `[${timestamp}] ${message}`
+            logElement.appendChild(logLine)
+            logElement.scrollTop = logElement.scrollHeight
+            console.log(message)
+        }
+
+        function clearLogs() {
+            document.getElementById('test-logs').innerHTML = ''
+        }
+
+        function addResult(containerId, message, success = true) {
+            const container = document.getElementById(containerId)
+            const result = document.createElement('div')
+            result.className = `test-result ${success ? 'success' : 'error'}`
+            result.textContent = message
+            container.appendChild(result)
+            log(message, success ? 'success' : 'error')
+        }
+
+        // Initialize page
+        window.addEventListener('load', () => {
+            initializePage()
+        })
+
+        function initializePage() {
+            // Show browser info
+            const browserInfo = document.getElementById('browser-info')
+            browserInfo.innerHTML = `
+                <p><strong>User Agent:</strong> ${navigator.userAgent}</p>
+                <p><strong>Platform:</strong> ${navigator.platform}</p>
+                <p><strong>Language:</strong> ${navigator.language}</p>
+                <p><strong>Online:</strong> ${navigator.onLine}</p>
+                <p><strong>Cookie Enabled:</strong> ${navigator.cookieEnabled}</p>
+            `
+
+            // Check API availability
+            const polyfillStatus = document.getElementById('polyfill-status')
+            const apis = [
+                { name: 'fetch', available: typeof fetch !== 'undefined' },
+                { name: 'AbortController', available: typeof AbortController !== 'undefined' },
+                { name: 'Promise', available: typeof Promise !== 'undefined' },
+                { name: 'JSON', available: typeof JSON !== 'undefined' },
+                { name: 'XMLHttpRequest', available: typeof XMLHttpRequest !== 'undefined' },
+                { name: 'setTimeout', available: typeof setTimeout !== 'undefined' },
+                { name: 'console', available: typeof console !== 'undefined' }
+            ]
+
+            apis.forEach(api => {
+                const status = document.createElement('div')
+                status.style.padding = '5px'
+                status.style.marginBottom = '5px'
+                status.style.borderRadius = '3px'
+                status.style.backgroundColor = api.available ? '#d4edda' : '#f8d7da'
+                status.style.color = api.available ? '#155724' : '#721c24'
+                status.textContent = `${api.name}: ${api.available ? 'Available' : 'Not Available'}`
+                polyfillStatus.appendChild(status)
+            })
+
+            log('Page initialized - ready for testing')
+        }
+
+        // Make functions available globally for Playwright
+        window.testFunctions = {
+            log,
+            addResult,
+            clearLogs
+        }
+    </script>
+
+    <!-- Load AgentKit bundle -->
+    <script src="/agentkit.js"></script>
+</body>
+</html>
