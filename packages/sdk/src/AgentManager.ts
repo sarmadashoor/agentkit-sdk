@@ -23,6 +23,8 @@ export class AgentManager {
   private isShutdown = false
   private registeredScopes: string[]
   private agentId: string // Authoritative agent ID
+  private sendQueue: Promise<void> = Promise.resolve() // Concurrency protection
+  private cleanupCalled = false // Prevent multiple cleanup calls
 
   constructor(
     agent: Agent, 
@@ -158,10 +160,29 @@ export class AgentManager {
       })
     }
 
+    // Queue this send operation to prevent race conditions, but isolate errors
+    this.sendQueue = this.sendQueue
+      .catch(() => {}) // Prevent error propagation from previous operations
+      .then(async () => {
+        // Check again after waiting in queue
+        if (this.isShutdown) {
+          throw new AgentHandleError('AgentManager has been shutdown', {
+            context: { agentId: this.agentId, transportId: this.transport.id }
+          })
+        }
+
+        await this.processSendOperation(input)
+      })
+
+    return this.sendQueue
+  }
+
+  private async processSendOperation(input: unknown): Promise<void> {
     debugLog.operation('send start', { 
       agentId: this.agentId,
       transportId: this.transport.id,
-      inputType: typeof input
+      inputType: typeof input,
+      concurrencyProtected: true
     }, this.options.debug)
 
     let output: unknown
@@ -244,7 +265,8 @@ export class AgentManager {
 
     debugLog.operation('send complete', { 
       agentId: this.agentId,
-      transportId: this.transport.id 
+      transportId: this.transport.id,
+      concurrencyProtected: true
     }, this.options.debug)
   }
 
@@ -281,6 +303,15 @@ export class AgentManager {
         }
       )
       this.callOnError(shutdownError)
+      
+      // Mark as shutdown and call cleanup even if agent shutdown failed
+      this.isShutdown = true
+      this.isInitialized = false
+      
+      // Call onShutdown and onCleanup hooks even on failure
+      this.callOnShutdown()
+      this.callOnCleanup()
+      
       throw shutdownError
     }
     
@@ -292,6 +323,9 @@ export class AgentManager {
     
     // Call onShutdown lifecycle hook
     this.callOnShutdown()
+    
+    // Call onCleanup lifecycle hook after successful shutdown
+    this.callOnCleanup()
   }
 
   createRuntimeHandle(): AgentRuntimeHandle {
@@ -362,6 +396,25 @@ export class AgentManager {
         // Don't throw - hooks should not break the main flow
         if (this.options.debug) {
           console.warn(`[AgentKit] onError hook failed: ${getErrorMessage(error)}`)
+        }
+      }
+    }
+  }
+
+  private callOnCleanup(): void {
+    if (this.options.onCleanup && !this.cleanupCalled) {
+      this.cleanupCalled = true // Prevent multiple cleanup calls
+      try {
+        debugLog.lifecycle('calling onCleanup hook', 'AgentManager', { agentId: this.agentId }, this.options.debug)
+        this.options.onCleanup(this.agentId)
+        if (this.options.debug) {
+          console.log(`[AgentKit:DEBUG] Cleanup hook fired for agent: ${this.agentId}`)
+        }
+      } catch (error) {
+        debugLog.error('onCleanup hook', error as Error, this.options.debug)
+        // Don't throw - hooks should not break the main flow
+        if (this.options.debug) {
+          console.warn(`[AgentKit] onCleanup hook failed: ${getErrorMessage(error)}`)
         }
       }
     }

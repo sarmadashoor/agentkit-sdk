@@ -31,6 +31,7 @@ export interface ConnectAgentOptions {
   onInit?: (agentId: string) => void
   onShutdown?: (agentId: string) => void
   onError?: (err: Error) => void
+  onCleanup?: (agentId: string) => void
 }
 
 export interface AgentRuntimeHandle {
@@ -83,7 +84,8 @@ export const ConnectAgentOptionsSchema = z.object({
   // Lifecycle event hooks
   onInit: z.function().args(z.string()).returns(z.void()).optional(),
   onShutdown: z.function().args(z.string()).returns(z.void()).optional(),
-  onError: z.function().args(z.instanceof(Error)).returns(z.void()).optional()
+  onError: z.function().args(z.instanceof(Error)).returns(z.void()).optional(),
+  onCleanup: z.function().args(z.string()).returns(z.void()).optional()
 })
 
 export const AgentMetadataSchema = z.object({
