@@ -6,9 +6,11 @@ import { ValidationError, RegistryError, CompatibilityError } from '../errors'
 import { z } from 'zod'
 
 describe('connectAgent', () => {
+  let registry: AgentRegistry
+
   beforeEach(() => {
-    // Clear registry before each test
-    AgentRegistry.clear()
+    // Create fresh registry before each test
+    registry = new AgentRegistry()
   })
 
   afterEach(() => {
@@ -111,7 +113,7 @@ describe('connectAgent', () => {
   describe('with string agent and transport IDs', () => {
     it('should resolve agent from registry', async () => {
       // Register test agent
-      AgentRegistry.register({
+      registry.register({
         id: 'test-agent',
         name: 'Test Agent',
         version: '1.0.0',
@@ -120,11 +122,12 @@ describe('connectAgent', () => {
 
       // Register dummy transport
       const dummyTransport = createDummyTransport()
-      AgentRegistry.registerTransport(dummyTransport)
+      registry.registerTransport(dummyTransport)
 
       const handle = await connectAgent({
         agent: 'test-agent',
-        transport: 'dummy'
+        transport: 'dummy',
+        registry: registry
       })
 
       expect(handle).toBeDefined()
@@ -137,7 +140,8 @@ describe('connectAgent', () => {
       await expect(
         connectAgent({
           agent: 'non-existent-agent',
-          transport
+          transport,
+          registry: registry
         })
       ).rejects.toThrow(RegistryError)
     })
@@ -148,7 +152,8 @@ describe('connectAgent', () => {
       await expect(
         connectAgent({
           agent,
-          transport: 'non-existent-transport'
+          transport: 'non-existent-transport',
+          registry: registry
         })
       ).rejects.toThrow(RegistryError)
     })

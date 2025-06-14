@@ -3,8 +3,10 @@ import { AgentRegistry } from '../index'
 import { DummyAgent } from '@agentkit/test-agent'
 
 describe('AgentRegistry supportedScopes preservation', () => {
+  let registry: AgentRegistry
+
   beforeEach(() => {
-    AgentRegistry.clear()
+    registry = new AgentRegistry()
   })
 
   it('should preserve supportedScopes field during registration and lookup', () => {
@@ -17,10 +19,10 @@ describe('AgentRegistry supportedScopes preservation', () => {
       factory: () => new DummyAgent()
     }
 
-    AgentRegistry.register(metadata)
+    registry.register(metadata)
 
     // Retrieve and verify supportedScopes is preserved
-    const retrieved = AgentRegistry.lookup('scoped-agent')
+    const retrieved = registry.lookup('scoped-agent')
     
     expect(retrieved).toBeDefined()
     expect(retrieved.id).toBe('scoped-agent')
@@ -38,9 +40,9 @@ describe('AgentRegistry supportedScopes preservation', () => {
       factory: () => new DummyAgent()
     }
 
-    AgentRegistry.register(metadata)
+    registry.register(metadata)
 
-    const retrieved = AgentRegistry.lookup('no-scopes-agent')
+    const retrieved = registry.lookup('no-scopes-agent')
     
     expect(retrieved).toBeDefined()
     expect(retrieved.id).toBe('no-scopes-agent')
@@ -57,9 +59,9 @@ describe('AgentRegistry supportedScopes preservation', () => {
       factory: () => new DummyAgent()
     }
 
-    AgentRegistry.register(metadata)
+    registry.register(metadata)
 
-    const retrieved = AgentRegistry.lookup('empty-scopes-agent')
+    const retrieved = registry.lookup('empty-scopes-agent')
     
     expect(retrieved).toBeDefined()
     expect(retrieved.id).toBe('empty-scopes-agent')
@@ -70,7 +72,7 @@ describe('AgentRegistry supportedScopes preservation', () => {
 
   it('should handle multiple agents with different supportedScopes', () => {
     // Register multiple agents with different scopes
-    AgentRegistry.register({
+    registry.register({
       id: 'reader-agent',
       name: 'Read Only Agent',
       version: '1.0.0',
@@ -78,7 +80,7 @@ describe('AgentRegistry supportedScopes preservation', () => {
       factory: () => new DummyAgent()
     })
 
-    AgentRegistry.register({
+    registry.register({
       id: 'writer-agent',
       name: 'Write Only Agent',
       version: '1.0.0',
@@ -86,7 +88,7 @@ describe('AgentRegistry supportedScopes preservation', () => {
       factory: () => new DummyAgent()
     })
 
-    AgentRegistry.register({
+    registry.register({
       id: 'admin-agent',
       name: 'Admin Agent',
       version: '1.0.0',
@@ -95,9 +97,9 @@ describe('AgentRegistry supportedScopes preservation', () => {
     })
 
     // Verify each agent has correct scopes
-    const reader = AgentRegistry.lookup('reader-agent')
-    const writer = AgentRegistry.lookup('writer-agent')
-    const admin = AgentRegistry.lookup('admin-agent')
+    const reader = registry.lookup('reader-agent')
+    const writer = registry.lookup('writer-agent')
+    const admin = registry.lookup('admin-agent')
 
     expect(reader.supportedScopes).toEqual(['read'])
     expect(writer.supportedScopes).toEqual(['write'])

@@ -2,22 +2,34 @@ import { AgentMetadata, AgentMetadataSchema, Transport, TransportSchema } from '
 import { z } from 'zod'
 
 export class AgentRegistry {
-  private static agents = new Map<string, AgentMetadata>()
-  private static transports = new Map<string, Transport>()
+  private agents = new Map<string, AgentMetadata>()
+  private transports = new Map<string, Transport>()
 
-  static register(metadata: AgentMetadata): void {
+  register(metadata: AgentMetadata): void {
     // Validate structure but store original to preserve all fields
     AgentMetadataSchema.parse(metadata)
+    
+    // Check for duplicate IDs
+    if (this.agents.has(metadata.id)) {
+      throw new Error(`Agent with id "${metadata.id}" is already registered in this registry`)
+    }
+    
     this.agents.set(metadata.id, metadata)
   }
 
-  static registerTransport(transport: Transport): void {
+  registerTransport(transport: Transport): void {
     // Validate structure but store original to preserve context
     TransportSchema.parse(transport)
+    
+    // Check for duplicate IDs
+    if (this.transports.has(transport.id)) {
+      throw new Error(`Transport with id "${transport.id}" is already registered in this registry`)
+    }
+    
     this.transports.set(transport.id, transport)
   }
 
-  static lookup(agentId: string): AgentMetadata {
+  lookup(agentId: string): AgentMetadata {
     const metadata = this.agents.get(agentId)
     if (!metadata) {
       throw new Error(`Agent with id "${agentId}" not found in registry`)
@@ -25,7 +37,7 @@ export class AgentRegistry {
     return metadata
   }
 
-  static lookupTransport(transportId: string): Transport {
+  lookupTransport(transportId: string): Transport {
     const transport = this.transports.get(transportId)
     if (!transport) {
       throw new Error(`Transport with id "${transportId}" not found in registry`)
@@ -33,30 +45,68 @@ export class AgentRegistry {
     return transport
   }
 
-  static clear(): void {
+  // New methods for better API design
+  getAgent(agentId: string): AgentMetadata | undefined {
+    return this.agents.get(agentId)
+  }
+
+  getTransport(transportId: string): Transport | undefined {
+    return this.transports.get(transportId)
+  }
+
+  // Cleanup and disposal methods
+  clear(): void {
     this.agents.clear()
     this.transports.clear()
   }
 
-  static listAgents(): string[] {
+  removeAgent(agentId: string): boolean {
+    return this.agents.delete(agentId)
+  }
+
+  removeTransport(transportId: string): boolean {
+    return this.transports.delete(transportId)
+  }
+
+  // Introspection methods
+  listAgents(): string[] {
     return Array.from(this.agents.keys())
   }
 
-  static listTransports(): string[] {
+  listTransports(): string[] {
     return Array.from(this.transports.keys())
+  }
+
+  hasAgent(agentId: string): boolean {
+    return this.agents.has(agentId)
+  }
+
+  hasTransport(transportId: string): boolean {
+    return this.transports.has(transportId)
+  }
+
+  // Get count information
+  get agentCount(): number {
+    return this.agents.size
+  }
+
+  get transportCount(): number {
+    return this.transports.size
   }
 }
 
-// Static registrations for built-in test agents and transports
-// This ensures they're always available for testing
-export function initializeDefaultRegistry(): void {
+// Create a default registry instance for backwards compatibility
+export const defaultRegistry = new AgentRegistry()
+
+// Function to initialize the default registry with built-in agents and transports
+export function initializeDefaultRegistry(registry: AgentRegistry = defaultRegistry): void {
   try {
     // Import here to avoid circular dependencies
     const { DummyAgent } = require('@agentkit/test-agent')
     const { DummyTransport } = require('@agentkit/transports-dummy')
 
     // Register dummy agent
-    AgentRegistry.register({
+    registry.register({
       id: 'dummy-agent',
       name: 'Dummy Agent',
       version: '1.0.0',
@@ -65,7 +115,7 @@ export function initializeDefaultRegistry(): void {
     })
 
     // Register dummy transport
-    AgentRegistry.registerTransport(new DummyTransport({
+    registry.registerTransport(new DummyTransport({
       debug: false,
       logMessages: false
     }))
@@ -81,6 +131,38 @@ export function initializeDefaultRegistry(): void {
 // Auto-initialize in test environments
 if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
   initializeDefaultRegistry()
+}
+
+// Backwards compatibility static methods - delegate to default registry
+// These can be removed in a future major version
+export class LegacyAgentRegistry {
+  static register(metadata: AgentMetadata): void {
+    defaultRegistry.register(metadata)
+  }
+
+  static registerTransport(transport: Transport): void {
+    defaultRegistry.registerTransport(transport)
+  }
+
+  static lookup(agentId: string): AgentMetadata {
+    return defaultRegistry.lookup(agentId)
+  }
+
+  static lookupTransport(transportId: string): Transport {
+    return defaultRegistry.lookupTransport(transportId)
+  }
+
+  static clear(): void {
+    defaultRegistry.clear()
+  }
+
+  static listAgents(): string[] {
+    return defaultRegistry.listAgents()
+  }
+
+  static listTransports(): string[] {
+    return defaultRegistry.listTransports()
+  }
 }
 
 // Export for convenience

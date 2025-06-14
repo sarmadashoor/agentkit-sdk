@@ -5,7 +5,7 @@ import {
   Agent,
   Transport
 } from '@agentkit/types'
-import { AgentRegistry } from '@agentkit/registry'
+import { AgentRegistry, defaultRegistry } from '@agentkit/registry'
 import { AgentManager } from './AgentManager'
 import { 
   RegistryError, 
@@ -21,8 +21,12 @@ export async function connectAgent(options: ConnectAgentOptions): Promise<AgentR
   debugLog.operation('connectAgent start', { 
     agentType: typeof options.agent, 
     transportType: typeof options.transport,
-    hasScope: !!options.scope
+    hasScope: !!options.scope,
+    hasRegistry: !!options.registry
   }, options.debug)
+
+  // Use provided registry or fall back to default registry for backwards compatibility
+  const registry = options.registry || defaultRegistry
 
   // Validate options with enhanced error messages
   try {
@@ -53,7 +57,7 @@ export async function connectAgent(options: ConnectAgentOptions): Promise<AgentR
   if (typeof options.agent === 'string') {
     try {
       debugLog.operation('agent lookup', { agentId: options.agent }, options.debug)
-      const metadata = AgentRegistry.lookup(options.agent)
+      const metadata = registry.lookup(options.agent)
       debugLog.agentResolution(options.agent, metadata, options.debug || false)
       agent = metadata.factory()
       // Use metadata ID as the authoritative agent ID, not the factory-created agent's ID
@@ -68,7 +72,7 @@ export async function connectAgent(options: ConnectAgentOptions): Promise<AgentR
       }, options.debug)
     } catch (error) {
       debugLog.error('agent lookup', error as Error, options.debug)
-      const availableAgents = AgentRegistry.listAgents()
+      const availableAgents = registry.listAgents()
       throw new RegistryError(
         `Agent "${options.agent}" not found in registry. Available agents: [${availableAgents.join(', ')}]`,
         { 
@@ -93,11 +97,11 @@ export async function connectAgent(options: ConnectAgentOptions): Promise<AgentR
   if (typeof options.transport === 'string') {
     try {
       debugLog.operation('transport lookup', { transportId: options.transport }, options.debug)
-      transport = AgentRegistry.lookupTransport(options.transport)
+      transport = registry.lookupTransport(options.transport)
       debugLog.transportResolution(options.transport, transport, options.debug || false)
     } catch (error) {
       debugLog.error('transport lookup', error as Error, options.debug)
-      const availableTransports = AgentRegistry.listTransports()
+      const availableTransports = registry.listTransports()
       throw new RegistryError(
         `Transport "${options.transport}" not found in registry. Available transports: [${availableTransports.join(', ')}]`,
         { 
@@ -239,5 +243,22 @@ export {
   AgentMetadata
 } from '@agentkit/types'
 
-export { AgentRegistry, initializeDefaultRegistry } from '@agentkit/registry'
+export { 
+  AgentRegistry, 
+  defaultRegistry, 
+  initializeDefaultRegistry,
+  LegacyAgentRegistry 
+} from '@agentkit/registry'
+
+// Backwards compatibility - export static methods that delegate to default registry
+// These can be removed in a future major version
+export const AgentRegistryLegacy = {
+  register: (metadata: any) => defaultRegistry.register(metadata),
+  registerTransport: (transport: any) => defaultRegistry.registerTransport(transport),
+  lookup: (agentId: string) => defaultRegistry.lookup(agentId),
+  lookupTransport: (transportId: string) => defaultRegistry.lookupTransport(transportId),
+  clear: () => defaultRegistry.clear(),
+  listAgents: () => defaultRegistry.listAgents(),
+  listTransports: () => defaultRegistry.listTransports()
+}
 export { AgentManager } from './AgentManager'

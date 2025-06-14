@@ -25,6 +25,8 @@ export interface ConnectAgentOptions {
   techStack?: string
   onOutput?: (message: unknown) => void
   debug?: boolean
+  // Registry instance for agent/transport lookup
+  registry?: any // Will be typed as AgentRegistry in the SDK package to avoid circular dependency
   // Lifecycle event hooks
   onInit?: (agentId: string) => void
   onShutdown?: (agentId: string) => void
@@ -52,17 +54,17 @@ export interface AgentMetadata {
 }
 
 export const AgentSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  version: z.string(),
+  id: z.string().min(1, 'Agent ID cannot be empty'),
+  name: z.string().min(1, 'Agent name cannot be empty'),
+  version: z.string().min(1, 'Agent version cannot be empty'),
   init: z.function().args(z.unknown().optional()).returns(z.promise(z.void())),
   handle: z.function().args(z.unknown()).returns(z.promise(z.unknown())),
   shutdown: z.function().returns(z.promise(z.void()))
 })
 
 export const TransportSchema = z.object({
-  id: z.string(),
-  name: z.string(),
+  id: z.string().min(1, 'Transport ID cannot be empty'),
+  name: z.string().min(1, 'Transport name cannot be empty'),
   init: z.function().args(z.unknown().optional()).returns(z.promise(z.void())),
   send: z.function().args(z.unknown()).returns(z.promise(z.void())),
   receive: z.function().returns(z.promise(z.unknown())),
@@ -76,6 +78,8 @@ export const ConnectAgentOptionsSchema = z.object({
   techStack: z.string().optional(),
   onOutput: z.function().args(z.unknown()).returns(z.void()).optional(),
   debug: z.boolean().optional(),
+  // Registry instance for agent/transport lookup
+  registry: z.any().optional(), // Will be validated in the SDK package
   // Lifecycle event hooks
   onInit: z.function().args(z.string()).returns(z.void()).optional(),
   onShutdown: z.function().args(z.string()).returns(z.void()).optional(),
@@ -83,9 +87,9 @@ export const ConnectAgentOptionsSchema = z.object({
 })
 
 export const AgentMetadataSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  version: z.string(),
+  id: z.string().min(1, 'Agent ID cannot be empty'),
+  name: z.string().min(1, 'Agent name cannot be empty'),
+  version: z.string().min(1, 'Agent version cannot be empty'),
   description: z.string().optional(),
   supportedScopes: z.array(z.string()).optional(),
   factory: z.function().returns(AgentSchema)

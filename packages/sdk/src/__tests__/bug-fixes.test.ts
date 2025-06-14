@@ -5,11 +5,13 @@ import { DummyAgent } from '@agentkit/test-agent'
 import { DummyTransport } from '@agentkit/transports-dummy'
 
 describe('Bug fixes for Phase 6', () => {
+  let registry: AgentRegistry
+
   beforeEach(() => {
-    AgentRegistry.clear()
+    registry = new AgentRegistry()
     
     // Register test transports
-    AgentRegistry.registerTransport(new DummyTransport({
+    registry.registerTransport(new DummyTransport({
       debug: false,
       logMessages: false
     }))
@@ -26,10 +28,11 @@ describe('Bug fixes for Phase 6', () => {
         factory: () => new DummyAgent()
       }
 
-      AgentRegistry.register(metadata)
+      registry.register(metadata)
 
       // Connect to the agent
       const handle = await connectAgent({
+        registry: registry,
         agent: 'scoped-agent',
         transport: 'dummy',
         scope: ['read', 'write'],
@@ -53,9 +56,10 @@ describe('Bug fixes for Phase 6', () => {
         factory: () => new DummyAgent()
       }
 
-      AgentRegistry.register(metadata)
+      registry.register(metadata)
 
       const handle = await connectAgent({
+        registry: registry,
         agent: 'empty-scopes-agent',
         transport: 'dummy',
         scope: ['read'],
@@ -76,9 +80,10 @@ describe('Bug fixes for Phase 6', () => {
         factory: () => new DummyAgent()
       }
 
-      AgentRegistry.register(metadata)
+      registry.register(metadata)
 
       const handle = await connectAgent({
+        registry: registry,
         agent: 'no-scopes-agent',
         transport: 'dummy',
         scope: ['read'],
@@ -108,9 +113,10 @@ describe('Bug fixes for Phase 6', () => {
         }
       }
 
-      AgentRegistry.register(metadata)
+      registry.register(metadata)
 
       const handle = await connectAgent({
+        registry: registry,
         agent: 'registry-agent-id',
         transport: 'dummy',
         scope: ['read'],
@@ -139,9 +145,10 @@ describe('Bug fixes for Phase 6', () => {
         }
       }
 
-      AgentRegistry.register(metadata)
+      registry.register(metadata)
 
       const handle = await connectAgent({
+        registry: registry,
         agent: 'hook-test-agent',
         transport: 'dummy',
         debug: true,
@@ -173,6 +180,7 @@ describe('Bug fixes for Phase 6', () => {
       })
 
       const handle = await connectAgent({
+        registry: registry,
         agent: directAgent,
         transport: transport,
         debug: true
@@ -203,9 +211,10 @@ describe('Bug fixes for Phase 6', () => {
         }
       }
 
-      AgentRegistry.register(metadata)
+      registry.register(metadata)
 
       const handle = await connectAgent({
+        registry: registry,
         agent: 'complex-test-agent',
         transport: 'dummy',
         scope: ['read', 'invalid-scope'], // Intentional scope mismatch for logging
@@ -235,10 +244,11 @@ describe('Bug fixes for Phase 6', () => {
         factory: () => new DummyAgent()
       }
 
-      AgentRegistry.register(metadata)
+      registry.register(metadata)
 
       // This should succeed even with scope mismatch
       const handle = await connectAgent({
+        registry: registry,
         agent: 'mismatch-agent',
         transport: 'dummy',
         scope: ['read', 'write', 'admin'], // Requesting more than supported
