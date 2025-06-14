@@ -3,7 +3,7 @@
  */
 
 import { ZodSchema, ZodError } from 'zod'
-import { ValidationError } from './errors'
+import { SchemaValidationError, InvalidInputError } from './errors'
 import { debugLog } from './log'
 
 /**
@@ -23,17 +23,12 @@ export function validateSchema<T>(
     const errorDetails = formatZodError(result.error)
     debugLog.validation(`${label} schema`, false, errorDetails, debug)
     
-    throw new ValidationError(
-      `Invalid ${label} configuration: ${errorDetails}`,
-      { 
-        cause: result.error,
-        context: { 
-          label,
-          input: typeof input === 'object' ? JSON.stringify(input, null, 2) : input,
-          errors: result.error.errors
-        }
+    throw SchemaValidationError.fromZodError(result.error, {
+      context: { 
+        label,
+        input: typeof input === 'object' ? JSON.stringify(input, null, 2) : input
       }
-    )
+    })
   }
 
   debugLog.validation(`${label} schema`, true, 'Validation successful', debug)
@@ -63,8 +58,9 @@ export function validateAgentConfig(input: unknown, debug: boolean = false): unk
   // For now, we don't have a specific agent config schema
   // but we can validate that it's an object if provided
   if (input !== undefined && input !== null && typeof input !== 'object') {
-    throw new ValidationError(
-      'Agent configuration must be an object',
+    throw new InvalidInputError(
+      'agentConfig',
+      'must be an object',
       { context: { input, type: typeof input } }
     )
   }
@@ -80,8 +76,9 @@ export function validateTransportConfig(input: unknown, debug: boolean = false):
   // For now, we don't have a specific transport config schema
   // but we can validate that it's an object if provided
   if (input !== undefined && input !== null && typeof input !== 'object') {
-    throw new ValidationError(
-      'Transport configuration must be an object',
+    throw new InvalidInputError(
+      'transportConfig',
+      'must be an object', 
       { context: { input, type: typeof input } }
     )
   }
@@ -99,16 +96,18 @@ export function validateScope(scope: unknown, debug: boolean = false): string[] 
   }
 
   if (!Array.isArray(scope)) {
-    throw new ValidationError(
-      'Scope must be an array of strings',
+    throw new InvalidInputError(
+      'scope',
+      'must be an array of strings',
       { context: { scope, type: typeof scope } }
     )
   }
 
   for (let i = 0; i < scope.length; i++) {
     if (typeof scope[i] !== 'string') {
-      throw new ValidationError(
-        `Scope item at index ${i} must be a string`,
+      throw new InvalidInputError(
+        `scope[${i}]`,
+        'must be a string',
         { context: { scope, invalidItem: scope[i], index: i } }
       )
     }

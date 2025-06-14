@@ -8,10 +8,10 @@ import {
 import { AgentRegistry, defaultRegistry } from '@agentkit/registry'
 import { AgentManager } from './AgentManager'
 import { 
-  RegistryError, 
-  CompatibilityError,
-  ValidationError,
-  ScopeError,
+  AgentNotFoundError,
+  TransportNotFoundError, 
+  AgentCompatibilityError,
+  InvalidInputError,
   getErrorMessage
 } from './errors'
 import { debugLog } from './log'
@@ -42,7 +42,8 @@ export async function connectAgent(options: ConnectAgentOptions): Promise<AgentR
       validateScope(options.scope, options.debug)
     } catch (error) {
       debugLog.error('scope validation', error as Error, options.debug)
-      throw new ScopeError(
+      throw new InvalidInputError(
+        'scope',
         `Invalid scope configuration: ${getErrorMessage(error)}`,
         { cause: error instanceof Error ? error : new Error(String(error)) }
       )
@@ -73,17 +74,14 @@ export async function connectAgent(options: ConnectAgentOptions): Promise<AgentR
     } catch (error) {
       debugLog.error('agent lookup', error as Error, options.debug)
       const availableAgents = registry.listAgents()
-      throw new RegistryError(
-        `Agent "${options.agent}" not found in registry. Available agents: [${availableAgents.join(', ')}]`,
-        { 
-          cause: error instanceof Error ? error : new Error(String(error)),
-          context: { 
-            requestedAgent: options.agent, 
-            availableAgents,
-            totalAgents: availableAgents.length
-          }
+      throw new AgentNotFoundError(options.agent, {
+        cause: error instanceof Error ? error : new Error(String(error)),
+        context: { 
+          requestedAgent: options.agent, 
+          availableAgents,
+          totalAgents: availableAgents.length
         }
-      )
+      })
     }
   } else {
     debugLog.operation('agent direct', { agentId: options.agent.id }, options.debug)
@@ -102,17 +100,14 @@ export async function connectAgent(options: ConnectAgentOptions): Promise<AgentR
     } catch (error) {
       debugLog.error('transport lookup', error as Error, options.debug)
       const availableTransports = registry.listTransports()
-      throw new RegistryError(
-        `Transport "${options.transport}" not found in registry. Available transports: [${availableTransports.join(', ')}]`,
-        { 
-          cause: error instanceof Error ? error : new Error(String(error)),
-          context: { 
-            requestedTransport: options.transport, 
-            availableTransports,
-            totalTransports: availableTransports.length
-          }
+      throw new TransportNotFoundError(options.transport, {
+        cause: error instanceof Error ? error : new Error(String(error)),
+        context: { 
+          requestedTransport: options.transport, 
+          availableTransports,
+          totalTransports: availableTransports.length
         }
-      )
+      })
     }
   } else {
     debugLog.operation('transport direct', { transportId: options.transport.id }, options.debug)
@@ -172,14 +167,18 @@ export async function connectAgent(options: ConnectAgentOptions): Promise<AgentR
 function validateCompatibility(agent: Agent, transport: Transport, options: ConnectAgentOptions): void {
   // Check that both components have required IDs
   if (!agent.id || typeof agent.id !== 'string') {
-    throw new CompatibilityError(
+    throw new AgentCompatibilityError(
+      agent.id || 'unknown',
+      'validation',
       'Agent must have a valid string ID',
       { context: { agent: agent.name || 'unnamed', agentId: agent.id } }
     )
   }
 
   if (!transport.id || typeof transport.id !== 'string') {
-    throw new CompatibilityError(
+    throw new AgentCompatibilityError(
+      'unknown',
+      transport.id || 'unknown',
       'Transport must have a valid string ID',
       { context: { transport: transport.name || 'unnamed', transportId: transport.id } }
     )
@@ -187,21 +186,27 @@ function validateCompatibility(agent: Agent, transport: Transport, options: Conn
 
   // Check that agent has required lifecycle methods
   if (typeof agent.init !== 'function') {
-    throw new CompatibilityError(
+    throw new AgentCompatibilityError(
+      agent.id,
+      'validation',
       `Agent "${agent.id}" is missing required init() method`,
       { context: { agentId: agent.id, agentName: agent.name } }
     )
   }
 
   if (typeof agent.handle !== 'function') {
-    throw new CompatibilityError(
+    throw new AgentCompatibilityError(
+      agent.id,
+      'validation',
       `Agent "${agent.id}" is missing required handle() method`,
       { context: { agentId: agent.id, agentName: agent.name } }
     )
   }
 
   if (typeof agent.shutdown !== 'function') {
-    throw new CompatibilityError(
+    throw new AgentCompatibilityError(
+      agent.id,
+      'validation',
       `Agent "${agent.id}" is missing required shutdown() method`,
       { context: { agentId: agent.id, agentName: agent.name } }
     )
@@ -209,14 +214,18 @@ function validateCompatibility(agent: Agent, transport: Transport, options: Conn
 
   // Check that transport has required methods
   if (typeof transport.init !== 'function') {
-    throw new CompatibilityError(
+    throw new AgentCompatibilityError(
+      'unknown',
+      transport.id,
       `Transport "${transport.id}" is missing required init() method`,
       { context: { transportId: transport.id, transportName: transport.name } }
     )
   }
 
   if (typeof transport.send !== 'function') {
-    throw new CompatibilityError(
+    throw new AgentCompatibilityError(
+      'unknown',
+      transport.id,
       `Transport "${transport.id}" is missing required send() method`,
       { context: { transportId: transport.id, transportName: transport.name } }
     )

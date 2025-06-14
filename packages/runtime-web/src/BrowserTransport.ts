@@ -1,4 +1,15 @@
 import { Transport } from '@agentkit/types'
+import { 
+  InvalidConfigurationError, 
+  TransportInitError,
+  TransportSendError,
+  TransportReceiveError,
+  NetworkError,
+  RequestTimeoutError,
+  HttpError,
+  CorsError,
+  SerializationError
+} from '@agentkit/errors'
 
 export interface BrowserTransportConfig {
   endpoint: string
@@ -19,17 +30,24 @@ export class BrowserTransport implements Transport {
   constructor(config: BrowserTransportConfig) {
     // Validate required config
     if (!config.endpoint) {
-      throw new Error('Endpoint is required')
+      throw new InvalidConfigurationError('Endpoint is required', {
+        context: { configKey: 'endpoint' }
+      })
     }
 
     // Validate endpoint URL format
     try {
       const url = new URL(config.endpoint)
       if (!['http:', 'https:'].includes(url.protocol)) {
-        throw new Error('Invalid protocol')
+        throw new InvalidConfigurationError('Invalid protocol - must be http or https', {
+          context: { endpoint: config.endpoint, protocol: url.protocol }
+        })
       }
     } catch (error) {
-      throw new Error('Invalid endpoint URL')
+      throw new InvalidConfigurationError('Invalid endpoint URL format', {
+        cause: error as Error,
+        context: { endpoint: config.endpoint }
+      })
     }
 
     // Set config with defaults
@@ -49,19 +67,36 @@ export class BrowserTransport implements Transport {
 
   async send(message: unknown): Promise<void> {
     if (this.isShutdown) {
-      throw new Error('Transport has been shutdown')
+      throw new TransportSendError('Transport has been shutdown', {
+        context: { transportId: this.id }
+      })
     }
 
-    await this.makeRequest('POST', message)
-    // send() should not return anything
+    try {
+      await this.makeRequest('POST', message)
+    } catch (error) {
+      throw new TransportSendError('Failed to send message', {
+        cause: error as Error,
+        context: { transportId: this.id, messageType: typeof message }
+      })
+    }
   }
 
   async receive(): Promise<unknown> {
     if (this.isShutdown) {
-      throw new Error('Transport has been shutdown')
+      throw new TransportReceiveError('Transport has been shutdown', {
+        context: { transportId: this.id }
+      })
     }
 
-    return this.makeRequest('GET')
+    try {
+      return this.makeRequest('GET')
+    } catch (error) {
+      throw new TransportReceiveError('Failed to receive message', {
+        cause: error as Error,
+        context: { transportId: this.id }
+      })
+    }
   }
 
   async shutdown(): Promise<void> {
@@ -85,7 +120,9 @@ export class BrowserTransport implements Transport {
   private async makeRequest(method: string, body?: unknown): Promise<unknown> {
     // Check if fetch is available
     if (typeof fetch === 'undefined') {
-      throw new Error('fetch is not available')
+      throw new NetworkError('fetch is not available - browser environment required', {
+        context: { environment: 'non-browser' }
+      })
     }
 
     let lastError: Error | null = null
@@ -111,7 +148,7 @@ export class BrowserTransport implements Transport {
       }
     }
 
-    throw lastError || new Error('Unknown error')
+    throw lastError || new NetworkError('Unknown error occurred during request')
   }
 
   private async executeRequest(method: string, body?: unknown): Promise<unknown> {
@@ -162,7 +199,7 @@ export class BrowserTransport implements Transport {
           ? `HTTP ${response.status}: ${response.statusText} - ${errorText}`
           : `HTTP ${response.status}: ${response.statusText}`
         
-        throw new Error(errorMessage)
+        throw new HttpError(response.status, response.statusText, errorText)
       }
 
       // Parse JSON response for GET requests or non-204 responses
@@ -170,7 +207,10 @@ export class BrowserTransport implements Transport {
         try {
           return await response.json()
         } catch (error) {
-          throw new Error(`Failed to parse response JSON: ${(error as Error).message}`)
+          throw new SerializationError('deserialize', 'JSON', {
+            cause: error as Error,
+            context: { operation: 'deserialize', format: 'json' }
+          })
         }
       }
 
@@ -180,12 +220,17 @@ export class BrowserTransport implements Transport {
       // Handle specific error types
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          throw new Error('Request timeout')
+          throw new RequestTimeoutError(this.config.timeout, {
+            context: { endpoint: this.config.endpoint }
+          })
         }
         
         // Handle network/CORS errors
-        if (error.message.includes('fetch')) {
-          throw new Error(`Network error - this may be a CORS issue: ${error.message}`)
+        if (error.message.includes('fetch') || error.message.includes('CORS')) {
+          throw new CorsError(`Network/CORS error: ${error.message}`, {
+            cause: error,
+            context: { endpoint: this.config.endpoint }
+          })
         }
       }
       
@@ -200,6 +245,9 @@ export class BrowserTransport implements Transport {
 
   private isClientError(error: Error): boolean {
     // Check if error is a 4xx client error (don't retry these)
+    if (error instanceof HttpError) {
+      return error.isClientError()
+    }
     return error.message.includes('HTTP 4')
   }
 

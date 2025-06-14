@@ -1,4 +1,12 @@
 import { AgentMetadata, AgentMetadataSchema, Transport, TransportSchema } from '@agentkit/types'
+import { 
+  DuplicateAgentIdError, 
+  DuplicateTransportIdError, 
+  AgentNotFoundError, 
+  TransportNotFoundError,
+  AgentMetadataValidationError,
+  TransportMetadataValidationError
+} from '@agentkit/errors'
 import { z } from 'zod'
 
 export class AgentRegistry {
@@ -7,11 +15,18 @@ export class AgentRegistry {
 
   register(metadata: AgentMetadata): void {
     // Validate structure but store original to preserve all fields
-    AgentMetadataSchema.parse(metadata)
+    try {
+      AgentMetadataSchema.parse(metadata)
+    } catch (error) {
+      throw new AgentMetadataValidationError(
+        `Invalid agent metadata: ${(error as z.ZodError).issues.map(i => i.message).join(', ')}`,
+        { cause: error as Error, context: { agentId: metadata.id } }
+      )
+    }
     
     // Check for duplicate IDs
     if (this.agents.has(metadata.id)) {
-      throw new Error(`Agent with id "${metadata.id}" is already registered in this registry`)
+      throw new DuplicateAgentIdError(metadata.id)
     }
     
     this.agents.set(metadata.id, metadata)
@@ -19,11 +34,18 @@ export class AgentRegistry {
 
   registerTransport(transport: Transport): void {
     // Validate structure but store original to preserve context
-    TransportSchema.parse(transport)
+    try {
+      TransportSchema.parse(transport)
+    } catch (error) {
+      throw new TransportMetadataValidationError(
+        `Invalid transport metadata: ${(error as z.ZodError).issues.map(i => i.message).join(', ')}`,
+        { cause: error as Error, context: { transportId: transport.id } }
+      )
+    }
     
     // Check for duplicate IDs
     if (this.transports.has(transport.id)) {
-      throw new Error(`Transport with id "${transport.id}" is already registered in this registry`)
+      throw new DuplicateTransportIdError(transport.id)
     }
     
     this.transports.set(transport.id, transport)
@@ -32,7 +54,7 @@ export class AgentRegistry {
   lookup(agentId: string): AgentMetadata {
     const metadata = this.agents.get(agentId)
     if (!metadata) {
-      throw new Error(`Agent with id "${agentId}" not found in registry`)
+      throw new AgentNotFoundError(agentId)
     }
     return metadata
   }
@@ -40,7 +62,7 @@ export class AgentRegistry {
   lookupTransport(transportId: string): Transport {
     const transport = this.transports.get(transportId)
     if (!transport) {
-      throw new Error(`Transport with id "${transportId}" not found in registry`)
+      throw new TransportNotFoundError(transportId)
     }
     return transport
   }

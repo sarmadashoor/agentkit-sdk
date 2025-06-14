@@ -106,19 +106,19 @@ describe('AgentRegistry Edge Cases', () => {
     it('should throw for non-existent agent', () => {
       expect(() => {
         registry.lookup('non-existent-agent')
-      }).toThrow('Agent with id "non-existent-agent" not found in registry')
+      }).toThrow('Agent not found in registry: non-existent-agent')
     })
 
     it('should throw for non-existent transport', () => {
       expect(() => {
         registry.lookupTransport('non-existent-transport')
-      }).toThrow('Transport with id "non-existent-transport" not found in registry')
+      }).toThrow('Transport not found in registry: non-existent-transport')
     })
 
     it('should handle empty string lookups gracefully', () => {
       expect(() => {
         registry.lookup('')
-      }).toThrow('Agent with id "" not found in registry')
+      }).toThrow('Agent not found in registry: ')
     })
 
     it('should handle null/undefined lookups gracefully', () => {

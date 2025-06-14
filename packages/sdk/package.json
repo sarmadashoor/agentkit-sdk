@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "@agentkit/registry": "workspace:*",
-    "@agentkit/types": "workspace:*"
+    "@agentkit/types": "workspace:*",
+    "@agentkit/errors": "workspace:*"
   },
   "devDependencies": {
     "@agentkit/test-agent": "workspace:*",

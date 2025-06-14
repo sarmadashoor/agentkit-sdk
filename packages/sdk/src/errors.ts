@@ -1,119 +1,104 @@
 /**
- * Custom error classes for AgentKit SDK
- * All errors are serializable and provide clear developer-friendly messages
+ * AgentKit SDK Error System
+ * Re-exports from the unified @agentkit/errors package while maintaining
+ * backward compatibility for existing SDK consumers.
  */
 
-export abstract class AgentKitError extends Error {
-  readonly name: string
-  readonly cause?: Error
-  readonly context?: Record<string, unknown>
+// Re-export the unified error system
+export {
+  // Base error classes and utilities
+  AgentKitError,
+  isAgentKitError,
+  getErrorMessage,
+  wrapError,
+  type ErrorCategory,
+  type ErrorCode,
+  type ErrorContext,
+  type SerializedError,
+  
+  // SDK-specific errors
+  AgentInitError,
+  AgentAlreadyInitializedError,
+  AgentNotInitializedError,
+  AgentHandleError,
+  AgentShutdownError,
+  LifecycleHookError,
+  InvalidConfigurationError,
+  MissingRequiredConfigError,
+  ResourceExhaustedError,
+  QueueFullError,
+  MaxRetriesExceededError,
 
-  constructor(message: string, options?: { cause?: Error; context?: Record<string, unknown> }) {
-    super(message)
-    this.name = this.constructor.name
-    this.cause = options?.cause
-    this.context = options?.context
+  // Transport errors
+  TransportInitError,
+  TransportSendError,
+  TransportReceiveError,
+  NetworkError,
+  RequestTimeoutError,
+  ConnectionFailedError,
+  HttpError,
+  CorsError,
+  SerializationError,
+  RateLimitError,
+  PayloadTooLargeError,
+  AuthenticationError,
+  AuthorizationError,
+  InvalidApiKeyError,
+  TokenExpiredError,
 
-    // Ensure proper prototype chain for instanceof checks
-    Object.setPrototypeOf(this, new.target.prototype)
+  // Registry errors
+  AgentNotFoundError,
+  TransportNotFoundError,
+  DuplicateAgentIdError,
+  DuplicateTransportIdError,
+  RegistryValidationError,
+  RegistryCleanupError,
+  AgentMetadataValidationError,
+  TransportMetadataValidationError,
+  AgentCompatibilityError,
+  RegistryCapacityError,
 
-    // Capture stack trace if available
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, this.constructor)
-    }
-  }
+  // Validation errors
+  InvalidInputError,
+  SchemaValidationError,
+  TypeMismatchError,
+  RequiredFieldMissingError,
+  ValidationHelpers,
 
-  toJSON() {
-    return {
-      name: this.name,
-      message: this.message,
-      stack: this.stack,
-      cause: this.cause?.message,
-      context: this.context
-    }
-  }
-}
+  // Utility classes
+  ErrorFactory,
+  ErrorTypeGuards
+} from '@agentkit/errors'
 
-export class AgentInitError extends AgentKitError {
-  constructor(message: string, options?: { cause?: Error; context?: Record<string, unknown> }) {
-    super(`Agent initialization failed: ${message}`, options)
-  }
-}
-
-export class AgentHandleError extends AgentKitError {
-  constructor(message: string, options?: { cause?: Error; context?: Record<string, unknown> }) {
-    super(`Agent handle operation failed: ${message}`, options)
-  }
-}
-
-export class AgentShutdownError extends AgentKitError {
-  constructor(message: string, options?: { cause?: Error; context?: Record<string, unknown> }) {
-    super(`Agent shutdown failed: ${message}`, options)
-  }
-}
-
-export class TransportInitError extends AgentKitError {
-  constructor(message: string, options?: { cause?: Error; context?: Record<string, unknown> }) {
-    super(`Transport initialization failed: ${message}`, options)
-  }
-}
-
-export class TransportSendError extends AgentKitError {
-  constructor(message: string, options?: { cause?: Error; context?: Record<string, unknown> }) {
-    super(`Transport send operation failed: ${message}`, options)
-  }
-}
-
-export class RegistryError extends AgentKitError {
-  constructor(message: string, options?: { cause?: Error; context?: Record<string, unknown> }) {
-    super(`Registry operation failed: ${message}`, options)
-  }
-}
-
-export class ValidationError extends AgentKitError {
-  constructor(message: string, options?: { cause?: Error; context?: Record<string, unknown> }) {
-    super(`Validation failed: ${message}`, options)
-  }
-}
-
-export class CompatibilityError extends AgentKitError {
-  constructor(message: string, options?: { cause?: Error; context?: Record<string, unknown> }) {
-    super(`Compatibility check failed: ${message}`, options)
-  }
-}
-
-export class ScopeError extends AgentKitError {
-  constructor(message: string, options?: { cause?: Error; context?: Record<string, unknown> }) {
-    super(`Scope validation failed: ${message}`, options)
-  }
-}
+// Legacy error classes for backward compatibility
+// These aliases will be deprecated in a future version
+import { 
+  InvalidInputError as _ValidationError,
+  AgentCompatibilityError as _CompatibilityError,
+  InvalidInputError as _ScopeError
+} from '@agentkit/errors'
 
 /**
- * Type guard to check if an error is an AgentKit error
+ * @deprecated Use InvalidInputError from @agentkit/errors instead
  */
-export function isAgentKitError(error: unknown): error is AgentKitError {
-  return error instanceof AgentKitError
-}
+export const ValidationError = _ValidationError
 
 /**
- * Extract a developer-friendly error message from any error
+ * @deprecated Use AgentCompatibilityError from @agentkit/errors instead
  */
-export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  if (typeof error === 'string') {
-    return error
-  }
-  return 'Unknown error occurred'
-}
+export const CompatibilityError = _CompatibilityError
 
 /**
- * Create a safe error object for serialization
+ * @deprecated Use InvalidInputError from @agentkit/errors instead
+ */
+export const ScopeError = _ScopeError
+
+/**
+ * @deprecated Use the unified error serialization from @agentkit/errors instead
  */
 export function createSafeError(error: unknown): Record<string, unknown> {
-  if (isAgentKitError(error)) {
-    return error.toJSON()
+  if (error && typeof error === 'object' && 'toJSON' in error && typeof (error as any).toJSON === 'function') {
+    return (error as any).toJSON()
   }
   
   if (error instanceof Error) {
@@ -126,7 +111,7 @@ export function createSafeError(error: unknown): Record<string, unknown> {
 
   return {
     name: 'UnknownError',
-    message: getErrorMessage(error),
+    message: error ? String(error) : 'Unknown error occurred',
     error: String(error)
   }
 }

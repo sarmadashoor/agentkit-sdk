@@ -176,7 +176,7 @@ describe('AgentRegistry Instance-Based Design', () => {
           version: '1.0.0'
           // Missing factory
         } as any)
-      }).toThrow(/factory/)
+      }).toThrow(/validation failed/)
     })
 
     it('should handle agent lookup errors gracefully', () => {

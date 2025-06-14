@@ -35,7 +35,8 @@
   "author": "AgentKit Team",
   "license": "MIT",
   "dependencies": {
-    "@agentkit/types": "workspace:*"
+    "@agentkit/types": "workspace:*",
+    "@agentkit/errors": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -18,6 +18,32 @@ export interface Transport {
   config?: unknown
 }
 
+export interface ObservabilityHooks {
+  onRequestStart?: (metadata: RequestMetadata) => void
+  onRequestEnd?: (metadata: RequestMetadata, duration: number) => void
+  onError?: (error: Error, context: ErrorContext) => void
+}
+
+export interface RequestMetadata {
+  requestId: string
+  operation: 'init' | 'send' | 'shutdown'
+  agentId: string
+  transportId: string
+  timestamp: string
+  context?: Record<string, unknown>
+}
+
+export interface ErrorContext {
+  requestId?: string
+  operation?: string
+  agentId: string
+  transportId: string
+  timestamp: string
+  phase: 'init' | 'handle' | 'send' | 'shutdown' | 'cleanup'
+  error: Error
+  context?: Record<string, unknown>
+}
+
 export interface ConnectAgentOptions {
   agent: string | Agent
   transport: string | Transport
@@ -32,6 +58,8 @@ export interface ConnectAgentOptions {
   onShutdown?: (agentId: string) => void
   onError?: (err: Error) => void
   onCleanup?: (agentId: string) => void
+  // Observability hooks
+  observability?: ObservabilityHooks
 }
 
 export interface AgentRuntimeHandle {
@@ -72,6 +100,32 @@ export const TransportSchema = z.object({
   config: z.unknown().optional()
 })
 
+const RequestMetadataSchema = z.object({
+  requestId: z.string(),
+  operation: z.enum(['init', 'send', 'shutdown']),
+  agentId: z.string(),
+  transportId: z.string(),
+  timestamp: z.string(),
+  context: z.record(z.unknown()).optional()
+})
+
+const ErrorContextSchema = z.object({
+  requestId: z.string().optional(),
+  operation: z.string().optional(),
+  agentId: z.string(),
+  transportId: z.string(),
+  timestamp: z.string(),
+  phase: z.enum(['init', 'handle', 'send', 'shutdown', 'cleanup']),
+  error: z.instanceof(Error),
+  context: z.record(z.unknown()).optional()
+})
+
+const ObservabilityHooksSchema = z.object({
+  onRequestStart: z.function().args(RequestMetadataSchema).returns(z.void()).optional(),
+  onRequestEnd: z.function().args(RequestMetadataSchema, z.number()).returns(z.void()).optional(),
+  onError: z.function().args(z.instanceof(Error), ErrorContextSchema).returns(z.void()).optional()
+}).optional()
+
 export const ConnectAgentOptionsSchema = z.object({
   agent: z.union([z.string(), AgentSchema]),
   transport: z.union([z.string(), TransportSchema]),
@@ -85,7 +139,9 @@ export const ConnectAgentOptionsSchema = z.object({
   onInit: z.function().args(z.string()).returns(z.void()).optional(),
   onShutdown: z.function().args(z.string()).returns(z.void()).optional(),
   onError: z.function().args(z.instanceof(Error)).returns(z.void()).optional(),
-  onCleanup: z.function().args(z.string()).returns(z.void()).optional()
+  onCleanup: z.function().args(z.string()).returns(z.void()).optional(),
+  // Observability hooks
+  observability: ObservabilityHooksSchema
 })
 
 export const AgentMetadataSchema = z.object({

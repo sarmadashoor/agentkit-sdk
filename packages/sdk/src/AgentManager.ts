@@ -14,6 +14,7 @@ import {
 } from './errors'
 import { debugLog } from './log'
 import { validateAgentConfig, validateTransportConfig } from './validation'
+import { ObservabilityTracker } from './observability'
 
 export class AgentManager {
   private agent: Agent
@@ -25,6 +26,7 @@ export class AgentManager {
   private agentId: string // Authoritative agent ID
   private sendQueue: Promise<void> = Promise.resolve() // Concurrency protection
   private cleanupCalled = false // Prevent multiple cleanup calls
+  private observabilityTracker: ObservabilityTracker
 
   constructor(
     agent: Agent, 
@@ -39,6 +41,12 @@ export class AgentManager {
     this.registeredScopes = registeredScopes
     // Use provided agentId or fall back to agent.id for backward compatibility
     this.agentId = agentId || agent.id
+    
+    // Initialize observability tracker
+    this.observabilityTracker = new ObservabilityTracker(
+      options.observability || {},
+      options.debug || false
+    )
 
     debugLog.lifecycle('constructed', 'AgentManager', {
       agentId: this.agentId,
@@ -46,7 +54,8 @@ export class AgentManager {
       transportId: transport.id,
       hasOnOutput: !!options.onOutput,
       registeredScopes,
-      requestedScopes: options.scope || []
+      requestedScopes: options.scope || [],
+      hasObservabilityHooks: this.observabilityTracker.hasHooks()
     }, options.debug)
     
     // Log scope mismatch in debug mode
@@ -66,85 +75,125 @@ export class AgentManager {
       })
     }
 
-    debugLog.lifecycle('initializing', 'AgentManager', {
-      agentId: this.agentId,
-      transportId: this.transport.id
-    }, this.options.debug)
+    // Track initialization with observability
+    return this.observabilityTracker.trackRequest(
+      'init',
+      this.agentId,
+      this.transport.id,
+      async (requestId) => {
+        debugLog.lifecycle('initializing', 'AgentManager', {
+          agentId: this.agentId,
+          transportId: this.transport.id,
+          requestId
+        }, this.options.debug)
 
-    try {
-      // Initialize transport first
-      debugLog.lifecycle('init start', 'Transport', { 
-        transportId: this.transport.id,
-        config: this.transport.config
-      }, this.options.debug)
+        try {
+          // Initialize transport first
+          debugLog.lifecycle('init start', 'Transport', { 
+            transportId: this.transport.id,
+            config: this.transport.config,
+            requestId
+          }, this.options.debug)
 
-      const transportConfig = validateTransportConfig(this.transport.config, this.options.debug)
-      await this.transport.init(transportConfig)
+          const transportConfig = validateTransportConfig(this.transport.config, this.options.debug)
+          await this.transport.init(transportConfig)
 
-      debugLog.lifecycle('init complete', 'Transport', { 
-        transportId: this.transport.id 
-      }, this.options.debug)
+          debugLog.lifecycle('init complete', 'Transport', { 
+            transportId: this.transport.id,
+            requestId
+          }, this.options.debug)
 
-    } catch (error) {
-      debugLog.error('transport initialization', error as Error, this.options.debug)
-      const transportError = new TransportInitError(
-        `Failed to initialize transport "${this.transport.id}": ${getErrorMessage(error)}`,
-        { 
-          cause: error instanceof Error ? error : new Error(String(error)),
-          context: { 
-            transportId: this.transport.id, 
-            transportName: this.transport.name,
-            config: this.transport.config
-          }
+        } catch (error) {
+          debugLog.error('transport initialization', error as Error, this.options.debug)
+          
+          // Track the specific error phase
+          this.observabilityTracker.trackError(
+            error as Error,
+            'init',
+            this.agentId,
+            this.transport.id,
+            { phase: 'transport', requestId }
+          )
+
+          const transportError = new TransportInitError(
+            `Failed to initialize transport "${this.transport.id}": ${getErrorMessage(error)}`,
+            { 
+              cause: error instanceof Error ? error : new Error(String(error)),
+              context: { 
+                transportId: this.transport.id, 
+                transportName: this.transport.name,
+                config: this.transport.config,
+                requestId
+              }
+            }
+          )
+          this.callOnError(transportError)
+          throw transportError
         }
-      )
-      this.callOnError(transportError)
-      throw transportError
-    }
 
-    try {
-      // Then initialize agent
-      const agentConfig = {
-        scope: this.options.scope,
-        techStack: this.options.techStack
-      }
-
-      debugLog.lifecycle('init start', 'Agent', {
-        agentId: this.agentId,
-        config: agentConfig
-      }, this.options.debug)
-
-      const validatedConfig = validateAgentConfig(agentConfig, this.options.debug)
-      await this.agent.init(validatedConfig)
-
-      debugLog.lifecycle('init complete', 'Agent', {
-        agentId: this.agentId
-      }, this.options.debug)
-
-    } catch (error) {
-      debugLog.error('agent initialization', error as Error, this.options.debug)
-      const agentError = new AgentInitError(
-        `Failed to initialize agent "${this.agentId}": ${getErrorMessage(error)}`,
-        { 
-          cause: error instanceof Error ? error : new Error(String(error)),
-          context: { 
-            agentId: this.agentId, 
-            agentName: this.agent.name,
-            version: this.agent.version,
+        try {
+          // Then initialize agent
+          const agentConfig = {
             scope: this.options.scope,
             techStack: this.options.techStack
           }
-        }
-      )
-      this.callOnError(agentError)
-      throw agentError
-    }
 
-    this.isInitialized = true
-    debugLog.lifecycle('initialized', 'AgentManager', undefined, this.options.debug)
-    
-    // Call onInit lifecycle hook
-    this.callOnInit()
+          debugLog.lifecycle('init start', 'Agent', {
+            agentId: this.agentId,
+            config: agentConfig,
+            requestId
+          }, this.options.debug)
+
+          const validatedConfig = validateAgentConfig(agentConfig, this.options.debug)
+          await this.agent.init(validatedConfig)
+
+          debugLog.lifecycle('init complete', 'Agent', {
+            agentId: this.agentId,
+            requestId
+          }, this.options.debug)
+
+        } catch (error) {
+          debugLog.error('agent initialization', error as Error, this.options.debug)
+          
+          // Track the specific error phase
+          this.observabilityTracker.trackError(
+            error as Error,
+            'init',
+            this.agentId,
+            this.transport.id,
+            { phase: 'agent', requestId }
+          )
+
+          const agentError = new AgentInitError(
+            `Failed to initialize agent "${this.agentId}": ${getErrorMessage(error)}`,
+            { 
+              cause: error instanceof Error ? error : new Error(String(error)),
+              context: { 
+                agentId: this.agentId, 
+                agentName: this.agent.name,
+                version: this.agent.version,
+                scope: this.options.scope,
+                techStack: this.options.techStack,
+                requestId
+              }
+            }
+          )
+          this.callOnError(agentError)
+          throw agentError
+        }
+
+        this.isInitialized = true
+        debugLog.lifecycle('initialized', 'AgentManager', { requestId }, this.options.debug)
+        
+        // Call onInit lifecycle hook
+        this.callOnInit()
+      },
+      {
+        agentName: this.agent.name,
+        transportName: this.transport.name,
+        hasScope: !!(this.options.scope && this.options.scope.length > 0)
+      }
+    )
   }
 
   async send(input: unknown): Promise<void> {
@@ -171,18 +220,30 @@ export class AgentManager {
           })
         }
 
-        await this.processSendOperation(input)
+        await this.observabilityTracker.trackRequest(
+          'send',
+          this.agentId,
+          this.transport.id,
+          async (requestId) => {
+            await this.processSendOperation(input, requestId)
+          },
+          {
+            inputType: typeof input,
+            hasInput: input !== undefined && input !== null
+          }
+        )
       })
 
     return this.sendQueue
   }
 
-  private async processSendOperation(input: unknown): Promise<void> {
+  private async processSendOperation(input: unknown, requestId: string): Promise<void> {
     debugLog.operation('send start', { 
       agentId: this.agentId,
       transportId: this.transport.id,
       inputType: typeof input,
-      concurrencyProtected: true
+      concurrencyProtected: true,
+      requestId
     }, this.options.debug)
 
     let output: unknown
@@ -191,18 +252,30 @@ export class AgentManager {
       // Process input through agent
       debugLog.lifecycle('handle start', 'Agent', {
         agentId: this.agentId,
-        inputType: typeof input
+        inputType: typeof input,
+        requestId
       }, this.options.debug)
 
       output = await this.agent.handle(input)
 
       debugLog.lifecycle('handle complete', 'Agent', {
         agentId: this.agentId,
-        outputType: typeof output
+        outputType: typeof output,
+        requestId
       }, this.options.debug)
 
     } catch (error) {
       debugLog.error('agent handle operation', error as Error, this.options.debug)
+      
+      // Track the specific error phase
+      this.observabilityTracker.trackError(
+        error as Error,
+        'handle',
+        this.agentId,
+        this.transport.id,
+        { phase: 'handle', requestId, inputType: typeof input }
+      )
+
       const handleError = new AgentHandleError(
         `Agent "${this.agentId}" failed to handle input: ${getErrorMessage(error)}`,
         { 
@@ -210,7 +283,8 @@ export class AgentManager {
           context: { 
             agentId: this.agentId,
             inputType: typeof input,
-            input: this.options.debug ? input : '[input hidden in non-debug mode]'
+            input: this.options.debug ? input : '[input hidden in non-debug mode]',
+            requestId
           }
         }
       )
@@ -222,17 +296,29 @@ export class AgentManager {
       // Send output through transport
       debugLog.lifecycle('send start', 'Transport', {
         transportId: this.transport.id,
-        outputType: typeof output
+        outputType: typeof output,
+        requestId
       }, this.options.debug)
 
       await this.transport.send(output)
 
       debugLog.lifecycle('send complete', 'Transport', {
-        transportId: this.transport.id
+        transportId: this.transport.id,
+        requestId
       }, this.options.debug)
 
     } catch (error) {
       debugLog.error('transport send operation', error as Error, this.options.debug)
+      
+      // Track the specific error phase
+      this.observabilityTracker.trackError(
+        error as Error,
+        'send',
+        this.agentId,
+        this.transport.id,
+        { phase: 'send', requestId, outputType: typeof output }
+      )
+
       const sendError = new TransportSendError(
         `Transport "${this.transport.id}" failed to send output: ${getErrorMessage(error)}`,
         { 
@@ -240,7 +326,8 @@ export class AgentManager {
           context: { 
             transportId: this.transport.id,
             outputType: typeof output,
-            output: this.options.debug ? output : '[output hidden in non-debug mode]'
+            output: this.options.debug ? output : '[output hidden in non-debug mode]',
+            requestId
           }
         }
       )
@@ -251,7 +338,7 @@ export class AgentManager {
     // Call onOutput callback if provided
     if (this.options.onOutput) {
       try {
-        debugLog.operation('onOutput callback', { agentId: this.agentId }, this.options.debug)
+        debugLog.operation('onOutput callback', { agentId: this.agentId, requestId }, this.options.debug)
         this.options.onOutput(output)
       } catch (error) {
         // Don't fail the entire operation for callback errors, but log them
@@ -266,7 +353,8 @@ export class AgentManager {
     debugLog.operation('send complete', { 
       agentId: this.agentId,
       transportId: this.transport.id,
-      concurrencyProtected: true
+      concurrencyProtected: true,
+      requestId
     }, this.options.debug)
   }
 
@@ -282,50 +370,86 @@ export class AgentManager {
       })
     }
 
-    debugLog.lifecycle('shutdown start', 'AgentManager', {
-      agentId: this.agentId,
-      transportId: this.transport.id
-    }, this.options.debug)
+    // Track shutdown with observability
+    return this.observabilityTracker.trackRequest(
+      'shutdown',
+      this.agentId,
+      this.transport.id,
+      async (requestId) => {
+        debugLog.lifecycle('shutdown start', 'AgentManager', {
+          agentId: this.agentId,
+          transportId: this.transport.id,
+          requestId
+        }, this.options.debug)
 
-    try {
-      // Shutdown agent
-      debugLog.lifecycle('shutdown start', 'Agent', { agentId: this.agentId }, this.options.debug)
-      await this.agent.shutdown()
-      debugLog.lifecycle('shutdown complete', 'Agent', { agentId: this.agentId }, this.options.debug)
+        try {
+          // Shutdown agent
+          debugLog.lifecycle('shutdown start', 'Agent', { 
+            agentId: this.agentId, 
+            requestId 
+          }, this.options.debug)
+          
+          await this.agent.shutdown()
+          
+          debugLog.lifecycle('shutdown complete', 'Agent', { 
+            agentId: this.agentId, 
+            requestId 
+          }, this.options.debug)
 
-    } catch (error) {
-      debugLog.error('agent shutdown', error as Error, this.options.debug)
-      const shutdownError = new AgentShutdownError(
-        `Agent "${this.agentId}" failed to shutdown: ${getErrorMessage(error)}`,
-        { 
-          cause: error instanceof Error ? error : new Error(String(error)),
-          context: { agentId: this.agentId, agentName: this.agent.name }
+        } catch (error) {
+          debugLog.error('agent shutdown', error as Error, this.options.debug)
+          
+          // Track the specific error phase
+          this.observabilityTracker.trackError(
+            error as Error,
+            'shutdown',
+            this.agentId,
+            this.transport.id,
+            { phase: 'shutdown', requestId }
+          )
+
+          const shutdownError = new AgentShutdownError(
+            `Agent "${this.agentId}" failed to shutdown: ${getErrorMessage(error)}`,
+            { 
+              cause: error instanceof Error ? error : new Error(String(error)),
+              context: { 
+                agentId: this.agentId, 
+                agentName: this.agent.name,
+                requestId
+              }
+            }
+          )
+          this.callOnError(shutdownError)
+          
+          // Mark as shutdown and call cleanup even if agent shutdown failed
+          this.isShutdown = true
+          this.isInitialized = false
+          
+          // Call onShutdown and onCleanup hooks even on failure
+          this.callOnShutdown()
+          this.callOnCleanup()
+          
+          throw shutdownError
         }
-      )
-      this.callOnError(shutdownError)
-      
-      // Mark as shutdown and call cleanup even if agent shutdown failed
-      this.isShutdown = true
-      this.isInitialized = false
-      
-      // Call onShutdown and onCleanup hooks even on failure
-      this.callOnShutdown()
-      this.callOnCleanup()
-      
-      throw shutdownError
-    }
-    
-    // Transport doesn't have shutdown in the interface, but we mark manager as shutdown
-    this.isShutdown = true
-    this.isInitialized = false
+        
+        // Transport doesn't have shutdown in the interface, but we mark manager as shutdown
+        this.isShutdown = true
+        this.isInitialized = false
 
-    debugLog.lifecycle('shutdown complete', 'AgentManager', undefined, this.options.debug)
-    
-    // Call onShutdown lifecycle hook
-    this.callOnShutdown()
-    
-    // Call onCleanup lifecycle hook after successful shutdown
-    this.callOnCleanup()
+        debugLog.lifecycle('shutdown complete', 'AgentManager', { requestId }, this.options.debug)
+        
+        // Call onShutdown lifecycle hook
+        this.callOnShutdown()
+        
+        // Call onCleanup lifecycle hook after successful shutdown
+        this.callOnCleanup()
+      },
+      {
+        agentName: this.agent.name,
+        transportName: this.transport.name,
+        wasInitialized: this.isInitialized
+      }
+    )
   }
 
   createRuntimeHandle(): AgentRuntimeHandle {

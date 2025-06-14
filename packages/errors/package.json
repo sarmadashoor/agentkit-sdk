@@ -1,0 +1,42 @@
+{
+  "name": "@agentkit/errors",
+  "version": "0.1.0-alpha",
+  "description": "Unified error hierarchy for AgentKit SDK",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "error",
+    "agentkit",
+    "sdk",
+    "typescript"
+  ],
+  "author": "AgentKit Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anthropics/agentkit-sdk.git",
+    "directory": "packages/errors"
+  }
+}

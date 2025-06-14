@@ -20,7 +20,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@agentkit/types": "workspace:*"
+    "@agentkit/types": "workspace:*",
+    "@agentkit/errors": "workspace:*"
   },
   "devDependencies": {
     "@agentkit/test-agent": "workspace:*",
