@@ -34,29 +34,80 @@ agentkit-sdk/
 └── scripts/              # Future CLI tooling
 ```
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js >= 18.0.0
-- pnpm >= 8.0.0
+## Quick Start
 
 ### Installation
 
 ```bash
+npm install @agentkit/sdk
+```
+
+### Basic Usage
+
+```typescript
+import { connectAgent, AgentRegistry } from '@agentkit/sdk'
+import { DummyAgent } from '@agentkit/test-agent'
+import { DummyTransport } from '@agentkit/transports-dummy'
+
+// Register an agent
+AgentRegistry.register({
+  id: 'my-agent',
+  name: 'My Agent',
+  version: '1.0.0',
+  factory: () => new DummyAgent()
+})
+
+// Register a transport
+AgentRegistry.registerTransport(new DummyTransport())
+
+// Connect and use
+const handle = await connectAgent({
+  agent: 'my-agent',
+  transport: 'dummy',
+  onOutput: (message) => console.log('Agent response:', message)
+})
+
+await handle.send({ message: 'Hello, agent!' })
+await handle.shutdown()
+```
+
+See [`examples/`](./examples/) for more detailed usage patterns.
+
+## Development Setup
+
+### Prerequisites
+
+- Node.js >= 18.0.0
+- pnpm >= 8.0.0 (recommended) or npm
+
+### Installation
+
+```bash
+# With pnpm (recommended)
 pnpm install
+
+# Or with npm
+npm install
 ```
 
 ### Building
 
 ```bash
+# With pnpm
 pnpm build
+
+# Or with npm
+npm run build:npm
 ```
 
 ### Testing
 
 ```bash
+# With pnpm
 pnpm test
+
+# Or with npm  
+npm run test:npm
 ```
 
 ## Development
@@ -65,11 +116,22 @@ This is a monorepo managed with pnpm workspaces. Each package in the `packages/`
 
 ### Available Scripts
 
-- `pnpm build` - Build all packages
-- `pnpm test` - Run all tests
+- `pnpm build` / `npm run build:npm` - Build all packages
+- `pnpm test` / `npm run test:npm` - Run all tests
+- `pnpm typecheck` / `npm run typecheck:npm` - Run TypeScript type checking
 - `pnpm clean` - Clean all build artifacts
 - `pnpm lint` - Run linting
-- `pnpm typecheck` - Run TypeScript type checking
+
+## Documentation
+
+- [📖 Architecture Overview](./docs/architecture.md) - System design and component relationships
+- [🗂️ Registry Documentation](./docs/registry.md) - Agent and transport registration patterns
+- [📋 Changelog](./docs/CHANGELOG.md) - Version history and release notes
+
+## Examples
+
+- [`examples/basic-agent-usage.ts`](./examples/basic-agent-usage.ts) - Fundamental SDK usage patterns
+- [`examples/debug-mode.ts`](./examples/debug-mode.ts) - Debug logging and lifecycle hooks
 
 ## License
 

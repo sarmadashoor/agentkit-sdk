@@ -1,6 +1,6 @@
 {
   "name": "@agentkit/registry",
-  "version": "0.0.0",
+  "version": "0.1.0-alpha",
   "description": "Internal Agent Registry for AgentKit SDK",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

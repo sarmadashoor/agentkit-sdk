@@ -1,6 +1,6 @@
 {
   "name": "@agentkit/types",
-  "version": "0.0.0",
+  "version": "0.1.0-alpha",
   "description": "Shared Zod schemas and TypeScript interfaces for AgentKit SDK",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

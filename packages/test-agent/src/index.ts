@@ -16,7 +16,7 @@ export class DummyAgent implements Agent {
   version = '1.0.0'
   private initialized = false
   private config: DummyAgentConfig
-  private initData: any = null
+  private initData: unknown = null
 
   constructor() {
     this.config = DummyAgentConfigSchema.parse({})
@@ -76,9 +76,13 @@ export class DummyAgent implements Agent {
     // Return void as expected by the interface
   }
 
-  // Helper method for testing
+  // Helper methods for testing
   isInitialized(): boolean {
     return this.initialized
+  }
+
+  setConfig(config: DummyAgentConfig): void {
+    this.config = DummyAgentConfigSchema.parse(config)
   }
 }
 
@@ -152,7 +156,7 @@ export const createDummyAgent = (config?: DummyAgentConfig): Agent => {
   const agent = new DummyAgent()
   // Pre-configure the agent if config is provided
   if (config) {
-    (agent as any).config = DummyAgentConfigSchema.parse(config)
+    agent.setConfig(config)
   }
   return agent
 }

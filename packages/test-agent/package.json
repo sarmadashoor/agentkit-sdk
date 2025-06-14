@@ -1,6 +1,6 @@
 {
   "name": "@agentkit/test-agent",
-  "version": "0.0.0",
+  "version": "0.1.0-alpha",
   "description": "Dummy agent for lifecycle testing in AgentKit SDK",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

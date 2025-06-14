@@ -137,7 +137,7 @@ export const debugLog = {
     logWithContext(
       LogLevel.DEBUG,
       'Transport resolved from registry',
-      { transportId, transportName: (transport as any)?.name },
+      { transportId, transportName: (transport as { name?: string })?.name },
       debug
     )
   },
