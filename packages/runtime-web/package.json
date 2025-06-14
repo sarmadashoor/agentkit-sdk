@@ -1,0 +1,54 @@
+{
+  "name": "@agentkit/runtime-web",
+  "version": "0.1.0-alpha",
+  "description": "Browser runtime and transport for AgentKit SDK",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "browser": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "browser": "./dist/index.js",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "agent",
+    "browser",
+    "transport",
+    "mcp",
+    "web",
+    "fetch"
+  ],
+  "author": "AgentKit Team",
+  "license": "MIT",
+  "dependencies": {
+    "@agentkit/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.6.0",
+    "@vitest/coverage-v8": "^1.6.0"
+  },
+  "peerDependencies": {
+    "@agentkit/sdk": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anthropics/agentkit-sdk.git",
+    "directory": "packages/runtime-web"
+  }
+}
