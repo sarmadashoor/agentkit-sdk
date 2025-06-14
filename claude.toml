@@ -1,0 +1,93 @@
+# claude.toml
+# Configuration file for Claude Code CLI automation
+# This file enforces strict architectural and quality guardrails for the AgentKit SDK.
+
+[project]
+name = "AgentKit SDK"
+description = "A transport- and agent-agnostic SDK for safely mounting AI agents into host applications."
+monorepo = true
+workspace_root = "./"
+packages = ["packages/sdk", "packages/registry", "packages/transports-dummy", "packages/test-agent", "packages/types"]
+language = "typescript"
+type_safety = "strict"
+testing_framework = "vitest"
+
+[guardrails]
+
+# ✅ Architectural Contract
+[[guardrails.rule]]
+id = "enforce-agent-agnostic-design"
+description = "No references to specific agents like SmartChat are allowed. All logic must be agent-agnostic."
+enforced_in = ["sdk", "registry", "transports-dummy", "types"]
+on_violation = "fail"
+
+[[guardrails.rule]]
+id = "enforce-strict-boundaries"
+description = "No internal state leakage. SDK should expose only typed interfaces and schema-driven interaction."
+on_violation = "warn"
+
+[[guardrails.rule]]
+id = "no-globals"
+description = "Global variables or side effects are strictly disallowed. SDK must operate in isolated execution contexts."
+on_violation = "fail"
+
+[[guardrails.rule]]
+id = "zod-schema-validation-required"
+description = "All externally provided configs must be validated with Zod. Use centralized schemas from 'types'."
+enforced_in = ["sdk", "registry"]
+on_violation = "fail"
+
+# ✅ Development Workflow
+[workflow]
+tdd_required = true
+minimum_test_coverage = 85
+testing_required_before_commit = true
+enable_type_checks = true
+block_merge_on_type_errors = true
+
+# ✅ Commit Behavior
+[commits]
+strategy = "atomic"
+require_branch_prefix = true
+allowed_prefixes = ["feat", "fix", "refactor", "test", "docs", "chore"]
+commit_message_format = "<prefix>: <brief summary>"
+auto_generate_changelog = true
+track_changelog_in = "docs/CHANGELOG.md"
+
+# ✅ Prompts + Instructions for Claude
+[prompts]
+
+initial_setup = """
+You are a Claude CLI agent setting up a high-integrity TypeScript monorepo SDK. All logic must be strictly modular, test-driven, agent-agnostic, and CSP-safe. Never refer to SmartChat. No UI assumptions. Follow the architecture laid out in AgentKit SDK Architecture. Every package must include tests, types, and typed interfaces. Use Zod schemas for validation. 
+"""
+
+before_edit = """
+Before making any change, validate:
+1. Architectural compliance (no UI/agent coupling)
+2. Isolated testability
+3. Whether the change has full test coverage
+4. Whether Zod validation is applied if needed
+"""
+
+before_commit = """
+Ensure:
+- Test coverage ≥ 85%
+- `vitest` and `tsc` both pass
+- Commit includes summary of change, with affected module
+- If modifying a public interface, update types and changelog
+"""
+
+before_release = """
+Run:
+- `pnpm test` across all packages
+- `tsc --noEmit`
+- Auto-update `CHANGELOG.md`
+- Confirm exports map includes all public modules
+"""
+
+# ✅ Docs and Changelog Hooks
+[documentation]
+auto_update = true
+enforce_md_files = ["README.md", "docs/registry.md", "docs/architecture.md"]
+auto_changelog = true
+change_format = "- [<package>] <description> ([commit])"

@@ -1,0 +1,29 @@
+{
+  "name": "agentkit-sdk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Modular, secure, agent-agnostic TypeScript SDK for managing AI agents inside host applications",
+  "keywords": ["ai", "agents", "sdk", "typescript"],
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r --parallel run build",
+    "test": "pnpm -r --parallel run test",
+    "clean": "pnpm -r --parallel run clean",
+    "lint": "pnpm -r --parallel run lint",
+    "typecheck": "pnpm -r --parallel run typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0",
+    "zod": "^3.22.4"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

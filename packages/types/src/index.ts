@@ -1,0 +1,97 @@
+import { z } from 'zod'
+
+export interface Agent {
+  id: string
+  name: string
+  version: string
+  init: (config?: unknown) => Promise<void>
+  handle: (input: unknown) => Promise<unknown>
+  shutdown: () => Promise<void>
+}
+
+export interface Transport {
+  id: string
+  name: string
+  init: (config?: unknown) => Promise<void>
+  send: (message: unknown) => Promise<void>
+  receive: () => Promise<unknown>
+  config?: unknown
+}
+
+export interface ConnectAgentOptions {
+  agent: string | Agent
+  transport: string | Transport
+  scope?: string[]
+  techStack?: string
+  onOutput?: (message: unknown) => void
+  debug?: boolean
+  // Lifecycle event hooks
+  onInit?: (agentId: string) => void
+  onShutdown?: (agentId: string) => void
+  onError?: (err: Error) => void
+}
+
+export interface AgentRuntimeHandle {
+  send: (input: unknown) => Promise<void>
+  shutdown: () => Promise<void>
+  metadata: {
+    agentId: string
+    transportId: string
+    registeredScopes: string[]
+    requestedScopes: string[]
+  }
+}
+
+export interface AgentMetadata {
+  id: string
+  name: string
+  version: string
+  description?: string
+  supportedScopes?: string[]
+  factory: () => Agent
+}
+
+export const AgentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  version: z.string(),
+  init: z.function().args(z.unknown().optional()).returns(z.promise(z.void())),
+  handle: z.function().args(z.unknown()).returns(z.promise(z.unknown())),
+  shutdown: z.function().returns(z.promise(z.void()))
+})
+
+export const TransportSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  init: z.function().args(z.unknown().optional()).returns(z.promise(z.void())),
+  send: z.function().args(z.unknown()).returns(z.promise(z.void())),
+  receive: z.function().returns(z.promise(z.unknown())),
+  config: z.unknown().optional()
+})
+
+export const ConnectAgentOptionsSchema = z.object({
+  agent: z.union([z.string(), AgentSchema]),
+  transport: z.union([z.string(), TransportSchema]),
+  scope: z.array(z.string()).optional(),
+  techStack: z.string().optional(),
+  onOutput: z.function().args(z.unknown()).returns(z.void()).optional(),
+  debug: z.boolean().optional(),
+  // Lifecycle event hooks
+  onInit: z.function().args(z.string()).returns(z.void()).optional(),
+  onShutdown: z.function().args(z.string()).returns(z.void()).optional(),
+  onError: z.function().args(z.instanceof(Error)).returns(z.void()).optional()
+})
+
+export const AgentMetadataSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  version: z.string(),
+  description: z.string().optional(),
+  supportedScopes: z.array(z.string()).optional(),
+  factory: z.function().returns(AgentSchema)
+})
+
+export type ValidatedAgent = z.infer<typeof AgentSchema>
+export type ValidatedTransport = z.infer<typeof TransportSchema>
+export type ValidatedConnectAgentOptions = z.infer<typeof ConnectAgentOptionsSchema>
+export type ValidatedAgentMetadata = z.infer<typeof AgentMetadataSchema>
