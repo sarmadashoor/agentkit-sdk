@@ -236,3 +236,27 @@ export class TokenExpiredError extends TransportError {
     super(`${tokenType} has expired`, options)
   }
 }
+
+/**
+ * Transport backpressure errors
+ */
+export class TransportBackpressureError extends TransportError {
+  readonly code = 'TRANSPORT_BACKPRESSURE' as const
+  readonly category = 'resource' as const
+
+  public readonly currentLoad?: number
+  public readonly maxCapacity?: number
+
+  constructor(
+    transportId: string, 
+    message?: string, 
+    currentLoad?: number, 
+    maxCapacity?: number, 
+    options?: AgentKitErrorOptions
+  ) {
+    const defaultMessage = `Transport ${transportId} is under backpressure and cannot accept more messages`
+    super(message || defaultMessage, options)
+    this.currentLoad = currentLoad
+    this.maxCapacity = maxCapacity
+  }
+}

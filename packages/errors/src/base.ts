@@ -53,6 +53,7 @@ export type ErrorCode =
   | 'HTTP_ERROR'
   | 'CORS_ERROR'
   | 'SERIALIZATION_FAILED'
+  | 'TRANSPORT_BACKPRESSURE'
   
   // Resource Management
   | 'RESOURCE_EXHAUSTED'
@@ -75,6 +76,7 @@ export type ErrorCode =
   
   // Plugin System
   | 'PLUGIN_VALIDATION_FAILED'
+  | 'PLUGIN_COMPATIBILITY_FAILED'
   | 'PLUGIN_HOOK_FAILED'
   | 'PLUGIN_REGISTRATION_FAILED'
   | 'PLUGIN_TIMEOUT'

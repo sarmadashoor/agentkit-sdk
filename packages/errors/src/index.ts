@@ -71,7 +71,8 @@ export {
   AuthenticationError,
   AuthorizationError,
   InvalidApiKeyError,
-  TokenExpiredError
+  TokenExpiredError,
+  TransportBackpressureError
 } from './transport'
 
 // Validation errors and helpers
@@ -86,6 +87,7 @@ export {
 // Plugin errors
 export {
   PluginValidationError,
+  PluginCompatibilityError,
   PluginHookError,
   PluginRegistrationError,
   PluginTimeoutError,

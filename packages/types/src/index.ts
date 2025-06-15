@@ -72,7 +72,7 @@ export interface Transport {
   
   // Backpressure API
   /** Check if transport can accept more messages (backpressure indicator) */
-  canAcceptMore?: () => boolean
+  canAcceptMore: () => boolean
   /** Get detailed transport status including capacity and health */
   getStatus?: () => TransportStatus
 }
@@ -209,8 +209,8 @@ export const TransportSchema = z.object({
   send: z.function().args(TransportMessageSchema).returns(z.promise(z.void())),
   receive: z.function().returns(z.promise(TransportMessageSchema)),
   config: TransportConfigSchema.optional(),
-  // Optional backpressure methods
-  canAcceptMore: z.function().returns(z.boolean()).optional(),
+  // Required backpressure method
+  canAcceptMore: z.function().returns(z.boolean()),
   getStatus: z.function().returns(TransportStatusSchema).optional()
 })
 
@@ -257,6 +257,27 @@ const FeatureFlagsSchema = z.object({
   enableCircuitBreaker: z.boolean().optional()
 }).optional()
 
+// Plugin compatibility schemas
+const PluginCompatibilitySchema = z.object({
+  minSdkVersion: z.string().optional(),
+  maxSdkVersion: z.string().optional(),
+  supportedVersions: z.array(z.string()).optional(),
+  nodeVersion: z.string().optional(),
+  browserCompatibility: z.object({
+    chrome: z.string().optional(),
+    firefox: z.string().optional(),
+    safari: z.string().optional(),
+    edge: z.string().optional()
+  }).optional()
+}).optional()
+
+const PluginPermissionsSchema = z.object({
+  network: z.boolean().optional(),
+  filesystem: z.boolean().optional(),
+  system: z.boolean().optional(),
+  custom: z.record(z.boolean()).optional()
+}).optional()
+
 // Plugin-related schemas (defined early for use in ConnectAgentOptionsSchema)
 const AgentContextSchema = z.object({
   agentId: z.string(),
@@ -275,6 +296,8 @@ const AgentKitPluginSchema = z.object({
   name: z.string().min(1),
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
   description: z.string().optional(),
+  compatibility: PluginCompatibilitySchema,
+  permissions: PluginPermissionsSchema,
   onInit: z.function().args(AgentContextSchema).returns(z.union([z.void(), z.promise(z.void())])).optional(),
   onSend: z.function().args(SendPayloadSchema, AgentContextSchema).returns(z.union([z.void(), z.promise(z.void())])).optional(),
   onError: z.function().args(z.instanceof(Error), AgentContextSchema).returns(z.union([z.void(), z.promise(z.void())])).optional(),
@@ -387,6 +410,41 @@ export interface SendPayload {
 export type PluginHookName = 'onInit' | 'onSend' | 'onError' | 'onShutdown'
 
 /**
+ * Plugin compatibility specification
+ */
+export interface PluginCompatibility {
+  /** Minimum SDK version required */
+  minSdkVersion?: string
+  /** Maximum SDK version supported */
+  maxSdkVersion?: string
+  /** Specific SDK versions supported (alternative to min/max) */
+  supportedVersions?: string[]
+  /** Node.js version requirements */
+  nodeVersion?: string
+  /** Browser compatibility requirements */
+  browserCompatibility?: {
+    chrome?: string
+    firefox?: string
+    safari?: string
+    edge?: string
+  }
+}
+
+/**
+ * Plugin execution permissions
+ */
+export interface PluginPermissions {
+  /** Allow access to network APIs */
+  network?: boolean
+  /** Allow access to filesystem APIs */
+  filesystem?: boolean
+  /** Allow access to process/system APIs */
+  system?: boolean
+  /** Custom permission flags */
+  custom?: Record<string, boolean>
+}
+
+/**
  * AgentKit Plugin Interface
  * Plugins can hook into various lifecycle events
  * All hooks support both sync and async execution
@@ -398,6 +456,10 @@ export interface AgentKitPlugin {
   version: string
   /** Optional description of what the plugin does */
   description?: string
+  /** Compatibility requirements */
+  compatibility?: PluginCompatibility
+  /** Required permissions */
+  permissions?: PluginPermissions
   
   /**
    * Called when the agent is initialized
@@ -465,7 +527,13 @@ export interface AgentRegistryInterface {
 }
 
 // Export schemas for external use
-export { AgentContextSchema, SendPayloadSchema, AgentKitPluginSchema }
+export { 
+  AgentContextSchema, 
+  SendPayloadSchema, 
+  AgentKitPluginSchema,
+  PluginCompatibilitySchema,
+  PluginPermissionsSchema 
+}
 
 // Type guard
 export function isAgentKitPlugin(value: unknown): value is AgentKitPlugin {
