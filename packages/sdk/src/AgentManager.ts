@@ -22,6 +22,15 @@ import { BoundedExecutor } from './boundedExecutor'
 import { CircuitBreaker } from './circuitBreaker'
 import { PluginManager, AgentKitPlugin, AgentContext, SendPayload } from './plugins'
 import { Mutex } from './utils/mutex'
+import { SharedAsyncLock } from './utils/AsyncLock'
+
+// Agent lifecycle states - replaces boolean flags for better state management
+export enum AgentState {
+  IDLE = 'idle',           // Initial state, not yet initialized
+  ACTIVE = 'active',       // Initialized and ready for operations
+  SHUTTING_DOWN = 'shutting_down', // Shutdown initiated, rejecting new operations
+  TERMINATED = 'terminated' // Fully shutdown, cannot be reused
+}
 
 // Extended ConnectAgentOptions to include plugins
 interface ConnectAgentOptions extends BaseConnectAgentOptions {
@@ -32,8 +41,7 @@ export class AgentManager {
   private agent: Agent
   private transport: Transport
   private options: ConnectAgentOptions
-  private isInitialized = false
-  private isShutdown = false
+  private state: AgentState = AgentState.IDLE
   private registeredScopes: string[]
   private agentId: string // Authoritative agent ID
   private cleanupCalled = false // Prevent multiple cleanup calls
@@ -42,9 +50,8 @@ export class AgentManager {
   private circuitBreaker?: CircuitBreaker
   private pluginManager: PluginManager
   
-  // Critical section protection
-  private stateMutex = new Mutex() // Protects state transitions (init/shutdown)
-  private sendMutex = new Mutex() // Protects send operations
+  // Critical section protection - using shared AsyncLock for send/shutdown coordination
+  private stateLock = SharedAsyncLock.getInstance() // Protects state transitions and send operations
 
   constructor(
     agent: Agent, 
@@ -116,17 +123,19 @@ export class AgentManager {
   }
 
   async initialize(): Promise<void> {
-    if (this.isInitialized) {
-      throw new AgentInitError('AgentManager is already initialized', {
-        context: { agentId: this.agentId, transportId: this.transport.id }
-      })
-    }
+    return this.stateLock.lock(async () => {
+      // Check state under lock
+      if (this.state === AgentState.ACTIVE) {
+        throw new AgentInitError('AgentManager is already initialized', {
+          context: { agentId: this.agentId, transportId: this.transport.id, currentState: this.state }
+        })
+      }
 
-    if (this.isShutdown) {
-      throw new AgentInitError('AgentManager has been shutdown and cannot be reinitialized', {
-        context: { agentId: this.agentId, transportId: this.transport.id }
-      })
-    }
+      if (this.state === AgentState.SHUTTING_DOWN || this.state === AgentState.TERMINATED) {
+        throw new AgentInitError('AgentManager has been shutdown and cannot be reinitialized', {
+          context: { agentId: this.agentId, transportId: this.transport.id, currentState: this.state }
+        })
+      }
 
     // Track initialization with observability
     return this.observabilityTracker.trackRequest(
@@ -235,8 +244,9 @@ export class AgentManager {
           throw agentError
         }
 
-        this.isInitialized = true
-        debugLog.lifecycle('initialized', 'AgentManager', { requestId }, this.options.debug)
+        // Atomically transition to active state
+        this.state = AgentState.ACTIVE
+        debugLog.lifecycle('initialized', 'AgentManager', { requestId, newState: this.state }, this.options.debug)
         
         // Call plugin onInit hooks
         await this.callPluginHook('onInit', {
@@ -255,21 +265,22 @@ export class AgentManager {
         hasScope: !!(this.options.scope && this.options.scope.length > 0)
       }
     )
+    }) // Close stateLock.lock
   }
 
   async send(input: AgentInput): Promise<void> {
-    // Atomic state check with mutex protection
-    return this.sendMutex.withLock(async () => {
-      // Double-check state under lock to prevent race conditions
-      if (this.isShutdown) {
+    // Use shared AsyncLock to prevent race conditions with shutdown
+    return this.stateLock.lock(async () => {
+      // Check state under lock to prevent race conditions
+      if (this.state === AgentState.SHUTTING_DOWN || this.state === AgentState.TERMINATED) {
         throw new AgentShutdownError('AgentManager has been shutdown', {
-          context: { agentId: this.agentId, transportId: this.transport.id }
+          context: { agentId: this.agentId, transportId: this.transport.id, currentState: this.state }
         })
       }
 
-      if (!this.isInitialized) {
+      if (this.state !== AgentState.ACTIVE) {
         throw new AgentHandleError('AgentManager not initialized. Call initialize() first.', {
-          context: { agentId: this.agentId, transportId: this.transport.id }
+          context: { agentId: this.agentId, transportId: this.transport.id, currentState: this.state }
         })
       }
 
@@ -286,10 +297,10 @@ export class AgentManager {
     return this.boundedExecutor.execute(
       `send-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       async () => {
-        // Double-check shutdown status after waiting in queue
-        if (this.isShutdown) {
+        // Double-check state after waiting in queue
+        if (this.state !== AgentState.ACTIVE) {
           throw new AgentShutdownError('AgentManager has been shutdown during operation', {
-            context: { agentId: this.agentId, transportId: this.transport.id }
+            context: { agentId: this.agentId, transportId: this.transport.id, currentState: this.state }
           })
         }
 
@@ -496,19 +507,29 @@ export class AgentManager {
   }
 
   async shutdown(): Promise<void> {
-    // Use mutex to ensure atomic shutdown operation
-    return this.stateMutex.withLock(async () => {
-      // Double-check shutdown state under lock
-      if (this.isShutdown) {
-        debugLog.operation('shutdown (already shutdown)', { agentId: this.agentId }, this.options.debug)
-        return // Already shutdown
+    // Use shared AsyncLock to ensure atomic shutdown operation and prevent race with send
+    return this.stateLock.lock(async () => {
+      // Check current state under lock
+      if (this.state === AgentState.SHUTTING_DOWN || this.state === AgentState.TERMINATED) {
+        debugLog.operation('shutdown (already shutdown)', { 
+          agentId: this.agentId, 
+          currentState: this.state 
+        }, this.options.debug)
+        return // Already shutdown or shutting down
       }
 
-      if (!this.isInitialized) {
+      if (this.state === AgentState.IDLE) {
         throw new AgentShutdownError('AgentManager not initialized', {
-          context: { agentId: this.agentId, transportId: this.transport.id }
+          context: { agentId: this.agentId, transportId: this.transport.id, currentState: this.state }
         })
       }
+
+      // Atomically transition to shutting down state - this will block new send operations
+      this.state = AgentState.SHUTTING_DOWN
+      debugLog.lifecycle('state transition', 'AgentManager', { 
+        agentId: this.agentId, 
+        newState: this.state 
+      }, this.options.debug)
 
       // Proceed with shutdown under lock protection
       return this.executeShutdownOperation()
@@ -531,8 +552,7 @@ export class AgentManager {
           requestId
         }, this.options.debug)
 
-        // Mark as shutdown first to prevent new operations
-        this.isShutdown = true
+        // State already set to SHUTTING_DOWN in shutdown() method
 
         // Shutdown bounded executor to reject queued operations and wait for active ones
         debugLog.lifecycle('shutdown start', 'BoundedExecutor', { 
@@ -638,8 +658,8 @@ export class AgentManager {
           )
           this.callOnError(shutdownError)
           
-          // Mark as shutdown and call cleanup even if agent shutdown failed
-          this.isInitialized = false
+          // Mark as terminated and call cleanup even if agent shutdown failed
+          this.state = AgentState.TERMINATED
           
           // Call onShutdown and onCleanup hooks even on failure
           this.callOnShutdown()
@@ -649,9 +669,12 @@ export class AgentManager {
         }
         
         // Finalize shutdown state
-        this.isInitialized = false
+        this.state = AgentState.TERMINATED
 
-        debugLog.lifecycle('shutdown complete', 'AgentManager', { requestId }, this.options.debug)
+        debugLog.lifecycle('shutdown complete', 'AgentManager', { 
+          requestId, 
+          finalState: this.state 
+        }, this.options.debug)
         
         // Call plugin onShutdown hooks
         await this.callPluginHook('onShutdown', {
@@ -670,7 +693,7 @@ export class AgentManager {
       {
         agentName: this.agent.name,
         transportName: this.transport.name,
-        wasInitialized: this.isInitialized
+        wasInitialized: this.state === AgentState.ACTIVE
       }
     )
   }
@@ -689,12 +712,15 @@ export class AgentManager {
   }
 
   // Utility methods for debugging and testing
-  getState(): { initialized: boolean; shutdown: boolean; agentId: string; transportId: string } {
+  getState(): { state: AgentState; agentId: string; transportId: string; 
+                initialized: boolean; shutdown: boolean } {
     return {
-      initialized: this.isInitialized,
-      shutdown: this.isShutdown,
+      state: this.state,
       agentId: this.agentId,
-      transportId: this.transport.id
+      transportId: this.transport.id,
+      // Backward compatibility flags
+      initialized: this.state === AgentState.ACTIVE,
+      shutdown: this.state === AgentState.SHUTTING_DOWN || this.state === AgentState.TERMINATED
     }
   }
 
@@ -714,8 +740,8 @@ export class AgentManager {
       canAcceptMore,
       queueSize: 0, // Unknown
       maxQueueSize: undefined,
-      isHealthy: this.isInitialized && !this.isShutdown,
-      healthMessage: this.isInitialized ? 'Transport operational' : 'Transport not ready'
+      isHealthy: this.state === AgentState.ACTIVE,
+      healthMessage: this.state === AgentState.ACTIVE ? 'Transport operational' : 'Transport not ready'
     }
   }
 

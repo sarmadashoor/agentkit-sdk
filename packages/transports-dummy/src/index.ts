@@ -211,6 +211,11 @@ export class LegacyDummyTransport implements Transport {
   getQueueSize(): number {
     return this.messageQueue.length
   }
+
+  // Required by Transport interface - legacy transport always accepts messages
+  canAcceptMore(): boolean {
+    return true
+  }
 }
 
 export const createDummyTransport = (config?: DummyTransportConfig): Transport => {

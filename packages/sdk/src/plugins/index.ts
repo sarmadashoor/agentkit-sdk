@@ -13,6 +13,10 @@ export { SecurePluginManager } from './SecurePluginManager'
 export { PluginSandbox } from './PluginSandbox'
 export { PluginCompatibilityValidator } from './PluginCompatibilityValidator'
 
+// Enhanced V2 sandboxing system
+export { SecurePluginManagerV2 } from './SecurePluginManagerV2'
+export { PluginSandboxV2 } from './PluginSandboxV2'
+
 export {
   AgentKitPlugin,
   AgentContext,
@@ -39,3 +43,15 @@ export type {
 export type {
   CompatibilityResult
 } from './PluginCompatibilityValidator'
+
+// Enhanced V2 types
+export type {
+  SecurePluginExecutionResult,
+  SecurePluginManagerOptions as SecurePluginManagerV2Options
+} from './SecurePluginManagerV2'
+
+export type {
+  SandboxExecutionResult as SandboxV2ExecutionResult,
+  PluginErrorEvent,
+  SandboxOptions as SandboxV2Options
+} from './PluginSandboxV2'

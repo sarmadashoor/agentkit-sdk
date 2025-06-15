@@ -284,14 +284,17 @@ export const AgentRegistryLegacy = {
   listAgents: () => defaultRegistry.listAgents(),
   listTransports: () => defaultRegistry.listTransports()
 }
-export { AgentManager } from './AgentManager'
+export { AgentManager, AgentState } from './AgentManager'
 export { BoundedExecutor } from './boundedExecutor'
 export { CircuitBreaker, CircuitState } from './circuitBreaker'
 export {
   PluginManager,
   LoggingPlugin,
   createLoggingPlugin,
-  PluginManagerOptions
+  PluginManagerOptions,
+  // Enhanced V2 sandboxing system
+  SecurePluginManagerV2,
+  PluginSandboxV2
 } from './plugins'
 
 // Re-export plugin types from @agentkit/types
@@ -315,3 +318,14 @@ export * from './errors'
 
 // Metrics and observability
 export * from './metrics'
+
+// Deep cloning utilities for plugin sandboxing
+export {
+  deepClone,
+  deepCloneArgs,
+  createFrozenClone,
+  validateClone,
+  isCloneable,
+  sanitizeForPlugin,
+  deepFreeze
+} from './utils/deepClone'
