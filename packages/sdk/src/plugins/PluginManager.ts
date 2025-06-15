@@ -41,7 +41,7 @@ export class PluginManager {
       observabilityHooks: options.observabilityHooks
     }
     
-    debugLog.lifecycle('plugin manager created', {
+    debugLog.lifecycle('plugin manager created', 'PluginManager', {
       hookTimeout: this.options.hookTimeout,
       failFast: this.options.failFast,
       debug: this.options.debug
@@ -66,11 +66,17 @@ export class PluginManager {
 
     this.plugins.push(plugin)
     
-    const hooks: PluginHookName[] = ['onInit', 'onSend', 'onError', 'onShutdown']
+    const availableHooks = [
+      plugin.onInit ? 'onInit' : null,
+      plugin.onSend ? 'onSend' : null, 
+      plugin.onError ? 'onError' : null,
+      plugin.onShutdown ? 'onShutdown' : null
+    ].filter(Boolean)
+    
     debugLog.operation('plugin registered', {
       name: plugin.name,
       version: plugin.version,
-      hooks: hooks.filter(h => !!plugin.hooks?.[h])
+      hooks: availableHooks
     }, this.options.debug)
   }
 
@@ -94,11 +100,11 @@ export class PluginManager {
     debugLog.operation('plugin hook execution start', {
       hook: hookName,
       pluginCount: this.plugins.length,
-      hasPlugins: this.plugins.some(p => !!p.hooks?.[hookName])
+      hasPlugins: this.plugins.some(p => !!(p as any)[hookName])
     }, this.options.debug)
 
     for (const plugin of this.plugins) {
-      const hook = plugin.hooks?.[hookName]
+      const hook = (plugin as any)[hookName]
       if (!hook) continue
 
       const result = await this.executePluginWithObservability(plugin, hookName, hook, args)
@@ -322,12 +328,7 @@ export class PluginManager {
 
     debugLog.error('plugin hook error', error as Error, this.options.debug)
 
-    if (this.options.debug) {
-      console.error(
-        `[PluginManager] Plugin "${plugin.name}" failed in ${hookName}:`,
-        error
-      )
-    }
+    debugLog.error('Plugin execution failed', error, this.options.debug)
   }
 
   /**
@@ -337,7 +338,7 @@ export class PluginManager {
     const hooks: PluginHookName[] = ['onInit', 'onSend', 'onError', 'onShutdown']
     
     for (const hookName of hooks) {
-      const hook = plugin.hooks?.[hookName]
+      const hook = (plugin as any)[hookName]
       if (!hook) continue
       
       if (typeof hook !== 'function') {

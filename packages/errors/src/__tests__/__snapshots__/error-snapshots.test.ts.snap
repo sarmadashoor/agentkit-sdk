@@ -20,7 +20,7 @@ exports[`Error System Snapshots > Error Hierarchy > error serialization and dese
     at runSuite (file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:909:15)
     at runFiles (file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:958:5)
     at startTests (file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:967:3)
-    at file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/vitest@1.6.1_@types+node@20.19.0/node_modules/vitest/dist/chunks/runtime-runBaseTests.oAvMKtQC.js:116:7",
+    at file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/vitest@1.6.1_@types+node@20.19.0_happy-dom@12.10.3/node_modules/vitest/dist/chunks/runtime-runBaseTests.oAvMKtQC.js:116:7",
   "timestamp": Any<String>,
 }
 `;

@@ -228,7 +228,11 @@ export class CircuitBreaker {
       reason
     }, this.options.debug)
     
-    console.warn(`[CircuitBreaker:${this.options.name}] Circuit opened: ${reason} (${this.failureCount} failures)`)
+    debugLog.warn('CircuitBreaker opened', {
+      name: this.options.name,
+      reason,
+      failureCount: this.failureCount
+    }, this.options.debug)
   }
 
   /**
@@ -263,7 +267,10 @@ export class CircuitBreaker {
       reason
     }, this.options.debug)
     
-    console.log(`[CircuitBreaker:${this.options.name}] Circuit transitioned to half-open: ${reason}`)
+    debugLog.lifecycle('half-open', 'CircuitBreaker', {
+      name: this.options.name,
+      reason
+    }, this.options.debug)
   }
 
   /**
@@ -301,7 +308,10 @@ export class CircuitBreaker {
       reason
     }, this.options.debug)
     
-    console.log(`[CircuitBreaker:${this.options.name}] Circuit recovered and closed: ${reason}`)
+    debugLog.lifecycle('closed', 'CircuitBreaker', {
+      name: this.options.name,
+      reason
+    }, this.options.debug)
   }
 
   /**
@@ -549,7 +559,9 @@ export class CircuitBreaker {
       clearedTimeouts: this.activeTimeouts.size
     }, this.options.debug)
     
-    console.log(`[CircuitBreaker:${this.options.name}] Circuit breaker shutdown complete`)
+    debugLog.lifecycle('shutdown complete', 'CircuitBreaker', {
+      name: this.options.name
+    }, this.options.debug)
   }
 
   /**

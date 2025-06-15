@@ -83,19 +83,19 @@ async function advancedExample() {
       debug: true,
       
       // Lifecycle hooks
-      onInit: (agentId) => {
+      onInit: (agentId: string) => {
         console.log(`🚀 Agent ${agentId} initialized`)
       },
       
-      onShutdown: (agentId) => {
+      onShutdown: (agentId: string) => {
         console.log(`🛑 Agent ${agentId} shutdown`)
       },
       
-      onError: (error) => {
+      onError: (error: Error) => {
         console.error('🚨 Agent error:', error.message)
       },
       
-      onCleanup: (agentId) => {
+      onCleanup: (agentId: string) => {
         console.log(`🧹 Cleanup completed for agent ${agentId}`)
       }
     })
@@ -155,7 +155,7 @@ async function chatExample() {
       scope: ['chat', 'history'],
       debug: false, // Disable debug in production
       
-      onOutput: (message) => {
+      onOutput: (message: any) => {
         // Handle real-time responses
         console.log('💬 Received:', message)
         displayMessage(message)

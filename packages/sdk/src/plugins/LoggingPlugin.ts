@@ -60,7 +60,7 @@ export class LoggingPlugin implements AgentKitPlugin {
     })
   }
 
-  private log(level: string, message: string, data: any): void {
+  private log(level: string, message: string, data: unknown): void {
     const timestamp = new Date().toISOString()
     const logMessage = `${this.logPrefix} [${timestamp}] ${message}`
     

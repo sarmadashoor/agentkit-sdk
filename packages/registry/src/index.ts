@@ -60,7 +60,7 @@ export class AgentRegistry implements AgentRegistryInterface {
     // Note: We create a shallow copy and freeze only the config deeply
     const frozenTransport = {
       ...transport,
-      config: createFrozenCopy(transport.config)
+      config: transport.config ? createFrozenCopy(transport.config) : undefined
     }
     this.transports.set(transport.id, Object.freeze(frozenTransport) as Transport)
   }
@@ -197,7 +197,8 @@ export function initializeDefaultRegistry(registry: AgentRegistry = defaultRegis
   } catch (error) {
     // Silently fail if modules aren't available (e.g., in production)
     if (process.env.NODE_ENV !== 'test') {
-      console.warn('Could not initialize default registry:', error)
+      // Silently ignore registry initialization errors to avoid console pollution in production
+      // Applications should handle registry setup explicitly if needed
     }
   }
 }

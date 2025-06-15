@@ -12,6 +12,11 @@
       "browser": "./dist/index.js",
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./lite": {
+      "browser": "./dist/lite.js",
+      "import": "./dist/lite.js",
+      "types": "./dist/lite.d.ts"
     }
   },
   "files": [
@@ -19,7 +24,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
+    "build:size-report": "npm run build && npm run size:check",
+    "size:check": "echo 'Bundle size analysis:' && echo 'Main bundle (with external deps):' && wc -c dist/index.js dist/BrowserTransport.js && echo 'Lite bundle (self-contained):' && wc -c dist/lite.js dist/BrowserTransportLite.js && echo 'Target: <20KB (20480 bytes)'",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "test:browser": "playwright test",

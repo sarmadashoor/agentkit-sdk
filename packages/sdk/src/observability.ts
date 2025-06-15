@@ -46,9 +46,11 @@ export function safeHookExecution(
     hookFn()
   } catch (error) {
     debugLog.error(`observability hook: ${hookName}`, error as Error, debug)
-    if (debug) {
-      console.warn(`[AgentKit] Observability hook '${hookName}' failed for agent ${agentId}: ${(error as Error).message}`)
-    }
+    debugLog.warn('Observability hook failed', {
+      hookName,
+      agentId,
+      error: (error as Error).message
+    }, debug)
     // Intentionally swallow the error to prevent disruption
   }
 }

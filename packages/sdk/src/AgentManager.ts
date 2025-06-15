@@ -455,7 +455,7 @@ export class AgentManager {
         debugLog.error('onOutput callback', error as Error, this.options.debug)
         // In debug mode, we could optionally warn the developer
         if (this.options.debug) {
-          console.warn(`[AgentKit] onOutput callback failed: ${getErrorMessage(error)}`)
+          debugLog.warn('onOutput callback failed', { error: getErrorMessage(error) }, this.options.debug)
         }
       }
     }
@@ -702,7 +702,7 @@ export class AgentManager {
         debugLog.error('onInit hook', error as Error, this.options.debug)
         // Don't throw - hooks should not break the main flow
         if (this.options.debug) {
-          console.warn(`[AgentKit] onInit hook failed: ${getErrorMessage(error)}`)
+          debugLog.warn('onInit hook failed', { error: getErrorMessage(error) }, this.options.debug)
         }
       }
     }
@@ -717,7 +717,7 @@ export class AgentManager {
         debugLog.error('onShutdown hook', error as Error, this.options.debug)
         // Don't throw - hooks should not break the main flow
         if (this.options.debug) {
-          console.warn(`[AgentKit] onShutdown hook failed: ${getErrorMessage(error)}`)
+          debugLog.warn('onShutdown hook failed', { error: getErrorMessage(error) }, this.options.debug)
         }
       }
     }
@@ -736,7 +736,7 @@ export class AgentManager {
         debugLog.error('onError hook', error as Error, this.options.debug)
         // Don't throw - hooks should not break the main flow
         if (this.options.debug) {
-          console.warn(`[AgentKit] onError hook failed: ${getErrorMessage(error)}`)
+          debugLog.warn('onError hook failed', { error: getErrorMessage(error) }, this.options.debug)
         }
       }
     }
@@ -749,13 +749,13 @@ export class AgentManager {
         debugLog.lifecycle('calling onCleanup hook', 'AgentManager', { agentId: this.agentId }, this.options.debug)
         this.options.onCleanup(this.agentId)
         if (this.options.debug) {
-          console.log(`[AgentKit:DEBUG] Cleanup hook fired for agent: ${this.agentId}`)
+          debugLog.lifecycle('cleanup hook fired', 'AgentManager', { agentId: this.agentId }, this.options.debug)
         }
       } catch (error) {
         debugLog.error('onCleanup hook', error as Error, this.options.debug)
         // Don't throw - hooks should not break the main flow
         if (this.options.debug) {
-          console.warn(`[AgentKit] onCleanup hook failed: ${getErrorMessage(error)}`)
+          debugLog.warn('onCleanup hook failed', { error: getErrorMessage(error) }, this.options.debug)
         }
       }
     }
@@ -789,7 +789,7 @@ export class AgentManager {
         supportedScopes,
         unsupportedScopes 
       })
-      console.warn(`[AgentKit] ${message}`)
+      debugLog.warn(message, {}, this.options.debug)
     } else {
       debugLog.operation('scope check', { 
         status: 'all requested scopes supported',
@@ -823,14 +823,14 @@ export class AgentManager {
       const failures = results.filter(r => !r.success)
       if (failures.length > 0 && this.options.debug) {
         failures.forEach(failure => {
-          console.warn(`[AgentKit] Plugin '${failure.pluginName}' failed in '${failure.hookName}':`, failure.error)
+          debugLog.warn('Plugin hook failed', { pluginName: failure.pluginName, hookName: failure.hookName, error: failure.error }, this.options.debug)
         })
       }
     } catch (error) {
       // Plugin execution should not break the main flow
       debugLog.error('plugin hook execution', error as Error, this.options.debug)
       if (this.options.debug) {
-        console.warn(`[AgentKit] Plugin hook '${hookName}' failed:`, error)
+        debugLog.warn('Plugin hook failed', { hookName, error }, this.options.debug)
       }
     }
   }

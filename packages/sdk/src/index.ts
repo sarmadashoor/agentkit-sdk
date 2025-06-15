@@ -312,3 +312,6 @@ export {
 
 // Re-export all errors for convenience
 export * from './errors'
+
+// Metrics and observability
+export * from './metrics'

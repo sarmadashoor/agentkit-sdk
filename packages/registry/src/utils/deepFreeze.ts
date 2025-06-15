@@ -17,7 +17,7 @@ export function deepFreeze<T extends object>(obj: T, visited = new WeakSet()): R
   
   // Retrieve the property names defined on obj
   Object.getOwnPropertyNames(obj).forEach(prop => {
-    const value = (obj as any)[prop]
+    const value = (obj as Record<string, unknown>)[prop]
     
     // Freeze properties that are objects, 
     // unless they're already frozen
@@ -40,14 +40,14 @@ function deepCopy<T>(obj: T, visited = new WeakMap()): T {
   }
   
   // Handle circular references
-  if (visited.has(obj as any)) {
-    return visited.get(obj as any)
+  if (visited.has(obj as object)) {
+    return visited.get(obj as object)
   }
   
   // Handle arrays
   if (Array.isArray(obj)) {
-    const copy: any[] = []
-    visited.set(obj as any, copy)
+    const copy: unknown[] = []
+    visited.set(obj as object, copy)
     for (let i = 0; i < obj.length; i++) {
       copy[i] = deepCopy(obj[i], visited)
     }
@@ -55,12 +55,12 @@ function deepCopy<T>(obj: T, visited = new WeakMap()): T {
   }
   
   // Handle objects
-  const copy: any = {}
-  visited.set(obj as any, copy)
+  const copy: Record<string, unknown> = {}
+  visited.set(obj as object, copy)
   
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      copy[key] = deepCopy((obj as any)[key], visited)
+      copy[key] = deepCopy((obj as Record<string, unknown>)[key], visited)
     }
   }
   
@@ -80,14 +80,14 @@ export function createFrozenCopy<T extends object>(obj: T): Readonly<T> {
 /**
  * Check if an object is deeply frozen
  */
-export function isDeeplyFrozen(obj: any): boolean {
-  if (!Object.isFrozen(obj)) {
+export function isDeeplyFrozen(obj: unknown): boolean {
+  if (typeof obj !== 'object' || obj === null || !Object.isFrozen(obj)) {
     return false
   }
   
   // Check all properties recursively
   for (const prop of Object.getOwnPropertyNames(obj)) {
-    const value = obj[prop]
+    const value = (obj as Record<string, unknown>)[prop]
     if (value && typeof value === 'object' && !isDeeplyFrozen(value)) {
       return false
     }
