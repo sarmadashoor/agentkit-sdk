@@ -7,9 +7,16 @@ import { RequestMetadata, ErrorContext, ObservabilityHooks } from '@agentkit/typ
 import { debugLog } from './log'
 
 /**
- * Generate a unique request ID (simple UUID v4 implementation)
+ * Generate a cryptographically secure unique request ID using Node.js crypto API
+ * Falls back to custom implementation if crypto.randomUUID is not available
  */
 export function generateRequestId(): string {
+  // Use Node.js 18+ crypto.randomUUID() for cryptographically secure UUIDs
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  
+  // Fallback implementation for environments without crypto.randomUUID
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0
     const v = c === 'x' ? r : (r & 0x3 | 0x8)
@@ -52,6 +59,7 @@ export function safeHookExecution(
 export class ObservabilityTracker {
   private hooks: ObservabilityHooks
   private debug: boolean
+  private isShutdown = false
 
   constructor(hooks: ObservabilityHooks = {}, debug: boolean = false) {
     this.hooks = hooks
@@ -186,5 +194,21 @@ export class ObservabilityTracker {
    */
   hasHooks(): boolean {
     return !!(this.hooks.onRequestStart || this.hooks.onRequestEnd || this.hooks.onError)
+  }
+
+  /**
+   * Shutdown the observability tracker and clean up resources
+   */
+  shutdown(): void {
+    if (this.isShutdown) {
+      return // Already shutdown, idempotent
+    }
+
+    this.isShutdown = true
+    
+    // Clear hook references to allow garbage collection
+    this.hooks = {}
+    
+    debugLog.operation('observability tracker shutdown', {}, this.debug)
   }
 }
