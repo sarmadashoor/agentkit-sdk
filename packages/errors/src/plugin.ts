@@ -87,3 +87,15 @@ export class RecursivePluginCallError extends AgentKitError {
     super(`Plugin "${pluginName}" hook "${hookName}" attempted recursive SDK call: ${recursiveCall}. This is not allowed to prevent infinite recursion.`, options)
   }
 }
+
+/**
+ * Error thrown when plugin sandbox execution fails
+ */
+export class PluginSandboxError extends AgentKitError {
+  readonly code = 'PLUGIN_SANDBOX_VIOLATION' as const
+  readonly category = 'security' as const
+
+  constructor(pluginName: string, hookName: string, reason: string, options?: AgentKitErrorOptions) {
+    super(`Plugin "${pluginName}" hook "${hookName}" sandbox violation: ${reason}`, options)
+  }
+}

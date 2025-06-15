@@ -92,7 +92,8 @@ export {
   PluginRegistrationError,
   PluginTimeoutError,
   PluginSignatureError,
-  RecursivePluginCallError
+  RecursivePluginCallError,
+  PluginSandboxError
 } from './plugin'
 
 // Circuit breaker errors

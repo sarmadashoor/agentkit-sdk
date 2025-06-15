@@ -83,6 +83,7 @@ export type ErrorCode =
   | 'PLUGIN_TIMEOUT'
   | 'PLUGIN_INVALID_SIGNATURE'
   | 'PLUGIN_RECURSIVE_CALL'
+  | 'PLUGIN_SANDBOX_VIOLATION'
   
   // Circuit Breaker
   | 'CIRCUIT_BREAKER_OPEN'
