@@ -380,4 +380,14 @@ export class BrowserTransportLite implements Transport {
     this.activeTimeouts.add(timeout)
     return timeout
   }
+
+  /**
+   * Check if transport can accept more messages (backpressure indicator)
+   */
+  canAcceptMore(): boolean {
+    // For HTTP transport, we base backpressure on active request count
+    // This prevents overwhelming the target server or browser's connection pool
+    const maxConcurrentRequests = 10 // Reasonable default for browser environment
+    return !this.isShutdown && this.activeRequests.size < maxConcurrentRequests
+  }
 }

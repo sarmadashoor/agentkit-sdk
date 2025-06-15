@@ -149,6 +149,15 @@ export class MockTransport implements Transport {
   }
 
   /**
+   * Check if transport can accept more messages (backpressure indicator)
+   */
+  canAcceptMore(): boolean {
+    // For mock transport, we can simulate backpressure based on failure rate
+    // High failure rate might indicate system stress
+    return this.config.failureRate < 0.8 // Allow backpressure when failure rate is high
+  }
+
+  /**
    * Truncate data for logging
    */
   private truncateData(data: unknown): string {

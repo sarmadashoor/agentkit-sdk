@@ -288,6 +288,16 @@ export class BrowserTransport implements Transport {
   }
 
   /**
+   * Check if transport can accept more messages (backpressure indicator)
+   */
+  canAcceptMore(): boolean {
+    // For HTTP transport, we base backpressure on active request count
+    // This prevents overwhelming the target server or browser's connection pool
+    const maxConcurrentRequests = 10 // Reasonable default for browser environment
+    return !this.isShutdown && this.activeRequests.size < maxConcurrentRequests
+  }
+
+  /**
    * Helper method to create tracked timeouts that will be cleaned up on shutdown
    */
   private createTrackedTimeout(callback: () => void, delay: number): NodeJS.Timeout {
