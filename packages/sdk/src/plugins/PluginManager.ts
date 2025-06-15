@@ -328,7 +328,7 @@ export class PluginManager {
 
     debugLog.error('plugin hook error', error as Error, this.options.debug)
 
-    debugLog.error('Plugin execution failed', error, this.options.debug)
+    debugLog.error('Plugin execution failed', error as Error, this.options.debug)
   }
 
   /**

@@ -17,6 +17,18 @@ export class PluginValidationError extends AgentKitError {
 }
 
 /**
+ * Error thrown when plugin compatibility checks fail
+ */
+export class PluginCompatibilityError extends AgentKitError {
+  readonly code = 'PLUGIN_COMPATIBILITY_FAILED' as const
+  readonly category = 'config' as const
+
+  constructor(pluginName: string, reason: string, options?: AgentKitErrorOptions) {
+    super(`Plugin "${pluginName}" compatibility check failed: ${reason}`, options)
+  }
+}
+
+/**
  * Error thrown when plugin hook execution fails
  */
 export class PluginHookError extends AgentKitError {

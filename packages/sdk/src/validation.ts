@@ -24,7 +24,18 @@ export function validateSchema<T>(
     const errorDetails = formatZodError(result.error)
     debugLog.validation(`${label} schema`, false, errorDetails, debug)
     
-    throw SchemaValidationError.fromZodError(result.error, {
+    // Convert ZodError to compatible format
+    const compatibleError = {
+      issues: result.error.issues.map(issue => ({
+        path: issue.path.map(p => String(p)),
+        message: issue.message,
+        expected: 'expected' in issue ? String(issue.expected) : undefined,
+        received: 'received' in issue ? String(issue.received) : undefined
+      })),
+      message: result.error.message
+    }
+    
+    throw SchemaValidationError.fromZodError(compatibleError, {
       context: { 
         label,
         input: typeof input === 'object' ? JSON.stringify(input, null, 2) : input

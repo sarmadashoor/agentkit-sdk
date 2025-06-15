@@ -7,6 +7,12 @@
 
 export { PluginManager } from './PluginManager'
 export { LoggingPlugin, createLoggingPlugin } from './LoggingPlugin'
+
+// New secure plugin system exports
+export { SecurePluginManager } from './SecurePluginManager'
+export { PluginSandbox } from './PluginSandbox'
+export { PluginCompatibilityValidator } from './PluginCompatibilityValidator'
+
 export {
   AgentKitPlugin,
   AgentContext,
@@ -18,3 +24,18 @@ export {
   AgentKitPluginSchema,
   isAgentKitPlugin
 } from './types'
+
+export type {
+  PluginExecutionSummary,
+  HookExecutionOrder,
+  SecurePluginManagerOptions
+} from './SecurePluginManager'
+
+export type {
+  SandboxExecutionResult,
+  SandboxOptions
+} from './PluginSandbox'
+
+export type {
+  CompatibilityResult
+} from './PluginCompatibilityValidator'
