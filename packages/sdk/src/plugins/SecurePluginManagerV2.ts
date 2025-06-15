@@ -29,6 +29,7 @@ import {
 } from '../errors'
 import { debugLog } from '../log'
 import { PluginSandboxV2, SandboxExecutionResult, PluginErrorEvent } from './PluginSandboxV2'
+import { pluginExecutionContext, withPluginExecutionContext } from './PluginExecutionContext'
 
 /**
  * Plugin registration metadata with order tracking
@@ -224,11 +225,15 @@ export class SecurePluginManagerV2 extends EventEmitter {
         let sandboxResult: SandboxExecutionResult
 
         if (this.options.enableSandboxing) {
-          // Use sandbox for complete isolation
-          sandboxResult = await this.sandbox.executeHook(plugin, hookName, ...args)
+          // Use sandbox for complete isolation with execution context tracking
+          sandboxResult = await this.executeWithExecutionContext(plugin, hookName, () =>
+            this.sandbox.executeHook(plugin, hookName, ...args)
+          )
         } else {
-          // Fallback to basic try/catch isolation
-          sandboxResult = await this.executeWithBasicIsolation(plugin, hookName, args)
+          // Fallback to basic try/catch isolation with execution context tracking
+          sandboxResult = await this.executeWithExecutionContext(plugin, hookName, () =>
+            this.executeWithBasicIsolation(plugin, hookName, args)
+          )
         }
 
         const enhancedResult: SecurePluginExecutionResult = {
@@ -327,6 +332,23 @@ export class SecurePluginManagerV2 extends EventEmitter {
     }, this.options.debug)
 
     return results
+  }
+
+  /**
+   * Execute plugin with execution context tracking for recursive call protection
+   */
+  private async executeWithExecutionContext(
+    plugin: AgentKitPlugin,
+    hookName: PluginHookName,
+    executeFn: () => Promise<SandboxExecutionResult>
+  ): Promise<SandboxExecutionResult> {
+    const executionId = pluginExecutionContext.startExecution(plugin.name, hookName)
+    
+    try {
+      return await executeFn()
+    } finally {
+      pluginExecutionContext.endExecution(executionId)
+    }
   }
 
   /**

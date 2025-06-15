@@ -81,6 +81,17 @@ export interface ObservabilityHooks {
   onRequestStart?: (metadata: RequestMetadata) => void
   onRequestEnd?: (metadata: RequestMetadata, duration: number) => void
   onError?: (error: Error, context: ErrorContext) => void
+  
+  // Transport backpressure events
+  onTransportBackpressureDetected?: (event: BackpressureEvent) => void
+  onTransportBackpressureResolved?: (event: BackpressureResolvedEvent) => void
+  onBackpressureQueueEnqueued?: (event: BackpressureQueueEvent) => void
+  onBackpressureQueueProcessed?: (event: BackpressureQueueEvent) => void
+  onBackpressureQueueFailed?: (event: BackpressureQueueFailedEvent) => void
+  
+  // Circuit breaker events
+  onCircuitBreakerStateChange?: (event: CircuitBreakerStateChangeEvent) => void
+  onCircuitBreakerRequestRejected?: (event: CircuitBreakerRejectionEvent) => void
 }
 
 export interface RequestMetadata {
@@ -100,6 +111,64 @@ export interface ErrorContext {
   timestamp: string
   phase: 'init' | 'handle' | 'send' | 'shutdown' | 'cleanup'
   error: Error
+  context?: Record<string, unknown>
+}
+
+// Backpressure observability event interfaces
+export interface BackpressureEvent {
+  agentId: string
+  transportId: string
+  timestamp: number
+  requestId?: string
+  transportStatus?: TransportStatus
+  context?: Record<string, unknown>
+}
+
+export interface BackpressureResolvedEvent {
+  agentId: string
+  transportId: string
+  timestamp: number
+  queueSize: number
+  totalProcessingTime: number
+  context?: Record<string, unknown>
+}
+
+export interface BackpressureQueueEvent {
+  agentId: string
+  transportId: string
+  timestamp: number
+  itemId: string
+  queueSize: number
+  processingTime?: number
+  attempts?: number
+  context?: Record<string, unknown>
+}
+
+export interface BackpressureQueueFailedEvent extends BackpressureQueueEvent {
+  error: Error
+  willRetry: boolean
+  maxRetries: number
+}
+
+// Circuit breaker observability event interfaces
+export interface CircuitBreakerStateChangeEvent {
+  agentId: string
+  transportId: string
+  circuitName: string
+  fromState: string
+  toState: string
+  timestamp: number
+  reason: string
+  metadata?: Record<string, unknown>
+}
+
+export interface CircuitBreakerRejectionEvent {
+  agentId: string
+  transportId: string
+  circuitName: string
+  timestamp: number
+  rejectedCount: number
+  nextAttemptAt?: number
   context?: Record<string, unknown>
 }
 

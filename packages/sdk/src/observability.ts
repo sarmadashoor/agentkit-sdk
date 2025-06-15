@@ -3,7 +3,17 @@
  * Provides safe hook execution and request tracking
  */
 
-import { RequestMetadata, ErrorContext, ObservabilityHooks } from '@agentkit/types'
+import { 
+  RequestMetadata, 
+  ErrorContext, 
+  ObservabilityHooks,
+  BackpressureEvent,
+  BackpressureResolvedEvent,
+  BackpressureQueueEvent,
+  BackpressureQueueFailedEvent,
+  CircuitBreakerStateChangeEvent,
+  CircuitBreakerRejectionEvent
+} from '@agentkit/types'
 import { debugLog } from './log'
 
 /**
@@ -195,7 +205,116 @@ export class ObservabilityTracker {
    * Check if any hooks are configured
    */
   hasHooks(): boolean {
-    return !!(this.hooks.onRequestStart || this.hooks.onRequestEnd || this.hooks.onError)
+    return !!(
+      this.hooks.onRequestStart || 
+      this.hooks.onRequestEnd || 
+      this.hooks.onError ||
+      this.hooks.onTransportBackpressureDetected ||
+      this.hooks.onTransportBackpressureResolved ||
+      this.hooks.onBackpressureQueueEnqueued ||
+      this.hooks.onBackpressureQueueProcessed ||
+      this.hooks.onBackpressureQueueFailed ||
+      this.hooks.onCircuitBreakerStateChange ||
+      this.hooks.onCircuitBreakerRequestRejected
+    )
+  }
+
+  /**
+   * Emit backpressure detected event
+   */
+  emitBackpressureDetected(event: BackpressureEvent): void {
+    if (this.isShutdown) return
+    
+    safeHookExecution(
+      'onTransportBackpressureDetected',
+      () => this.hooks.onTransportBackpressureDetected?.(event),
+      event.agentId,
+      this.debug
+    )
+  }
+
+  /**
+   * Emit backpressure resolved event
+   */
+  emitBackpressureResolved(event: BackpressureResolvedEvent): void {
+    if (this.isShutdown) return
+    
+    safeHookExecution(
+      'onTransportBackpressureResolved',
+      () => this.hooks.onTransportBackpressureResolved?.(event),
+      event.agentId,
+      this.debug
+    )
+  }
+
+  /**
+   * Emit backpressure queue enqueued event
+   */
+  emitBackpressureQueueEnqueued(event: BackpressureQueueEvent): void {
+    if (this.isShutdown) return
+    
+    safeHookExecution(
+      'onBackpressureQueueEnqueued',
+      () => this.hooks.onBackpressureQueueEnqueued?.(event),
+      event.agentId,
+      this.debug
+    )
+  }
+
+  /**
+   * Emit backpressure queue processed event
+   */
+  emitBackpressureQueueProcessed(event: BackpressureQueueEvent): void {
+    if (this.isShutdown) return
+    
+    safeHookExecution(
+      'onBackpressureQueueProcessed',
+      () => this.hooks.onBackpressureQueueProcessed?.(event),
+      event.agentId,
+      this.debug
+    )
+  }
+
+  /**
+   * Emit backpressure queue failed event
+   */
+  emitBackpressureQueueFailed(event: BackpressureQueueFailedEvent): void {
+    if (this.isShutdown) return
+    
+    safeHookExecution(
+      'onBackpressureQueueFailed',
+      () => this.hooks.onBackpressureQueueFailed?.(event),
+      event.agentId,
+      this.debug
+    )
+  }
+
+  /**
+   * Emit circuit breaker state change event
+   */
+  emitCircuitBreakerStateChange(event: CircuitBreakerStateChangeEvent): void {
+    if (this.isShutdown) return
+    
+    safeHookExecution(
+      'onCircuitBreakerStateChange',
+      () => this.hooks.onCircuitBreakerStateChange?.(event),
+      event.agentId,
+      this.debug
+    )
+  }
+
+  /**
+   * Emit circuit breaker request rejected event
+   */
+  emitCircuitBreakerRequestRejected(event: CircuitBreakerRejectionEvent): void {
+    if (this.isShutdown) return
+    
+    safeHookExecution(
+      'onCircuitBreakerRequestRejected',
+      () => this.hooks.onCircuitBreakerRequestRejected?.(event),
+      event.agentId,
+      this.debug
+    )
   }
 
   /**

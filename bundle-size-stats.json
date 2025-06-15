@@ -1,0 +1,75 @@
+{
+  "packages": {
+    "@agentkit/registry": {
+      "files": {
+        "index.js": {
+          "uncompressed": 295555,
+          "compressed": 44831,
+          "limit": 51200,
+          "violation": false
+        },
+        "index.mjs": {
+          "uncompressed": 294458,
+          "compressed": 44645,
+          "limit": 51200,
+          "violation": false
+        }
+      },
+      "violations": []
+    },
+    "@agentkit/runtime-web": {
+      "files": {
+        "index.js": {
+          "uncompressed": 88,
+          "compressed": 91,
+          "limit": 20480,
+          "violation": false
+        },
+        "lite.js": {
+          "uncompressed": 581,
+          "compressed": 313,
+          "limit": 15360,
+          "violation": false
+        }
+      },
+      "violations": []
+    },
+    "@agentkit/sdk": {
+      "files": {
+        "index.js": {
+          "uncompressed": 321203,
+          "compressed": 55986,
+          "limit": 61440,
+          "violation": false
+        },
+        "index.mjs": {
+          "uncompressed": 314344,
+          "compressed": 54871,
+          "limit": 61440,
+          "violation": false
+        }
+      },
+      "violations": []
+    },
+    "@agentkit/types": {
+      "files": {
+        "index.js": {
+          "uncompressed": 11972,
+          "compressed": 2164,
+          "limit": 5120,
+          "violation": false
+        },
+        "index.mjs": {
+          "uncompressed": 8004,
+          "compressed": 1614,
+          "limit": 5120,
+          "violation": false
+        }
+      },
+      "violations": []
+    }
+  },
+  "totalCompressed": 204515,
+  "totalUncompressed": 1246205,
+  "violations": []
+}

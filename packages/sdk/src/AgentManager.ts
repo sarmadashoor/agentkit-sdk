@@ -18,11 +18,15 @@ import {
 import { debugLog } from './log'
 import { validateAgentConfig, validateTransportConfig } from './validation'
 import { ObservabilityTracker } from './observability'
+import { MetricsCollector } from './observability/MetricsCollector'
+import { PluginExecutionTimeline } from './observability/PluginExecutionTimeline'
 import { BoundedExecutor } from './boundedExecutor'
 import { CircuitBreaker } from './circuitBreaker'
 import { PluginManager, AgentKitPlugin, AgentContext, SendPayload } from './plugins'
 import { Mutex } from './utils/mutex'
 import { SharedAsyncLock } from './utils/AsyncLock'
+import { guardAgainstRecursivePluginCalls } from './plugins/PluginExecutionContext'
+import { BackpressureQueue, BackpressureQueueOptions } from './BackpressureQueue'
 
 // Agent lifecycle states - replaces boolean flags for better state management
 export enum AgentState {
@@ -32,9 +36,22 @@ export enum AgentState {
   TERMINATED = 'terminated' // Fully shutdown, cannot be reused
 }
 
-// Extended ConnectAgentOptions to include plugins
+// Extended ConnectAgentOptions to include plugins and backpressure handling
 interface ConnectAgentOptions extends BaseConnectAgentOptions {
   plugins?: AgentKitPlugin[]
+  /** Enable backpressure fallback queue (default: true) */
+  enableBackpressureQueue?: boolean
+  /** Backpressure queue configuration options */
+  backpressureQueueOptions?: BackpressureQueueOptions
+  /** Enable debug mode with enhanced observability (default: false) */
+  enableDebugMode?: boolean
+  /** Observability configuration */
+  observabilityConfig?: {
+    enableMetricsCollection?: boolean
+    enableTimelineDebug?: boolean
+    performanceThreshold?: number
+    enableConsoleWarnings?: boolean
+  }
 }
 
 export class AgentManager {
@@ -49,6 +66,10 @@ export class AgentManager {
   private boundedExecutor: BoundedExecutor // Always use bounded executor for concurrency control
   private circuitBreaker?: CircuitBreaker
   private pluginManager: PluginManager
+  private backpressureQueue?: BackpressureQueue
+  private metricsCollector?: MetricsCollector
+  private timeline?: PluginExecutionTimeline
+  private enableDebugMode: boolean
   
   // Critical section protection - using shared AsyncLock for send/shutdown coordination
   private stateLock = SharedAsyncLock.getInstance() // Protects state transitions and send operations
@@ -66,12 +87,29 @@ export class AgentManager {
     this.registeredScopes = registeredScopes
     // Use provided agentId or fall back to agent.id for backward compatibility
     this.agentId = agentId || agent.id
+    this.enableDebugMode = options.enableDebugMode || false
     
     // Initialize observability tracker
     this.observabilityTracker = new ObservabilityTracker(
       options.observability || {},
       options.debug || false
     )
+    
+    // Initialize metrics collector if enabled
+    if (options.observabilityConfig?.enableMetricsCollection !== false) {
+      this.metricsCollector = new MetricsCollector({
+        platform: typeof window !== 'undefined' ? 'browser' : 'node'
+      })
+    }
+    
+    // Initialize plugin execution timeline if enabled
+    if (options.observabilityConfig?.enableTimelineDebug !== false) {
+      this.timeline = new PluginExecutionTimeline({
+        platform: typeof window !== 'undefined' ? 'browser' : 'node',
+        warningThreshold: options.observabilityConfig?.performanceThreshold,
+        enableConsoleWarnings: options.observabilityConfig?.enableConsoleWarnings !== false
+      })
+    }
     
     // Always initialize bounded executor for concurrency control and backpressure
     // Use provided limits or sensible defaults
@@ -92,13 +130,79 @@ export class AgentManager {
         ...options.circuitBreaker,
         enabled: true,
         name: `circuit-breaker-${this.agentId}-${this.transport.id}`,
-        debug: options.debug || false
+        debug: options.debug || false,
+        observabilityHooks: {
+          onCircuitOpen: (event) => {
+            this.observabilityTracker.emitCircuitBreakerStateChange({
+              agentId: this.agentId,
+              transportId: this.transport.id,
+              circuitName: event.circuitName,
+              fromState: event.fromState,
+              toState: event.toState,
+              timestamp: event.timestamp,
+              reason: event.reason,
+              metadata: event.metadata
+            })
+          },
+          onCircuitClose: (event) => {
+            this.observabilityTracker.emitCircuitBreakerStateChange({
+              agentId: this.agentId,
+              transportId: this.transport.id,
+              circuitName: event.circuitName,
+              fromState: event.fromState,
+              toState: event.toState,
+              timestamp: event.timestamp,
+              reason: event.reason,
+              metadata: event.metadata
+            })
+          },
+          onCircuitHalfOpen: (event) => {
+            this.observabilityTracker.emitCircuitBreakerStateChange({
+              agentId: this.agentId,
+              transportId: this.transport.id,
+              circuitName: event.circuitName,
+              fromState: event.fromState,
+              toState: event.toState,
+              timestamp: event.timestamp,
+              reason: event.reason,
+              metadata: event.metadata
+            })
+          },
+          onRequestRejected: (circuitName, rejectedCount) => {
+            this.observabilityTracker.emitCircuitBreakerRequestRejected({
+              agentId: this.agentId,
+              transportId: this.transport.id,
+              circuitName,
+              timestamp: Date.now(),
+              rejectedCount,
+              nextAttemptAt: this.circuitBreaker?.getStats().nextAttemptAt
+            })
+          }
+        }
       })
     }
     
-    // Initialize plugin manager
+    // Initialize plugin manager with observability hooks
     this.pluginManager = new PluginManager({
-      debug: options.debug || false
+      debug: options.debug || false,
+      observabilityHooks: {
+        onPluginStart: (pluginName: string, hookName: string) => {
+          this.timeline?.startExecution(hookName, pluginName)
+        },
+        onPluginSuccess: (pluginName: string, hookName: string, duration: number) => {
+          this.timeline?.addExecution(hookName, pluginName, duration, 'success')
+          this.metricsCollector?.recordPluginExecution(pluginName, hookName, duration, true)
+        },
+        onPluginError: (pluginName: string, hookName: string, error: Error) => {
+          const duration = Date.now() // Fallback duration
+          this.timeline?.addExecution(hookName, pluginName, duration, 'error', error.message)
+          this.metricsCollector?.recordPluginExecution(pluginName, hookName, duration, false)
+        },
+        onPluginTimeout: (pluginName: string, hookName: string, timeout: number) => {
+          this.timeline?.addExecution(hookName, pluginName, timeout, 'timeout')
+          this.metricsCollector?.recordPluginExecution(pluginName, hookName, timeout, false, true)
+        }
+      }
     })
     
     // Register plugins if provided
@@ -106,6 +210,62 @@ export class AgentManager {
       for (const plugin of options.plugins) {
         this.pluginManager.register(plugin)
       }
+    }
+    
+    // Initialize backpressure queue if enabled
+    if (options.enableBackpressureQueue !== false) { // Default to enabled
+      this.backpressureQueue = new BackpressureQueue(
+        this.transport,
+        {
+          debug: options.debug || false,
+          ...options.backpressureQueueOptions
+        },
+        {
+          onItemEnqueued: (item) => {
+            this.observabilityTracker.emitBackpressureQueueEnqueued({
+              agentId: this.agentId,
+              transportId: this.transport.id,
+              timestamp: Date.now(),
+              itemId: item.id,
+              queueSize: this.backpressureQueue!.getQueueSize(),
+              attempts: item.attempts
+            })
+          },
+          onItemProcessed: (item, processingTime) => {
+            this.observabilityTracker.emitBackpressureQueueProcessed({
+              agentId: this.agentId,
+              transportId: this.transport.id,
+              timestamp: Date.now(),
+              itemId: item.id,
+              queueSize: this.backpressureQueue!.getQueueSize(),
+              processingTime,
+              attempts: item.attempts
+            })
+          },
+          onItemFailed: (item, error, willRetry) => {
+            this.observabilityTracker.emitBackpressureQueueFailed({
+              agentId: this.agentId,
+              transportId: this.transport.id,
+              timestamp: Date.now(),
+              itemId: item.id,
+              queueSize: this.backpressureQueue!.getQueueSize(),
+              attempts: item.attempts,
+              error,
+              willRetry,
+              maxRetries: options.backpressureQueueOptions?.maxRetries ?? 5
+            })
+          },
+          onBackpressureResolved: (queueSize) => {
+            this.observabilityTracker.emitBackpressureResolved({
+              agentId: this.agentId,
+              transportId: this.transport.id,
+              timestamp: Date.now(),
+              queueSize,
+              totalProcessingTime: 0 // Could track this if needed
+            })
+          }
+        }
+      )
     }
 
     debugLog.lifecycle('constructed', 'AgentManager', {
@@ -137,8 +297,9 @@ export class AgentManager {
         })
       }
 
-    // Track initialization with observability
-    return this.observabilityTracker.trackRequest(
+    // Track initialization with observability and metrics
+    const startTime = Date.now()
+    const result = await this.observabilityTracker.trackRequest(
       'init',
       this.agentId,
       this.transport.id,
@@ -258,6 +419,9 @@ export class AgentManager {
         
         // Call onInit lifecycle hook
         this.callOnInit()
+        
+        // Expose timeline globally if debug mode is enabled
+        this.exposeTimelineGlobally()
       },
       {
         agentName: this.agent.name,
@@ -265,10 +429,19 @@ export class AgentManager {
         hasScope: !!(this.options.scope && this.options.scope.length > 0)
       }
     )
+    
+    // Record initialization metrics
+    const duration = Date.now() - startTime
+    this.metricsCollector?.recordInitLatency(duration)
+    
+    return result
     }) // Close stateLock.lock
   }
 
   async send(input: AgentInput): Promise<void> {
+    // Guard against recursive plugin calls
+    guardAgainstRecursivePluginCalls('AgentManager.send')
+    
     // Use shared AsyncLock to prevent race conditions with shutdown
     return this.stateLock.lock(async () => {
       // Check state under lock to prevent race conditions
@@ -306,7 +479,8 @@ export class AgentManager {
 
         // Wrap with circuit breaker if enabled
         const operationFn = async () => {
-          return this.observabilityTracker.trackRequest(
+          const startTime = Date.now()
+          const result = await this.observabilityTracker.trackRequest(
             'send',
             this.agentId,
             this.transport.id,
@@ -318,6 +492,12 @@ export class AgentManager {
               hasInput: input !== undefined && input !== null
             }
           )
+          
+          // Record send metrics
+          const duration = Date.now() - startTime
+          this.metricsCollector?.recordSendLatency(duration)
+          
+          return result
         }
         
         if (this.circuitBreaker) {
@@ -408,28 +588,57 @@ export class AgentManager {
     try {
       // Check transport backpressure before sending
       if (!this.transport.canAcceptMore()) {
-        const backpressureError = new TransportBackpressureError(
-          this.transport.id,
-          `Transport "${this.transport.id}" is under backpressure and cannot accept more messages`,
-          undefined, // currentLoad unknown
-          undefined  // maxCapacity unknown
-        )
-        
-        debugLog.warn('transport backpressure detected', {
+        // Emit backpressure detected event
+        this.observabilityTracker.emitBackpressureDetected({
+          agentId: this.agentId,
           transportId: this.transport.id,
-          requestId
-        }, this.options.debug)
+          timestamp: Date.now(),
+          requestId,
+          transportStatus: this.transport.getStatus?.()
+        })
         
-        // Track backpressure as an error
-        this.observabilityTracker.trackError(
-          backpressureError,
-          'send',
-          this.agentId,
-          this.transport.id,
-          { phase: 'backpressure', requestId, outputType: typeof output }
-        )
-        
-        throw backpressureError
+        if (this.backpressureQueue) {
+          // Use fallback queue for retry with exponential backoff
+          debugLog.operation('using backpressure fallback queue', {
+            transportId: this.transport.id,
+            requestId,
+            queueSize: this.backpressureQueue.getQueueSize()
+          }, this.options.debug)
+          
+          await this.backpressureQueue.enqueue(output)
+          
+          debugLog.operation('queued for backpressure retry', {
+            transportId: this.transport.id,
+            requestId,
+            newQueueSize: this.backpressureQueue.getQueueSize()
+          }, this.options.debug)
+          
+          return // Successfully queued, will be retried later
+        } else {
+          // No fallback queue - throw error immediately
+          const backpressureError = new TransportBackpressureError(
+            this.transport.id,
+            `Transport "${this.transport.id}" is under backpressure and cannot accept more messages`,
+            undefined, // currentLoad unknown
+            undefined  // maxCapacity unknown
+          )
+          
+          debugLog.warn('transport backpressure detected, no fallback queue', {
+            transportId: this.transport.id,
+            requestId
+          }, this.options.debug)
+          
+          // Track backpressure as an error
+          this.observabilityTracker.trackError(
+            backpressureError,
+            'send',
+            this.agentId,
+            this.transport.id,
+            { phase: 'backpressure', requestId, outputType: typeof output }
+          )
+          
+          throw backpressureError
+        }
       }
 
       // Send output through transport
@@ -507,6 +716,9 @@ export class AgentManager {
   }
 
   async shutdown(): Promise<void> {
+    // Guard against recursive plugin calls
+    guardAgainstRecursivePluginCalls('AgentManager.shutdown')
+    
     // Use shared AsyncLock to ensure atomic shutdown operation and prevent race with send
     return this.stateLock.lock(async () => {
       // Check current state under lock
@@ -540,8 +752,9 @@ export class AgentManager {
    * Internal shutdown operation that's called after state validation
    */
   private async executeShutdownOperation(): Promise<void> {
-    // Track shutdown with observability
-    return await this.observabilityTracker.trackRequest(
+    // Track shutdown with observability and metrics
+    const startTime = Date.now()
+    const result = await this.observabilityTracker.trackRequest(
       'shutdown',
       this.agentId,
       this.transport.id,
@@ -592,6 +805,21 @@ export class AgentManager {
         debugLog.lifecycle('shutdown complete', 'PluginManager', { 
           requestId 
         }, this.options.debug)
+
+        // Shutdown backpressure queue if it exists
+        if (this.backpressureQueue) {
+          debugLog.lifecycle('shutdown start', 'BackpressureQueue', { 
+            queueSize: this.backpressureQueue.getQueueSize(),
+            stats: this.backpressureQueue.getStats(),
+            requestId 
+          }, this.options.debug)
+          
+          this.backpressureQueue.shutdown()
+          
+          debugLog.lifecycle('shutdown complete', 'BackpressureQueue', { 
+            requestId 
+          }, this.options.debug)
+        }
 
         // Shutdown observability tracker
         debugLog.lifecycle('shutdown start', 'ObservabilityTracker', { 
@@ -696,6 +924,13 @@ export class AgentManager {
         wasInitialized: this.state === AgentState.ACTIVE
       }
     )
+    
+    // Record shutdown metrics
+    const duration = Date.now() - startTime
+    this.metricsCollector?.recordShutdownLatency(duration)
+    this.timeline?.finalize()
+    
+    return result
   }
 
   createRuntimeHandle(): AgentRuntimeHandle {
@@ -885,6 +1120,54 @@ export class AgentManager {
       if (this.options.debug) {
         debugLog.warn('Plugin hook failed', { hookName, error }, this.options.debug)
       }
+    }
+  }
+
+  // ===== OBSERVABILITY PUBLIC API =====
+
+  /**
+   * Get comprehensive metrics in Prometheus-compatible format
+   */
+  getMetrics() {
+    return this.metricsCollector?.getMetrics()
+  }
+
+  /**
+   * Get plugin execution timeline for debugging
+   */
+  getDebugTimeline() {
+    return this.timeline?.getTimeline()
+  }
+
+  /**
+   * Export metrics in Prometheus text format
+   */
+  exportPrometheusMetrics(): string {
+    return this.metricsCollector?.exportPrometheusMetrics() || ''
+  }
+
+  /**
+   * Print timeline to console for debugging
+   */
+  printTimeline(): void {
+    this.timeline?.printTimeline()
+  }
+
+  /**
+   * Get performance statistics for plugin analysis
+   */
+  getPerformanceStats() {
+    return this.timeline?.getPerformanceStats()
+  }
+
+  /**
+   * Expose timeline globally for browser debugging (if enabled)
+   */
+  private exposeTimelineGlobally(): void {
+    if (this.enableDebugMode && typeof window !== 'undefined' && this.timeline) {
+      (window as any).__AGENTKIT_TIMELINE__ = this.timeline.exportForBrowser()
+      console.log('🔍 AgentKit Timeline exposed as window.__AGENTKIT_TIMELINE__')
+      console.log('📊 Use window.__AGENTKIT_TIMELINE__.printTimeline() to view execution timeline')
     }
   }
 }

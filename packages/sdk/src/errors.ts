@@ -72,6 +72,7 @@ export {
   PluginRegistrationError,
   PluginTimeoutError,
   PluginSignatureError,
+  RecursivePluginCallError,
 
   // Circuit breaker errors
   CircuitBreakerError,

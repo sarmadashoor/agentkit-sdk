@@ -22,8 +22,12 @@ import {
 } from './errors'
 import { debugLog } from './log'
 import { validateSchema, validateScope } from './validation'
+import { guardAgainstRecursivePluginCalls } from './plugins/PluginExecutionContext'
 
 export async function connectAgent(options: ConnectAgentOptions): Promise<AgentRuntimeHandle> {
+  // Guard against recursive plugin calls
+  guardAgainstRecursivePluginCalls('connectAgent')
+  
   debugLog.operation('connectAgent start', { 
     agentType: typeof options.agent, 
     transportType: typeof options.transport,
@@ -297,6 +301,13 @@ export {
   PluginSandboxV2
 } from './plugins'
 
+// Plugin execution context and chaos testing utilities
+export {
+  pluginExecutionContext,
+  guardAgainstRecursivePluginCalls,
+  withPluginExecutionContext
+} from './plugins/PluginExecutionContext'
+
 // Re-export plugin types from @agentkit/types
 export type {
   AgentKitPlugin,
@@ -318,6 +329,15 @@ export * from './errors'
 
 // Metrics and observability
 export * from './metrics'
+
+// Observability - Stripe-grade SDK visibility and debugging
+export { MetricsCollector, PrometheusMetricsSchema } from './observability/MetricsCollector'
+export type { PrometheusMetrics, PluginExecutionMetric, Histogram } from './observability/MetricsCollector'
+
+export { PluginExecutionTimeline, TimelineSchema, TimelineEntrySchema } from './observability/PluginExecutionTimeline'
+export type { Timeline, TimelineEntry } from './observability/PluginExecutionTimeline'
+
+export { ObservabilityTracker, generateRequestId, getCurrentTimestamp, safeHookExecution } from './observability'
 
 // Deep cloning utilities for plugin sandboxing
 export {

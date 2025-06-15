@@ -17,6 +17,7 @@ export type ErrorCategory =
   | 'authentication' // Auth and permission errors
   | 'resource'      // Resource management errors (quota, limits)
   | 'plugin'        // Plugin-related errors (hooks, validation)
+  | 'security'      // Security-related errors (recursive calls, sandboxing)
   | 'internal'      // Internal SDK errors (bugs, unexpected states)
 
 /**
@@ -81,6 +82,7 @@ export type ErrorCode =
   | 'PLUGIN_REGISTRATION_FAILED'
   | 'PLUGIN_TIMEOUT'
   | 'PLUGIN_INVALID_SIGNATURE'
+  | 'PLUGIN_RECURSIVE_CALL'
   
   // Circuit Breaker
   | 'CIRCUIT_BREAKER_OPEN'

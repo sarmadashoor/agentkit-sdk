@@ -17,6 +17,13 @@ export { PluginCompatibilityValidator } from './PluginCompatibilityValidator'
 export { SecurePluginManagerV2 } from './SecurePluginManagerV2'
 export { PluginSandboxV2 } from './PluginSandboxV2'
 
+// Plugin execution context and chaos testing
+export { 
+  pluginExecutionContext,
+  guardAgainstRecursivePluginCalls,
+  withPluginExecutionContext
+} from './PluginExecutionContext'
+
 export {
   AgentKitPlugin,
   AgentContext,

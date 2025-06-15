@@ -75,3 +75,15 @@ export class PluginSignatureError extends AgentKitError {
     super(`Plugin "${pluginName}" hook "${hookName}" has invalid signature: ${reason}`, options)
   }
 }
+
+/**
+ * Error thrown when plugin attempts recursive SDK calls
+ */
+export class RecursivePluginCallError extends AgentKitError {
+  readonly code = 'PLUGIN_RECURSIVE_CALL' as const
+  readonly category = 'security' as const
+
+  constructor(pluginName: string, hookName: string, recursiveCall: string, options?: AgentKitErrorOptions) {
+    super(`Plugin "${pluginName}" hook "${hookName}" attempted recursive SDK call: ${recursiveCall}. This is not allowed to prevent infinite recursion.`, options)
+  }
+}

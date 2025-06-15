@@ -5,6 +5,7 @@
 
 import { debugLog } from './log'
 import { CircuitBreakerError, CircuitBreakerConfigError } from './errors'
+import { AsyncLock } from './utils/AsyncLock'
 
 /**
  * State transition event data
@@ -108,6 +109,9 @@ export class CircuitBreaker {
   // Memory leak prevention - track active timers
   private activeTimeouts = new Set<NodeJS.Timeout>()
   private isShutdown = false
+  
+  // Atomic state management - prevents race conditions in concurrent scenarios
+  private readonly stateLock = new AsyncLock()
 
   constructor(options: CircuitBreakerOptions = {}) {
     this.options = {
@@ -195,180 +199,205 @@ export class CircuitBreaker {
   }
 
   /**
-   * Transition circuit to OPEN state
+   * Transition circuit to OPEN state (atomic operation)
    */
-  private openCircuit(reason: string = 'failure threshold exceeded'): void {
-    const previousState = this.state
-    this.state = CircuitState.OPEN
-    this.openedAt = Date.now()
-    this.stateTransitions++
-    this.recoverySuccessCount = 0 // Reset recovery counter
-    
-    const event: StateTransitionEvent = {
-      circuitName: this.options.name,
-      fromState: previousState,
-      toState: this.state,
-      timestamp: this.openedAt,
-      reason,
-      metadata: {
+  private async openCircuit(reason: string = 'failure threshold exceeded'): Promise<void> {
+    await this.stateLock.lock(async () => {
+      // Double-check state hasn't changed while waiting for lock
+      if (this.state === CircuitState.OPEN) {
+        return // Already open, no need to transition
+      }
+      
+      const previousState = this.state
+      this.state = CircuitState.OPEN
+      this.openedAt = Date.now()
+      this.stateTransitions++
+      this.recoverySuccessCount = 0 // Reset recovery counter
+      
+      const event: StateTransitionEvent = {
+        circuitName: this.options.name,
+        fromState: previousState,
+        toState: this.state,
+        timestamp: this.openedAt,
+        reason,
+        metadata: {
+          failureCount: this.failureCount,
+          threshold: this.options.failureThreshold
+        }
+      }
+      
+      this.stateTransitionHistory.push(event)
+      this.observabilityHooks?.onCircuitOpen?.(event)
+      
+      debugLog.operation('circuit breaker opened', {
+        name: this.options.name,
+        previousState,
+        newState: this.state,
         failureCount: this.failureCount,
-        threshold: this.options.failureThreshold
-      }
-    }
-    
-    this.stateTransitionHistory.push(event)
-    this.observabilityHooks?.onCircuitOpen?.(event)
-    
-    debugLog.operation('circuit breaker opened', {
-      name: this.options.name,
-      previousState,
-      newState: this.state,
-      failureCount: this.failureCount,
-      threshold: this.options.failureThreshold,
-      reason
-    }, this.options.debug)
-    
-    debugLog.warn('CircuitBreaker opened', {
-      name: this.options.name,
-      reason,
-      failureCount: this.failureCount
-    }, this.options.debug)
+        threshold: this.options.failureThreshold,
+        reason
+      }, this.options.debug)
+      
+      debugLog.warn('CircuitBreaker opened', {
+        name: this.options.name,
+        reason,
+        failureCount: this.failureCount
+      }, this.options.debug)
+    })
   }
 
   /**
-   * Transition circuit to HALF_OPEN state
+   * Transition circuit to HALF_OPEN state (atomic operation)
    */
-  private halfOpenCircuit(reason: string = 'timeout expired'): void {
-    const previousState = this.state
-    const now = Date.now()
-    this.state = CircuitState.HALF_OPEN
-    this.stateTransitions++
-    this.recoverySuccessCount = 0
-    
-    const event: StateTransitionEvent = {
-      circuitName: this.options.name,
-      fromState: previousState,
-      toState: this.state,
-      timestamp: now,
-      reason,
-      metadata: {
-        timeOpen: this.openedAt ? now - this.openedAt : 0
+  private async halfOpenCircuit(reason: string = 'timeout expired'): Promise<void> {
+    await this.stateLock.lock(async () => {
+      // Double-check state is still OPEN and timeout has passed
+      if (this.state !== CircuitState.OPEN || !this.shouldAttemptReset()) {
+        return // State changed or timeout not reached yet
       }
-    }
-    
-    this.stateTransitionHistory.push(event)
-    this.observabilityHooks?.onCircuitHalfOpen?.(event)
-    
-    debugLog.operation('circuit breaker half-open', {
-      name: this.options.name,
-      previousState,
-      newState: this.state,
-      timeOpen: this.openedAt ? now - this.openedAt : 0,
-      reason
-    }, this.options.debug)
-    
-    debugLog.lifecycle('half-open', 'CircuitBreaker', {
-      name: this.options.name,
-      reason
-    }, this.options.debug)
+      
+      const previousState = this.state
+      const now = Date.now()
+      this.state = CircuitState.HALF_OPEN
+      this.stateTransitions++
+      this.recoverySuccessCount = 0
+      
+      const event: StateTransitionEvent = {
+        circuitName: this.options.name,
+        fromState: previousState,
+        toState: this.state,
+        timestamp: now,
+        reason,
+        metadata: {
+          timeOpen: this.openedAt ? now - this.openedAt : 0
+        }
+      }
+      
+      this.stateTransitionHistory.push(event)
+      this.observabilityHooks?.onCircuitHalfOpen?.(event)
+      
+      debugLog.operation('circuit breaker half-open', {
+        name: this.options.name,
+        previousState,
+        newState: this.state,
+        timeOpen: this.openedAt ? now - this.openedAt : 0,
+        reason
+      }, this.options.debug)
+      
+      debugLog.lifecycle('half-open', 'CircuitBreaker', {
+        name: this.options.name,
+        reason
+      }, this.options.debug)
+    })
   }
 
   /**
-   * Transition circuit to CLOSED state (reset)
+   * Transition circuit to CLOSED state (reset) - atomic operation
    */
-  private closeCircuit(reason: string = 'recovery successful'): void {
-    const previousState = this.state
-    const now = Date.now()
-    this.state = CircuitState.CLOSED
-    this.failureCount = 0
-    this.openedAt = undefined
-    this.stateTransitions++
-    this.recoverySuccessCount = 0
-    
-    const event: StateTransitionEvent = {
-      circuitName: this.options.name,
-      fromState: previousState,
-      toState: this.state,
-      timestamp: now,
-      reason,
-      metadata: {
+  private async closeCircuit(reason: string = 'recovery successful'): Promise<void> {
+    await this.stateLock.lock(async () => {
+      // Double-check we're in a state that can transition to CLOSED
+      if (this.state === CircuitState.CLOSED) {
+        return // Already closed, no need to transition
+      }
+      
+      const previousState = this.state
+      const now = Date.now()
+      this.state = CircuitState.CLOSED
+      this.failureCount = 0
+      this.openedAt = undefined
+      this.stateTransitions++
+      this.recoverySuccessCount = 0
+      
+      const event: StateTransitionEvent = {
+        circuitName: this.options.name,
+        fromState: previousState,
+        toState: this.state,
+        timestamp: now,
+        reason,
+        metadata: {
+          successCount: this.successCount,
+          recoverySuccessCount: this.recoverySuccessCount
+        }
+      }
+      
+      this.stateTransitionHistory.push(event)
+      this.observabilityHooks?.onCircuitClose?.(event)
+      
+      debugLog.operation('circuit breaker closed', {
+        name: this.options.name,
+        previousState,
+        newState: this.state,
         successCount: this.successCount,
-        recoverySuccessCount: this.recoverySuccessCount
-      }
-    }
-    
-    this.stateTransitionHistory.push(event)
-    this.observabilityHooks?.onCircuitClose?.(event)
-    
-    debugLog.operation('circuit breaker closed', {
-      name: this.options.name,
-      previousState,
-      newState: this.state,
-      successCount: this.successCount,
-      reason
-    }, this.options.debug)
-    
-    debugLog.lifecycle('closed', 'CircuitBreaker', {
-      name: this.options.name,
-      reason
-    }, this.options.debug)
+        reason
+      }, this.options.debug)
+      
+      debugLog.lifecycle('closed', 'CircuitBreaker', {
+        name: this.options.name,
+        reason
+      }, this.options.debug)
+    })
   }
 
   /**
-   * Record a successful operation
+   * Record a successful operation (atomic operation)
    */
-  private recordSuccess(responseTime?: number): void {
-    this.successCount++
-    this.lastSuccessTime = Date.now()
-    
-    if (responseTime !== undefined) {
-      this.responseTimes.push(responseTime)
-      // Keep only last 100 response times for average calculation
-      if (this.responseTimes.length > 100) {
-        this.responseTimes.shift()
-      }
+  private async recordSuccess(responseTime?: number): Promise<void> {
+    await this.stateLock.lock(async () => {
+      this.successCount++
+      this.lastSuccessTime = Date.now()
       
-      this.observabilityHooks?.onRequestSuccess?.(this.options.name, responseTime)
-    }
+      if (responseTime !== undefined) {
+        this.responseTimes.push(responseTime)
+        // Keep only last 100 response times for average calculation
+        if (this.responseTimes.length > 100) {
+          this.responseTimes.shift()
+        }
+        
+        this.observabilityHooks?.onRequestSuccess?.(this.options.name, responseTime)
+      }
 
-    if (this.state === CircuitState.HALF_OPEN) {
-      this.recoverySuccessCount++
-      
-      // Only close if we've reached the recovery threshold
-      if (this.recoverySuccessCount >= this.options.recoveryThreshold) {
-        this.closeCircuit(`recovery threshold reached (${this.recoverySuccessCount}/${this.options.recoveryThreshold})`)
+      if (this.state === CircuitState.HALF_OPEN) {
+        this.recoverySuccessCount++
+        
+        // Only close if we've reached the recovery threshold
+        if (this.recoverySuccessCount >= this.options.recoveryThreshold) {
+          await this.closeCircuit(`recovery threshold reached (${this.recoverySuccessCount}/${this.options.recoveryThreshold})`)
+        }
       }
-    }
+    })
   }
 
   /**
-   * Record a failed operation
+   * Record a failed operation (atomic operation)
    */
-  private recordFailure(error: Error, responseTime?: number): void {
-    this.failureCount++
-    this.lastFailureTime = Date.now()
-    
-    if (responseTime !== undefined) {
-      this.responseTimes.push(responseTime)
-      // Keep only last 100 response times for average calculation
-      if (this.responseTimes.length > 100) {
-        this.responseTimes.shift()
-      }
+  private async recordFailure(error: Error, responseTime?: number): Promise<void> {
+    await this.stateLock.lock(async () => {
+      this.failureCount++
+      this.lastFailureTime = Date.now()
       
-      this.observabilityHooks?.onRequestFailure?.(this.options.name, error, responseTime)
-    }
+      if (responseTime !== undefined) {
+        this.responseTimes.push(responseTime)
+        // Keep only last 100 response times for average calculation
+        if (this.responseTimes.length > 100) {
+          this.responseTimes.shift()
+        }
+        
+        this.observabilityHooks?.onRequestFailure?.(this.options.name, error, responseTime)
+      }
 
-    if (this.state === CircuitState.HALF_OPEN) {
-      // Failure in half-open state opens the circuit again
-      this.openCircuit('failure during recovery attempt')
-    } else if (this.state === CircuitState.CLOSED && this.failureCount >= this.options.failureThreshold) {
-      // Too many failures in closed state opens the circuit
-      this.openCircuit(`failure threshold exceeded (${this.failureCount}/${this.options.failureThreshold})`)
-    }
+      if (this.state === CircuitState.HALF_OPEN) {
+        // Failure in half-open state opens the circuit again
+        await this.openCircuit('failure during recovery attempt')
+      } else if (this.state === CircuitState.CLOSED && this.failureCount >= this.options.failureThreshold) {
+        // Too many failures in closed state opens the circuit
+        await this.openCircuit(`failure threshold exceeded (${this.failureCount}/${this.options.failureThreshold})`)
+      }
+    })
   }
 
   /**
-   * Execute a function with circuit breaker protection
+   * Execute a function with circuit breaker protection (with atomic state management)
    */
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     // If circuit breaker is disabled, execute directly
@@ -383,26 +412,36 @@ export class CircuitBreaker {
       })
     }
 
-    this.totalRequests++
+    // Atomic check and potential state transition from OPEN to HALF_OPEN
+    const canExecute = await this.stateLock.lock(async () => {
+      this.totalRequests++
+      
+      // Check if we should attempt reset from OPEN to HALF_OPEN
+      if (this.shouldAttemptReset()) {
+        await this.halfOpenCircuit('timeout expired, attempting recovery')
+      }
 
-    // Check if we should attempt reset from OPEN to HALF_OPEN
-    if (this.shouldAttemptReset()) {
-      this.halfOpenCircuit('timeout expired, attempting recovery')
-    }
+      // If circuit is open, reject immediately
+      if (this.state === CircuitState.OPEN) {
+        this.rejectedRequests++
+        
+        this.observabilityHooks?.onRequestRejected?.(this.options.name, this.rejectedRequests)
+        
+        debugLog.operation('circuit breaker request rejected', {
+          name: this.options.name,
+          state: this.state,
+          rejectedRequests: this.rejectedRequests,
+          totalRequests: this.totalRequests
+        }, this.options.debug)
+        
+        return false // Cannot execute
+      }
+      
+      return true // Can execute
+    })
 
-    // If circuit is open, reject immediately
-    if (this.state === CircuitState.OPEN) {
-      this.rejectedRequests++
-      
-      this.observabilityHooks?.onRequestRejected?.(this.options.name, this.rejectedRequests)
-      
-      debugLog.operation('circuit breaker request rejected', {
-        name: this.options.name,
-        state: this.state,
-        rejectedRequests: this.rejectedRequests,
-        totalRequests: this.totalRequests
-      }, this.options.debug)
-      
+    // If circuit is open, throw error outside the lock
+    if (!canExecute) {
       throw new CircuitBreakerError(this.options.name, {
         context: { 
           stats: this.getStats(),
@@ -416,7 +455,7 @@ export class CircuitBreaker {
     try {
       const result = await fn()
       const responseTime = Date.now() - startTime
-      this.recordSuccess(responseTime)
+      await this.recordSuccess(responseTime)
       
       debugLog.operation('circuit breaker request success', {
         name: this.options.name,
@@ -429,7 +468,7 @@ export class CircuitBreaker {
     } catch (error) {
       const responseTime = Date.now() - startTime
       const errorObj = error instanceof Error ? error : new Error(String(error))
-      this.recordFailure(errorObj, responseTime)
+      await this.recordFailure(errorObj, responseTime)
       
       debugLog.operation('circuit breaker request failed', {
         name: this.options.name,
@@ -444,20 +483,22 @@ export class CircuitBreaker {
   }
 
   /**
-   * Manually reset the circuit breaker to closed state
+   * Manually reset the circuit breaker to closed state (atomic)
    */
-  reset(): void {
-    this.closeCircuit()
-    this.successCount = 0
-    this.lastFailureTime = undefined
-    this.lastSuccessTime = undefined
+  async reset(): Promise<void> {
+    await this.stateLock.lock(async () => {
+      await this.closeCircuit('manual reset')
+      this.successCount = 0
+      this.lastFailureTime = undefined
+      this.lastSuccessTime = undefined
+    })
   }
 
   /**
-   * Manually open the circuit breaker
+   * Manually open the circuit breaker (atomic)
    */
-  forceOpen(): void {
-    this.openCircuit()
+  async forceOpen(): Promise<void> {
+    await this.openCircuit('manually forced open')
   }
 
   /**

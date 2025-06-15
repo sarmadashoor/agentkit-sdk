@@ -23,7 +23,16 @@
     "validate:all": "npm run validate:scripts && npm run validate:tsconfig && npm run validate:observability",
     "build:npm": "./scripts/build-all.sh",
     "test:npm": "./scripts/test-all.sh",
-    "typecheck:npm": "./scripts/typecheck.sh"
+    "typecheck:npm": "./scripts/typecheck.sh",
+    "lint:check": "npm run typecheck",
+    "lint:fix": "npm run format:fix",
+    "format:check": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "size:check": "node scripts/size-check.js",
+    "release:check": "node scripts/release-check.js",
+    "release": "node scripts/release.js",
+    "install:hooks": "./scripts/install-hooks.sh",
+    "postinstall": "./scripts/install-hooks.sh"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

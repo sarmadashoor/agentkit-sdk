@@ -1,0 +1,11 @@
+dist/
+coverage/
+node_modules/
+*.md
+*.json
+CHANGELOG.md
+pnpm-lock.yaml
+packages/*/dist/
+.nyc_output/
+test-results/
+playwright-report/
