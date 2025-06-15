@@ -1,21 +1,58 @@
 import { z } from 'zod'
 
+/**
+ * Configuration object for agent initialization
+ */
+export interface AgentConfig {
+  scope?: string[]
+  techStack?: string
+  [key: string]: unknown
+}
+
+/**
+ * Input data for agent processing
+ */
+export interface AgentInput {
+  [key: string]: unknown
+}
+
+/**
+ * Output data from agent processing
+ */
+export interface AgentOutput {
+  [key: string]: unknown
+}
+
 export interface Agent {
   id: string
   name: string
   version: string
-  init: (config?: unknown) => Promise<void>
-  handle: (input: unknown) => Promise<unknown>
+  init: (config?: AgentConfig) => Promise<void>
+  handle: (input: AgentInput) => Promise<AgentOutput>
   shutdown: () => Promise<void>
+}
+
+/**
+ * Configuration object for transport initialization
+ */
+export interface TransportConfig {
+  [key: string]: unknown
+}
+
+/**
+ * Message data for transport operations
+ */
+export interface TransportMessage {
+  [key: string]: unknown
 }
 
 export interface Transport {
   id: string
   name: string
-  init: (config?: unknown) => Promise<void>
-  send: (message: unknown) => Promise<void>
-  receive: () => Promise<unknown>
-  config?: unknown
+  init: (config?: TransportConfig) => Promise<void>
+  send: (message: TransportMessage) => Promise<void>
+  receive: () => Promise<TransportMessage>
+  config?: TransportConfig
 }
 
 export interface ObservabilityHooks {
@@ -74,7 +111,7 @@ export interface ConnectAgentOptions {
   transport: string | Transport
   scope?: string[]
   techStack?: string
-  onOutput?: (message: unknown) => void
+  onOutput?: (message: AgentOutput) => void
   debug?: boolean
   // Registry instance for agent/transport lookup
   registry?: AgentRegistryInterface
@@ -96,7 +133,7 @@ export interface ConnectAgentOptions {
 }
 
 export interface AgentRuntimeHandle {
-  send: (input: unknown) => Promise<void>
+  send: (input: AgentInput) => Promise<void>
   shutdown: () => Promise<void>
   metadata: {
     agentId: string
@@ -115,22 +152,33 @@ export interface AgentMetadata {
   factory: () => Agent
 }
 
+const AgentConfigSchema = z.object({
+  scope: z.array(z.string()).optional(),
+  techStack: z.string().optional()
+}).catchall(z.unknown())
+
+const AgentInputSchema = z.record(z.unknown())
+const AgentOutputSchema = z.record(z.unknown())
+
 export const AgentSchema = z.object({
   id: z.string().min(1, 'Agent ID cannot be empty'),
   name: z.string().min(1, 'Agent name cannot be empty'),
   version: z.string().min(1, 'Agent version cannot be empty'),
-  init: z.function().args(z.unknown().optional()).returns(z.promise(z.void())),
-  handle: z.function().args(z.unknown()).returns(z.promise(z.unknown())),
+  init: z.function().args(AgentConfigSchema.optional()).returns(z.promise(z.void())),
+  handle: z.function().args(AgentInputSchema).returns(z.promise(AgentOutputSchema)),
   shutdown: z.function().returns(z.promise(z.void()))
 })
+
+const TransportConfigSchema = z.record(z.unknown())
+const TransportMessageSchema = z.record(z.unknown())
 
 export const TransportSchema = z.object({
   id: z.string().min(1, 'Transport ID cannot be empty'),
   name: z.string().min(1, 'Transport name cannot be empty'),
-  init: z.function().args(z.unknown().optional()).returns(z.promise(z.void())),
-  send: z.function().args(z.unknown()).returns(z.promise(z.void())),
-  receive: z.function().returns(z.promise(z.unknown())),
-  config: z.unknown().optional()
+  init: z.function().args(TransportConfigSchema.optional()).returns(z.promise(z.void())),
+  send: z.function().args(TransportMessageSchema).returns(z.promise(z.void())),
+  receive: z.function().returns(z.promise(TransportMessageSchema)),
+  config: TransportConfigSchema.optional()
 })
 
 const RequestMetadataSchema = z.object({
@@ -186,7 +234,7 @@ const AgentContextSchema = z.object({
 })
 
 const SendPayloadSchema = z.object({
-  input: z.unknown(),
+  input: AgentInputSchema,
   metadata: z.record(z.unknown())
 })
 
@@ -202,8 +250,8 @@ const AgentKitPluginSchema = z.object({
 
 // Registry schema for validation
 const RegistrySchema = z.object({
-  register: z.function().args(z.string(), z.any()).returns(z.void()),
-  lookup: z.function().args(z.string()).returns(z.any()),
+  register: z.function().args(z.string(), z.record(z.unknown())).returns(z.void()),
+  lookup: z.function().args(z.string()).returns(z.record(z.unknown()).optional()),
   list: z.function().returns(z.array(z.string())),
   has: z.function().args(z.string()).returns(z.boolean()),
   remove: z.function().args(z.string()).returns(z.boolean())
@@ -246,7 +294,7 @@ export const ConnectAgentOptionsSchema = z.object({
   transport: z.union([z.string(), TransportSchema]),
   scope: z.array(z.string()).optional(),
   techStack: z.string().optional(),
-  onOutput: z.function().args(z.unknown()).returns(z.void()).optional(),
+  onOutput: z.function().args(AgentOutputSchema).returns(z.void()).optional(),
   debug: z.boolean().optional(),
   // Registry instance for agent/transport lookup
   registry: AgentRegistrySchema.optional(),
@@ -295,7 +343,7 @@ export interface AgentContext {
  */
 export interface SendPayload {
   /** The input being sent to the agent */
-  input: unknown
+  input: AgentInput
   /** Additional metadata about the send operation */
   metadata: Record<string, unknown>
 }
@@ -347,8 +395,9 @@ export interface AgentKitPlugin {
 
 /**
  * Generic registry interface for type safety
+ * T should extend Record<string, unknown> to ensure serializable objects
  */
-export interface Registry<T = any> {
+export interface Registry<T extends Record<string, unknown> = Record<string, unknown>> {
   register(id: string, item: T): void
   lookup(id: string): T | undefined
   list(): ReadonlyArray<string>

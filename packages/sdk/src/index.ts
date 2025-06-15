@@ -3,7 +3,13 @@ import {
   ConnectAgentOptionsSchema,
   AgentRuntimeHandle,
   Agent,
-  Transport
+  Transport,
+  AgentMetadata,
+  AgentInput,
+  AgentOutput,
+  AgentConfig,
+  TransportConfig,
+  TransportMessage
 } from '@agentkit/types'
 import { AgentRegistry, defaultRegistry } from '@agentkit/registry'
 import { AgentManager } from './AgentManager'
@@ -252,6 +258,14 @@ export {
   AgentMetadata
 } from '@agentkit/types'
 
+export type {
+  AgentInput,
+  AgentOutput,
+  AgentConfig,
+  TransportConfig,
+  TransportMessage
+}
+
 export { 
   AgentRegistry, 
   defaultRegistry, 
@@ -262,8 +276,8 @@ export {
 // Backwards compatibility - export static methods that delegate to default registry
 // These can be removed in a future major version
 export const AgentRegistryLegacy = {
-  register: (metadata: any) => defaultRegistry.register(metadata),
-  registerTransport: (transport: any) => defaultRegistry.registerTransport(transport),
+  register: (metadata: AgentMetadata) => defaultRegistry.register(metadata),
+  registerTransport: (transport: Transport) => defaultRegistry.registerTransport(transport),
   lookup: (agentId: string) => defaultRegistry.lookup(agentId),
   lookupTransport: (transportId: string) => defaultRegistry.lookupTransport(transportId),
   clear: () => defaultRegistry.clear(),

@@ -19,7 +19,9 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "error",

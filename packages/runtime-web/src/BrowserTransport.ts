@@ -1,4 +1,4 @@
-import { Transport } from '@agentkit/types'
+import { Transport, TransportMessage } from '@agentkit/types'
 import { 
   InvalidConfigurationError, 
   TransportInitError,
@@ -26,6 +26,8 @@ export class BrowserTransport implements Transport {
 
   private isShutdown = false
   private activeRequests = new Set<AbortController>()
+  // Memory leak prevention - track active timeouts
+  private activeTimeouts = new Set<NodeJS.Timeout>()
 
   constructor(config: BrowserTransportConfig) {
     // Validate required config
@@ -91,7 +93,7 @@ export class BrowserTransport implements Transport {
     }
   }
 
-  async receive(): Promise<unknown> {
+  async receive(): Promise<TransportMessage> {
     if (this.isShutdown) {
       throw new TransportReceiveError('Transport has been shutdown', {
         context: { transportId: this.id }
@@ -99,7 +101,7 @@ export class BrowserTransport implements Transport {
     }
 
     try {
-      return this.makeRequest('GET')
+      return this.makeRequest('GET') as Promise<TransportMessage>
     } catch (error) {
       throw new TransportReceiveError('Failed to receive message', {
         cause: error as Error,
@@ -114,6 +116,12 @@ export class BrowserTransport implements Transport {
     }
 
     this.isShutdown = true
+
+    // Clear all active timeouts to prevent memory leaks
+    for (const timeout of this.activeTimeouts) {
+      clearTimeout(timeout)
+    }
+    this.activeTimeouts.clear()
 
     // Abort all active requests
     for (const controller of this.activeRequests) {
@@ -162,14 +170,15 @@ export class BrowserTransport implements Transport {
 
   private async executeRequest(method: string, body?: unknown): Promise<unknown> {
     let abortController: AbortController | undefined
+    let timeoutId: NodeJS.Timeout | undefined
 
     // Create AbortController if available
     if (typeof AbortController !== 'undefined') {
       abortController = new AbortController()
       this.activeRequests.add(abortController)
 
-      // Set timeout
-      setTimeout(() => {
+      // Set timeout with proper tracking for cleanup
+      timeoutId = this.createTrackedTimeout(() => {
         if (abortController && !abortController.signal.aborted) {
           abortController.abort()
         }
@@ -257,6 +266,12 @@ export class BrowserTransport implements Transport {
       if (abortController) {
         this.activeRequests.delete(abortController)
       }
+      
+      // Clean up timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        this.activeTimeouts.delete(timeoutId)
+      }
     }
   }
 
@@ -270,6 +285,30 @@ export class BrowserTransport implements Transport {
 
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  /**
+   * Helper method to create tracked timeouts that will be cleaned up on shutdown
+   */
+  private createTrackedTimeout(callback: () => void, delay: number): NodeJS.Timeout {
+    if (this.isShutdown) {
+      // Don't create new timeouts after shutdown
+      throw new TransportSendError('Cannot create timeout after shutdown', {
+        context: { transportId: this.id }
+      })
+    }
+
+    const timeout = setTimeout(() => {
+      // Remove from tracking set when timeout fires
+      this.activeTimeouts.delete(timeout)
+      if (!this.isShutdown) {
+        callback()
+      }
+    }, delay)
+    
+    // Track the timeout for cleanup
+    this.activeTimeouts.add(timeout)
+    return timeout
   }
 
 }

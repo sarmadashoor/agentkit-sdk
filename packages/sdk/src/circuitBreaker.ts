@@ -104,6 +104,10 @@ export class CircuitBreaker {
   private readonly observabilityHooks?: CircuitBreakerObservabilityHooks
   private readonly stateTransitionHistory: StateTransitionEvent[] = []
   private recoverySuccessCount = 0
+  
+  // Memory leak prevention - track active timers
+  private activeTimeouts = new Set<NodeJS.Timeout>()
+  private isShutdown = false
 
   constructor(options: CircuitBreakerOptions = {}) {
     this.options = {
@@ -362,6 +366,13 @@ export class CircuitBreaker {
       return fn()
     }
 
+    // Check if circuit breaker has been shutdown
+    if (this.isShutdown) {
+      throw new CircuitBreakerError(this.options.name, {
+        context: { reason: 'circuit breaker has been shutdown' }
+      })
+    }
+
     this.totalRequests++
 
     // Check if we should attempt reset from OPEN to HALF_OPEN
@@ -507,5 +518,54 @@ export class CircuitBreaker {
       canExecute: this.canExecute(),
       nextAttemptIn
     }
+  }
+
+  /**
+   * Shutdown the circuit breaker and clean up all resources
+   * CRITICAL: This prevents timer leaks by clearing all active timeouts
+   */
+  shutdown(): void {
+    if (this.isShutdown) {
+      return // Already shutdown, idempotent
+    }
+
+    this.isShutdown = true
+    
+    // Clear all active timeouts to prevent memory leaks
+    for (const timeout of this.activeTimeouts) {
+      clearTimeout(timeout)
+    }
+    this.activeTimeouts.clear()
+    
+    // Clear response times array to release memory
+    this.responseTimes.length = 0
+    
+    // Clear state transition history to release memory
+    this.stateTransitionHistory.length = 0
+    
+    debugLog.operation('circuit breaker shutdown', {
+      name: this.options.name,
+      state: this.state,
+      clearedTimeouts: this.activeTimeouts.size
+    }, this.options.debug)
+    
+    console.log(`[CircuitBreaker:${this.options.name}] Circuit breaker shutdown complete`)
+  }
+
+  /**
+   * Helper method to create tracked timeouts that will be cleaned up on shutdown
+   */
+  private createTrackedTimeout(callback: () => void, delay: number): NodeJS.Timeout {
+    const timeout = setTimeout(() => {
+      // Remove from tracking set when timeout fires
+      this.activeTimeouts.delete(timeout)
+      if (!this.isShutdown) {
+        callback()
+      }
+    }, delay)
+    
+    // Track the timeout for cleanup
+    this.activeTimeouts.add(timeout)
+    return timeout
   }
 }

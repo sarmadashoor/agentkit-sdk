@@ -25,7 +25,7 @@ describe('Bounded Queue System', () => {
       version: '1.0.0',
       init: async () => {},
       handle: async (input: any) => {
-        const delay = input?.delay || 100
+        const delay = input?.delay || 10  // Reduced from 100ms to 10ms for faster tests
         await new Promise(resolve => setTimeout(resolve, delay))
         return { processed: input, timestamp: Date.now() }
       },
@@ -69,11 +69,11 @@ describe('Bounded Queue System', () => {
       })
 
       // Start 2 concurrent requests (should succeed)
-      const request1 = handle.send({ delay: 200, id: 1 })
-      const request2 = handle.send({ delay: 200, id: 2 })
+      const request1 = handle.send({ delay: 20, id: 1 })
+      const request2 = handle.send({ delay: 20, id: 2 })
 
       // Third request should be rejected immediately
-      await expect(handle.send({ delay: 200, id: 3 })).rejects.toThrow(ResourceExhaustedError)
+      await expect(handle.send({ delay: 20, id: 3 })).rejects.toThrow(ResourceExhaustedError)
 
       // Wait for the original requests to complete
       await Promise.all([request1, request2])
@@ -93,16 +93,16 @@ describe('Bounded Queue System', () => {
       })
 
       // Start first request
-      const request1 = handle.send({ delay: 100, id: 1 })
+      const request1 = handle.send({ delay: 10, id: 1 })
 
       // Second request should be rejected
-      await expect(handle.send({ delay: 100, id: 2 })).rejects.toThrow(ResourceExhaustedError)
+      await expect(handle.send({ delay: 10, id: 2 })).rejects.toThrow(ResourceExhaustedError)
 
       // Wait for first request to complete
       await request1
 
       // Now a new request should succeed
-      await expect(handle.send({ delay: 50, id: 3 })).resolves.not.toThrow()
+      await expect(handle.send({ delay: 5, id: 3 })).resolves.not.toThrow()
 
       await handle.shutdown()
     })
@@ -120,13 +120,13 @@ describe('Bounded Queue System', () => {
 
       // Start requests with different delays
       const promises = [
-        handle.send({ delay: 50, id: 1 }),   // Fast
-        handle.send({ delay: 200, id: 2 }),  // Slow
-        handle.send({ delay: 100, id: 3 })   // Medium
+        handle.send({ delay: 5, id: 1 }),   // Fast
+        handle.send({ delay: 20, id: 2 }),  // Slow
+        handle.send({ delay: 10, id: 3 })   // Medium
       ]
 
       // Fourth request should be rejected
-      await expect(handle.send({ delay: 50, id: 4 })).rejects.toThrow(ResourceExhaustedError)
+      await expect(handle.send({ delay: 5, id: 4 })).rejects.toThrow(ResourceExhaustedError)
 
       // All three should complete successfully
       await Promise.all(promises)
@@ -148,14 +148,14 @@ describe('Bounded Queue System', () => {
       })
 
       // Start one request (uses concurrency slot)
-      const activeRequest = handle.send({ delay: 200, id: 1 })
+      const activeRequest = handle.send({ delay: 20, id: 1 })
 
       // Queue two more requests (fills queue)
-      const queuedRequest1 = handle.send({ delay: 50, id: 2 })
-      const queuedRequest2 = handle.send({ delay: 50, id: 3 })
+      const queuedRequest1 = handle.send({ delay: 5, id: 2 })
+      const queuedRequest2 = handle.send({ delay: 5, id: 3 })
 
       // Fourth request should be rejected (queue full)
-      await expect(handle.send({ delay: 50, id: 4 })).rejects.toThrow(QueueFullError)
+      await expect(handle.send({ delay: 5, id: 4 })).rejects.toThrow(QueueFullError)
 
       // All queued requests should eventually complete
       await Promise.all([activeRequest, queuedRequest1, queuedRequest2])
@@ -180,10 +180,10 @@ describe('Bounded Queue System', () => {
 
       // Start requests that should be processed in order
       await Promise.all([
-        handle.send({ delay: 50, id: 1 }),
-        handle.send({ delay: 50, id: 2 }),
-        handle.send({ delay: 50, id: 3 }),
-        handle.send({ delay: 50, id: 4 })
+        handle.send({ delay: 5, id: 1 }),
+        handle.send({ delay: 5, id: 2 }),
+        handle.send({ delay: 5, id: 3 }),
+        handle.send({ delay: 5, id: 4 })
       ])
 
       // Results should be in FIFO order
@@ -204,17 +204,17 @@ describe('Bounded Queue System', () => {
       })
 
       // Fill concurrency and queue
-      const activeRequest = handle.send({ delay: 200, id: 1 })
-      const queuedRequest1 = handle.send({ delay: 50, id: 2 })
-      const queuedRequest2 = handle.send({ delay: 50, id: 3 })
+      const activeRequest = handle.send({ delay: 20, id: 1 })
+      const queuedRequest1 = handle.send({ delay: 5, id: 2 })
+      const queuedRequest2 = handle.send({ delay: 5, id: 3 })
 
       // Multiple overflow attempts should all fail
-      await expect(handle.send({ delay: 50, id: 4 })).rejects.toThrow(QueueFullError)
-      await expect(handle.send({ delay: 50, id: 5 })).rejects.toThrow(QueueFullError)
+      await expect(handle.send({ delay: 5, id: 4 })).rejects.toThrow(QueueFullError)
+      await expect(handle.send({ delay: 5, id: 5 })).rejects.toThrow(QueueFullError)
 
       // Verify queue full error has proper context
       try {
-        await handle.send({ delay: 50, id: 6 })
+        await handle.send({ delay: 5, id: 6 })
         expect.fail('Should have thrown QueueFullError')
       } catch (error) {
         expect(error).toBeInstanceOf(QueueFullError)
@@ -316,10 +316,10 @@ describe('Bounded Queue System', () => {
       })
 
       // Fast request should succeed
-      await expect(handle.send({ delay: 50, id: 1 })).resolves.not.toThrow()
+      await expect(handle.send({ delay: 5, id: 1 })).resolves.not.toThrow()
 
       // Slow request should timeout
-      await expect(handle.send({ delay: 200, id: 2 })).rejects.toThrow(RequestTimeoutError)
+      await expect(handle.send({ delay: 20, id: 2 })).rejects.toThrow(RequestTimeoutError)
 
       await handle.shutdown()
     })
@@ -335,7 +335,7 @@ describe('Bounded Queue System', () => {
       })
 
       try {
-        await handle.send({ delay: 200, id: 1 })
+        await handle.send({ delay: 20, id: 1 })
         expect.fail('Should have thrown RequestTimeoutError')
       } catch (error) {
         expect(error).toBeInstanceOf(RequestTimeoutError)
@@ -361,9 +361,9 @@ describe('Bounded Queue System', () => {
 
       // Start multiple requests with different delays
       const results = await Promise.allSettled([
-        handle.send({ delay: 50, id: 1 }),   // Should succeed
-        handle.send({ delay: 100, id: 2 }),  // Should succeed
-        handle.send({ delay: 200, id: 3 }),  // Should timeout
+        handle.send({ delay: 5, id: 1 }),   // Should succeed
+        handle.send({ delay: 10, id: 2 }),  // Should succeed
+        handle.send({ delay: 20, id: 3 }),  // Should timeout
         handle.send({ delay: 75, id: 4 })    // Should succeed
       ])
 
@@ -397,7 +397,7 @@ describe('Bounded Queue System', () => {
 
       // Send 10 requests rapidly
       const requests = Array.from({ length: 10 }, (_, i) =>
-        handle.send({ delay: 50, id: i + 1 })
+        handle.send({ delay: 5, id: i + 1 })
       )
 
       const results = await Promise.allSettled(requests)
@@ -463,16 +463,16 @@ describe('Bounded Queue System', () => {
       })
 
       // Start a very long-running request that would block the queue
-      const blockingRequest = handle.send({ delay: 1000, id: 'blocker' })
+      const blockingRequest = handle.send({ delay: 100, id: 'blocker' })
 
       // Queue some requests
       const queuedRequests = [
-        handle.send({ delay: 50, id: 1 }),
-        handle.send({ delay: 50, id: 2 })
+        handle.send({ delay: 5, id: 1 }),
+        handle.send({ delay: 5, id: 2 })
       ]
 
       // Additional requests should be rejected
-      await expect(handle.send({ delay: 50, id: 3 })).rejects.toThrow(QueueFullError)
+      await expect(handle.send({ delay: 5, id: 3 })).rejects.toThrow(QueueFullError)
 
       // Cancel the blocking request to prevent actual starvation in tests
       try {
@@ -577,11 +577,11 @@ describe('Bounded Queue System', () => {
       })
 
       // Fill concurrency and queue
-      const activeRequest = handle.send({ delay: 200, id: 1 })
-      const queuedRequest = handle.send({ delay: 50, id: 2 })
+      const activeRequest = handle.send({ delay: 20, id: 1 })
+      const queuedRequest = handle.send({ delay: 5, id: 2 })
 
       try {
-        await handle.send({ delay: 50, id: 3 })
+        await handle.send({ delay: 5, id: 3 })
         expect.fail('Should have thrown QueueFullError')
       } catch (error) {
         expect(error).toBeInstanceOf(QueueFullError)

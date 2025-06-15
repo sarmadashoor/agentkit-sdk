@@ -8,10 +8,18 @@ global.fetch = mockFetch
 // Mock AbortController
 const mockAbort = vi.fn()
 const mockAbortController = {
-  signal: { aborted: false },
+  signal: { 
+    aborted: false,
+    onabort: null,
+    reason: undefined,
+    throwIfAborted: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn()
+  },
   abort: mockAbort
 }
-global.AbortController = vi.fn(() => mockAbortController)
+global.AbortController = vi.fn().mockImplementation(() => mockAbortController)
 
 describe('BrowserTransport', () => {
   let transport: BrowserTransport
@@ -26,6 +34,12 @@ describe('BrowserTransport', () => {
     
     mockFetch.mockClear()
     mockAbort.mockClear()
+  })
+
+  afterEach(async () => {
+    if (transport) {
+      await transport.shutdown()
+    }
   })
 
   describe('Basic Transport Interface', () => {
@@ -96,22 +110,26 @@ describe('BrowserTransport', () => {
         headers: { 'Authorization': 'Bearer token' }
       })
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({})
-      })
-
-      await customTransport.send({ test: 'data' })
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/mcp',
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer token'
-          })
+      try {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({})
         })
-      )
+
+        await customTransport.send({ test: 'data' })
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          'https://api.example.com/mcp',
+          expect.objectContaining({
+            headers: expect.objectContaining({
+              'Authorization': 'Bearer token'
+            })
+          })
+        )
+      } finally {
+        await customTransport.shutdown()
+      }
     })
   })
 
@@ -261,22 +279,25 @@ describe('BrowserTransport', () => {
         endpoint: 'https://api.example.com/mcp'
       })
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true })
-      })
-
-      await testTransport.send({ test: 'data' })
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/mcp',
-        expect.objectContaining({
-          signal: undefined
+      try {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true })
         })
-      )
 
-      global.AbortController = originalAbortController
+        await testTransport.send({ test: 'data' })
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          'https://api.example.com/mcp',
+          expect.objectContaining({
+            signal: undefined
+          })
+        )
+      } finally {
+        await testTransport.shutdown()
+        global.AbortController = originalAbortController
+      }
     })
 
     it('should validate endpoint URL format', () => {
@@ -310,25 +331,29 @@ describe('BrowserTransport', () => {
         retryDelay: 100
       })
 
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 500,
-          statusText: 'Internal Server Error',
-          text: () => Promise.resolve('Server error')
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ success: true })
-        })
+      try {
+        mockFetch
+          .mockResolvedValueOnce({
+            ok: false,
+            status: 500,
+            statusText: 'Internal Server Error',
+            text: () => Promise.resolve('Server error')
+          })
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ success: true })
+          })
 
-      const sendPromise = retryTransport.send({ test: 'data' })
-      
-      await vi.advanceTimersByTimeAsync(100)
-      await sendPromise
+        const sendPromise = retryTransport.send({ test: 'data' })
+        
+        await vi.advanceTimersByTimeAsync(100)
+        await sendPromise
 
-      expect(mockFetch).toHaveBeenCalledTimes(2)
+        expect(mockFetch).toHaveBeenCalledTimes(2)
+      } finally {
+        await retryTransport.shutdown()
+      }
     })
 
     it('should not retry on 4xx client errors', async () => {
@@ -337,17 +362,21 @@ describe('BrowserTransport', () => {
         maxRetries: 2
       })
 
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-        text: () => Promise.resolve('Invalid request')
-      })
+      try {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          text: () => Promise.resolve('Invalid request')
+        })
 
-      await expect(retryTransport.send({ test: 'data' }))
-        .rejects.toThrow('HTTP 400: Bad Request - Invalid request')
+        await expect(retryTransport.send({ test: 'data' }))
+          .rejects.toThrow('HTTP 400: Bad Request - Invalid request')
 
-      expect(mockFetch).toHaveBeenCalledTimes(1)
+        expect(mockFetch).toHaveBeenCalledTimes(1)
+      } finally {
+        await retryTransport.shutdown()
+      }
     })
 
     it('should retry on network errors', async () => {
@@ -357,42 +386,51 @@ describe('BrowserTransport', () => {
         retryDelay: 50
       })
 
-      mockFetch
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ success: true })
-        })
+      try {
+        mockFetch
+          .mockRejectedValueOnce(new Error('Network error'))
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ success: true })
+          })
 
-      const sendPromise = retryTransport.send({ test: 'data' })
-      
-      await vi.advanceTimersByTimeAsync(50)
-      await sendPromise
+        const sendPromise = retryTransport.send({ test: 'data' })
+        
+        await vi.advanceTimersByTimeAsync(50)
+        await sendPromise
 
-      expect(mockFetch).toHaveBeenCalledTimes(2)
+        expect(mockFetch).toHaveBeenCalledTimes(2)
+      } finally {
+        await retryTransport.shutdown()
+      }
     })
 
     it('should fail after max retry attempts', async () => {
+      vi.useRealTimers()
+      
       const retryTransport = new BrowserTransport({
         endpoint: 'https://api.example.com/mcp',
         maxRetries: 2,
         retryDelay: 50
       })
 
-      mockFetch
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockRejectedValueOnce(new Error('Network error'))
+      try {
+        mockFetch
+          .mockRejectedValueOnce(new Error('Network error'))
+          .mockRejectedValueOnce(new Error('Network error'))
+          .mockRejectedValueOnce(new Error('Network error'))
 
-      const sendPromise = retryTransport.send({ test: 'data' })
-      
-      await vi.advanceTimersByTimeAsync(50)  // First retry
-      await vi.advanceTimersByTimeAsync(100) // Second retry (exponential backoff)
-      
-      await expect(sendPromise).rejects.toThrow('Network error')
+        const sendPromise = retryTransport.send({ test: 'data' })
+        
+        await expect(sendPromise).rejects.toThrow('Network error')
 
-      expect(mockFetch).toHaveBeenCalledTimes(3) // Initial + 2 retries
+        expect(mockFetch).toHaveBeenCalledTimes(3) // Initial + 2 retries
+      } finally {
+        // Proper cleanup to prevent unhandled rejections
+        await retryTransport.shutdown()
+        vi.useFakeTimers()
+      }
     })
 
     it('should implement exponential backoff delays', async () => {
@@ -402,25 +440,29 @@ describe('BrowserTransport', () => {
         retryDelay: 100
       })
 
-      mockFetch
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ success: true })
-        })
+      try {
+        mockFetch
+          .mockRejectedValueOnce(new Error('Network error'))
+          .mockRejectedValueOnce(new Error('Network error'))
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ success: true })
+          })
 
-      const sendPromise = retryTransport.send({ test: 'data' })
+        const sendPromise = retryTransport.send({ test: 'data' })
 
-      // First retry after 100ms
-      await vi.advanceTimersByTimeAsync(100)
-      
-      // Second retry after 200ms (exponential backoff)
-      await vi.advanceTimersByTimeAsync(200)
+        // First retry after 100ms
+        await vi.advanceTimersByTimeAsync(100)
+        
+        // Second retry after 200ms (exponential backoff)
+        await vi.advanceTimersByTimeAsync(200)
 
-      await sendPromise
-      expect(mockFetch).toHaveBeenCalledTimes(3)
+        await sendPromise
+        expect(mockFetch).toHaveBeenCalledTimes(3)
+      } finally {
+        await retryTransport.shutdown()
+      }
     })
   })
 })

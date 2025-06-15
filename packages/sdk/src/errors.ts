@@ -110,8 +110,16 @@ export const ScopeError = _ScopeError
  * @deprecated Use the unified error serialization from @agentkit/errors instead
  */
 export function createSafeError(error: unknown): Record<string, unknown> {
-  if (error && typeof error === 'object' && 'toJSON' in error && typeof (error as any).toJSON === 'function') {
-    return (error as any).toJSON()
+  if (error && typeof error === 'object' && 'toJSON' in error) {
+    const toJSONMethod = (error as Record<string, unknown>).toJSON
+    if (typeof toJSONMethod === 'function') {
+      try {
+        const result = toJSONMethod.call(error)
+        return typeof result === 'object' && result !== null ? result as Record<string, unknown> : {}
+      } catch {
+        // Fall through to error handling below
+      }
+    }
   }
   
   if (error instanceof Error) {

@@ -2,7 +2,9 @@ import {
   Agent, 
   Transport, 
   AgentRuntimeHandle,
-  ConnectAgentOptions as BaseConnectAgentOptions
+  ConnectAgentOptions as BaseConnectAgentOptions,
+  AgentInput,
+  AgentOutput
 } from '@agentkit/types'
 import { 
   AgentInitError,
@@ -61,12 +63,16 @@ export class AgentManager {
     
     // Always initialize bounded executor for concurrency control and backpressure
     // Use provided limits or sensible defaults
-    this.boundedExecutor = new BoundedExecutor(options.resourceLimits || {
-      maxConcurrentRequests: 10,
-      maxQueueSize: 50,
-      requestTimeoutMs: 30000,
-      maxPayloadSize: 1024 * 1024 // 1MB
-    })
+    this.boundedExecutor = new BoundedExecutor(
+      options.resourceLimits || {
+        maxConcurrentRequests: 10,
+        maxQueueSize: 50,
+        requestTimeoutMs: 30000,
+        maxPayloadSize: 1024 * 1024 // 1MB
+      },
+      undefined, // observabilityHooks - can be added later if needed
+      options.debug || false
+    )
     
     // Initialize circuit breaker if enabled via feature flags
     if (options.features?.enableCircuitBreaker) {
@@ -246,7 +252,7 @@ export class AgentManager {
     )
   }
 
-  async send(input: unknown): Promise<void> {
+  async send(input: AgentInput): Promise<void> {
     // Fail immediately if shutdown - no queuing allowed
     if (this.isShutdown) {
       throw new AgentShutdownError('AgentManager has been shutdown', {
@@ -297,7 +303,7 @@ export class AgentManager {
     )
   }
 
-  private async processSendOperation(input: unknown, requestId: string): Promise<void> {
+  private async processSendOperation(input: AgentInput, requestId: string): Promise<void> {
     debugLog.operation('send start', { 
       agentId: this.agentId,
       transportId: this.transport.id,
@@ -317,7 +323,7 @@ export class AgentManager {
       timestamp: Date.now()
     })
 
-    let output: unknown
+    let output: AgentOutput
 
     try {
       // Process input through agent
@@ -500,7 +506,59 @@ export class AgentManager {
             requestId 
           }, this.options.debug)
 
+          // Shutdown circuit breaker if it exists
+          if (this.circuitBreaker) {
+            debugLog.lifecycle('shutdown start', 'CircuitBreaker', { 
+              circuitBreakerName: this.circuitBreaker.getStats().state,
+              requestId 
+            }, this.options.debug)
+            
+            this.circuitBreaker.shutdown()
+            
+            debugLog.lifecycle('shutdown complete', 'CircuitBreaker', { 
+              requestId 
+            }, this.options.debug)
+          }
+
+          // Shutdown plugin manager
+          debugLog.lifecycle('shutdown start', 'PluginManager', { 
+            pluginCount: this.pluginManager.getPlugins().length,
+            requestId 
+          }, this.options.debug)
+          
+          this.pluginManager.shutdown()
+          
+          debugLog.lifecycle('shutdown complete', 'PluginManager', { 
+            requestId 
+          }, this.options.debug)
+
+          // Shutdown observability tracker
+          debugLog.lifecycle('shutdown start', 'ObservabilityTracker', { 
+            requestId 
+          }, this.options.debug)
+          
+          this.observabilityTracker.shutdown()
+          
+          debugLog.lifecycle('shutdown complete', 'ObservabilityTracker', { 
+            requestId 
+          }, this.options.debug)
+
           try {
+            // Shutdown transport if it has a shutdown method
+            if ('shutdown' in this.transport && typeof this.transport.shutdown === 'function') {
+              debugLog.lifecycle('shutdown start', 'Transport', { 
+                transportId: this.transport.id, 
+                requestId 
+              }, this.options.debug)
+              
+              await (this.transport as any).shutdown()
+              
+              debugLog.lifecycle('shutdown complete', 'Transport', { 
+                transportId: this.transport.id, 
+                requestId 
+              }, this.options.debug)
+            }
+
             // Shutdown agent
             debugLog.lifecycle('shutdown start', 'Agent', { 
               agentId: this.agentId, 
@@ -714,17 +772,17 @@ export class AgentManager {
    * Helper method to call plugin hooks safely
    */
   private async callPluginHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<void>
-  private async callPluginHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<void>
+  private async callPluginHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<void>  
   private async callPluginHook(hookName: 'onError', error: Error, context: AgentContext): Promise<void>
-  private async callPluginHook(hookName: string, ...args: any[]): Promise<void> {
+  private async callPluginHook(hookName: string, ...args: unknown[]): Promise<void> {
     try {
       let results
       if (hookName === 'onSend' && args.length === 2) {
-        results = await this.pluginManager.executeHook('onSend', args[0], args[1])
-      } else if ((hookName === 'onInit' || hookName === 'onShutdown' || hookName === 'onError') && args.length === 1) {
-        results = await this.pluginManager.executeHook(hookName as any, args[0])
+        results = await this.pluginManager.executeHook('onSend', args[0] as SendPayload, args[1] as AgentContext)
       } else if (hookName === 'onError' && args.length === 2) {
-        results = await this.pluginManager.executeHook('onError', args[0], args[1])
+        results = await this.pluginManager.executeHook('onError', args[0] as Error, args[1] as AgentContext)
+      } else if ((hookName === 'onInit' || hookName === 'onShutdown') && args.length === 1) {
+        results = await this.pluginManager.executeHook(hookName as 'onInit' | 'onShutdown', args[0] as AgentContext)
       } else {
         // Fallback - should not happen with proper typing
         throw new Error(`Invalid plugin hook call: ${hookName} with ${args.length} arguments`)

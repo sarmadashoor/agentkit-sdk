@@ -27,6 +27,10 @@ export class PluginManager {
   private options: Required<Omit<PluginManagerOptions, 'observabilityHooks'>> & {
     observabilityHooks?: PluginManagerObservabilityHooks
   }
+  private isShutdown = false
+  
+  // Memory leak prevention - track active timeouts
+  private activeTimeouts = new Set<NodeJS.Timeout>()
 
   constructor(options: PluginManagerOptions = {}) {
     this.options = {
@@ -76,7 +80,7 @@ export class PluginManager {
   async executeHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<PluginExecutionResult[]>
   async executeHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<PluginExecutionResult[]>
   async executeHook(hookName: 'onError', error: Error | AgentKitError, context: AgentContext): Promise<PluginExecutionResult[]>
-  async executeHook(hookName: PluginHookName, ...args: any[]): Promise<PluginExecutionResult[]> {
+  async executeHook(hookName: PluginHookName, ...args: [AgentContext] | [SendPayload, AgentContext] | [Error | AgentKitError, AgentContext]): Promise<PluginExecutionResult[]> {
     const startTime = Date.now()
     const results: PluginExecutionResult[] = []
     
@@ -115,7 +119,7 @@ export class PluginManager {
   /**
    * Create immutable copies of arguments to prevent plugin mutation
    */
-  private createImmutableArgs(hookName: PluginHookName, args: any[]): any[] {
+  private createImmutableArgs(hookName: PluginHookName, args: [AgentContext] | [SendPayload, AgentContext] | [Error | AgentKitError, AgentContext]): unknown[] {
     switch (hookName) {
       case 'onInit':
       case 'onShutdown':
@@ -134,7 +138,8 @@ export class PluginManager {
         return [error, context]
         
       default:
-        return args.map(arg => this.deepClone(arg))
+        // Type-safe fallback that shouldn't be reached with proper typing
+        return args.map((arg: unknown) => this.deepClone(arg))
     }
   }
 
@@ -143,8 +148,8 @@ export class PluginManager {
    */
   private deepClone<T>(obj: T): T {
     if (obj === null || typeof obj !== 'object') return obj
-    if (obj instanceof Date) return new Date(obj.getTime()) as any
-    if (obj instanceof Array) return obj.map(item => this.deepClone(item)) as any
+    if (obj instanceof Date) return new Date(obj.getTime()) as T
+    if (obj instanceof Array) return obj.map(item => this.deepClone(item)) as T
     if (obj instanceof Error) return obj // Don't clone errors
     
     const cloned = {} as T
@@ -163,7 +168,7 @@ export class PluginManager {
     plugin: AgentKitPlugin,
     hookName: PluginHookName,
     hook: Function,
-    args: any[]
+    args: unknown[]
   ): Promise<void> {
     debugLog.operation('plugin hook executing', {
       plugin: plugin.name,
@@ -186,10 +191,10 @@ export class PluginManager {
     plugin: AgentKitPlugin,
     hookName: PluginHookName,
     hook: Function,
-    args: any[]
+    args: unknown[]
   ): Promise<PluginExecutionResult> {
     const startTime = Date.now()
-    const immutableArgs = this.createImmutableArgs(hookName, args)
+    const immutableArgs = this.createImmutableArgs(hookName, args as [AgentContext] | [SendPayload, AgentContext] | [Error | AgentKitError, AgentContext])
     
     // Notify observability hook of plugin start
     this.options.observabilityHooks?.onPluginStart?.(plugin.name, hookName)
@@ -253,8 +258,10 @@ export class PluginManager {
     timeout: number,
     operation: string
   ): Promise<T> {
+    let timeoutId: NodeJS.Timeout | undefined
+    
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = this.createTrackedTimeout(() => {
         reject(new PluginTimeoutError(operation, timeout, {
           context: { operation, timeoutMs: timeout }
         }))
@@ -263,7 +270,15 @@ export class PluginManager {
 
     const executionPromise = Promise.resolve(fn())
     
-    return Promise.race([executionPromise, timeoutPromise])
+    try {
+      return await Promise.race([executionPromise, timeoutPromise])
+    } finally {
+      // Clean up timeout if it hasn't fired yet
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        this.activeTimeouts.delete(timeoutId)
+      }
+    }
   }
 
   /**
@@ -305,7 +320,7 @@ export class PluginManager {
       
       // Validate function signature by checking length (parameter count)
       // Skip validation for mock functions and functions with dynamic length
-      const isMockFunction = (hook as any).mockImplementation || (hook as any).isMockFunction || hook.toString().includes('Mock')
+      const isMockFunction = 'mockImplementation' in hook || 'isMockFunction' in hook || hook.toString().includes('Mock')
       
       // Validate parameter count for real functions
       if (!isMockFunction) {
@@ -368,5 +383,53 @@ export class PluginManager {
     }
     
     return removed
+  }
+
+  /**
+   * Shutdown the plugin manager and clean up all resources
+   * CRITICAL: This prevents timer leaks by clearing all active timeouts
+   */
+  shutdown(): void {
+    if (this.isShutdown) {
+      return // Already shutdown, idempotent
+    }
+
+    this.isShutdown = true
+
+    // Clear all active timeouts to prevent memory leaks
+    for (const timeout of this.activeTimeouts) {
+      clearTimeout(timeout)
+    }
+    this.activeTimeouts.clear()
+
+    // Clear plugins array to release references
+    this.plugins.length = 0
+
+    debugLog.operation('plugin manager shutdown', {
+      clearedTimeouts: this.activeTimeouts.size,
+      clearedPlugins: this.plugins.length
+    }, this.options.debug)
+  }
+
+  /**
+   * Helper method to create tracked timeouts that will be cleaned up on shutdown
+   */
+  private createTrackedTimeout(callback: () => void, delay: number): NodeJS.Timeout {
+    if (this.isShutdown) {
+      // Don't create new timeouts after shutdown
+      throw new Error('Cannot create timeout after PluginManager shutdown')
+    }
+
+    const timeout = setTimeout(() => {
+      // Remove from tracking set when timeout fires
+      this.activeTimeouts.delete(timeout)
+      if (!this.isShutdown) {
+        callback()
+      }
+    }, delay)
+    
+    // Track the timeout for cleanup
+    this.activeTimeouts.add(timeout)
+    return timeout
   }
 }

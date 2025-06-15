@@ -49,7 +49,7 @@ export class SchemaValidationError extends ValidationError {
   /**
    * Create from Zod error-like object
    */
-  static fromZodError(zodError: any, options?: AgentKitErrorOptions): SchemaValidationError {
+  static fromZodError(zodError: { issues?: Array<{ path?: string[]; message?: string; expected?: string; received?: string }>; message?: string }, options?: AgentKitErrorOptions): SchemaValidationError {
     // Handle Zod error structure
     if (zodError.issues && zodError.issues.length > 0) {
       const issue = zodError.issues[0]

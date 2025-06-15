@@ -5,6 +5,7 @@
 import { ZodSchema, ZodError } from 'zod'
 import { SchemaValidationError, InvalidInputError } from './errors'
 import { debugLog } from './log'
+import type { AgentConfig, TransportConfig } from '@agentkit/types'
 
 /**
  * Validate input against a Zod schema with clear error messages
@@ -54,7 +55,7 @@ function formatZodError(error: ZodError): string {
 /**
  * Validate agent configuration with helpful context
  */
-export function validateAgentConfig(input: unknown, debug: boolean = false): unknown {
+export function validateAgentConfig(input: unknown, debug: boolean = false): AgentConfig | undefined {
   // For now, we don't have a specific agent config schema
   // but we can validate that it's an object if provided
   if (input !== undefined && input !== null && typeof input !== 'object') {
@@ -66,13 +67,13 @@ export function validateAgentConfig(input: unknown, debug: boolean = false): unk
   }
   
   debugLog.validation('agent config', true, 'Agent config is valid', debug)
-  return input
+  return input as AgentConfig | undefined
 }
 
 /**
  * Validate transport configuration with helpful context
  */
-export function validateTransportConfig(input: unknown, debug: boolean = false): unknown {
+export function validateTransportConfig(input: unknown, debug: boolean = false): TransportConfig | undefined {
   // For now, we don't have a specific transport config schema
   // but we can validate that it's an object if provided
   if (input !== undefined && input !== null && typeof input !== 'object') {
@@ -84,7 +85,7 @@ export function validateTransportConfig(input: unknown, debug: boolean = false):
   }
   
   debugLog.validation('transport config', true, 'Transport config is valid', debug)
-  return input
+  return input as TransportConfig | undefined
 }
 
 /**

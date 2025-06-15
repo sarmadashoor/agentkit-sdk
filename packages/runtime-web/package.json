@@ -27,7 +27,9 @@
     "test:all": "npm run test && npm run test:browser",
     "serve:test": "node tests/test-server.js",
     "validate:browser": "node validate-browser.js",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "agent",
