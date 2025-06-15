@@ -31,6 +31,12 @@ export interface PluginManagerObservabilityHooks {
   onPluginSuccess?(pluginName: string, hookName: PluginHookName, duration: number): void
   /** Called before plugin execution starts */
   onPluginStart?(pluginName: string, hookName: PluginHookName): void
+  /** Called when a plugin attempts to escape sandbox */
+  onPluginSandboxEscape?(pluginName: string, hookName: PluginHookName, attempt: string): void
+  /** Called when sandbox execution starts */
+  onPluginSandboxStart?(pluginName: string, hookName: PluginHookName): void
+  /** Called when sandbox execution completes */
+  onPluginSandboxEnd?(pluginName: string, hookName: PluginHookName, duration: number): void
 }
 
 // Re-export AgentKitPlugin from @agentkit/types
@@ -48,6 +54,14 @@ export interface PluginManagerOptions {
   observabilityHooks?: PluginManagerObservabilityHooks
   /** Whether to fail fast on plugin errors (default: false - continue execution) */
   failFast?: boolean
+  /** Enable plugin sandboxing with vm.runInContext (Node.js only, default: true) */
+  sandbox?: boolean
+  /** Custom timeout for sandbox execution (default: 500ms) */
+  sandboxTimeout?: number
+  /** Allowed global objects in sandbox context */
+  allowedGlobals?: string[]
+  /** Enable debug mode for sandbox execution */
+  enableDebugMode?: boolean
 }
 
 /**

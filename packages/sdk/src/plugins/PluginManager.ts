@@ -14,10 +14,25 @@ import {
   AgentKitError,
   PluginValidationError,
   PluginSignatureError,
-  PluginTimeoutError 
+  PluginTimeoutError,
+  PluginSandboxError
 } from '../errors'
 import { debugLog } from '../log'
 import { deepClone, isCloneable } from '../utils/deepClone'
+
+// Platform detection for vm module
+let vm: any = null
+let isNodeJS = false
+
+try {
+  if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+    vm = require('vm')
+    isNodeJS = true
+  }
+} catch (error) {
+  // vm module not available (browser environment)
+  isNodeJS = false
+}
 
 /**
  * PluginManager handles registration and execution of AgentKit plugins
@@ -25,8 +40,9 @@ import { deepClone, isCloneable } from '../utils/deepClone'
  */
 export class PluginManager {
   private plugins: AgentKitPlugin[] = []
-  private options: Required<Omit<PluginManagerOptions, 'observabilityHooks'>> & {
+  private options: Required<Omit<PluginManagerOptions, 'observabilityHooks' | 'allowedGlobals'>> & {
     observabilityHooks?: PluginManagerObservabilityHooks
+    allowedGlobals?: string[]
   }
   private isShutdown = false
   
@@ -38,13 +54,29 @@ export class PluginManager {
       debug: options.debug ?? false,
       hookTimeout: options.hookTimeout ?? 5000,
       failFast: options.failFast ?? false,
-      observabilityHooks: options.observabilityHooks
+      observabilityHooks: options.observabilityHooks,
+      sandbox: options.sandbox ?? true, // Default to enabled
+      sandboxTimeout: options.sandboxTimeout ?? 500, // Default 500ms for sandbox
+      allowedGlobals: options.allowedGlobals ?? ['Math', 'Date', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean'],
+      enableDebugMode: options.enableDebugMode ?? false
+    }
+    
+    // Validate sandbox support
+    if (this.options.sandbox && !isNodeJS) {
+      debugLog.lifecycle('sandbox disabled - not running in Node.js', 'PluginManager', {
+        platform: typeof process !== 'undefined' ? 'node' : 'browser'
+      }, this.options.debug)
+      this.options.sandbox = false
     }
     
     debugLog.lifecycle('plugin manager created', 'PluginManager', {
       hookTimeout: this.options.hookTimeout,
       failFast: this.options.failFast,
-      debug: this.options.debug
+      debug: this.options.debug,
+      sandbox: this.options.sandbox,
+      sandboxTimeout: this.options.sandboxTimeout,
+      allowedGlobals: this.options.allowedGlobals?.length,
+      platform: isNodeJS ? 'node' : 'browser'
     }, this.options.debug)
   }
 
@@ -196,15 +228,289 @@ export class PluginManager {
   }
 
   /**
-   * Execute a plugin hook with proper async/sync handling
+   * Create a secure sandbox context for plugin execution
    */
-  private async executePluginHook(
+  private createSandboxContext(allowedGlobals: string[]): Record<string, any> {
+    const context: Record<string, any> = {
+      // Explicitly undefined dangerous globals
+      global: undefined,
+      globalThis: undefined,
+      process: undefined,
+      require: undefined,
+      module: undefined,
+      exports: undefined,
+      __dirname: undefined,
+      __filename: undefined,
+      Buffer: undefined,
+      console: this.options.enableDebugMode ? {
+        log: (...args: any[]) => debugLog.operation('sandbox-console', { args }, this.options.debug),
+        error: (...args: any[]) => debugLog.error('sandbox-console-error', new Error(String(args[0])), this.options.debug),
+        warn: (...args: any[]) => debugLog.operation('sandbox-console-warn', { args }, this.options.debug)
+      } : undefined,
+      
+      // Allowed safe globals
+      ...allowedGlobals.reduce((acc, globalName) => {
+        try {
+          const globalValue = (global as any)[globalName] || (globalThis as any)[globalName]
+          if (globalValue !== undefined) {
+            // Deep freeze the global to prevent mutation
+            acc[globalName] = this.deepFreeze(globalValue)
+          }
+        } catch (error) {
+          // Ignore globals that can't be accessed
+        }
+        return acc
+      }, {} as Record<string, any>),
+      
+      // Safe utilities
+      setTimeout: undefined, // Prevent infinite loops with timeouts
+      setInterval: undefined,
+      setImmediate: undefined,
+      clearTimeout: undefined,
+      clearInterval: undefined,
+      clearImmediate: undefined
+    }
+    
+    return context
+  }
+
+  /**
+   * Deep freeze an object to prevent mutation in sandbox
+   */
+  private deepFreeze(obj: any): any {
+    if (obj === null || typeof obj !== 'object') {
+      return obj
+    }
+    
+    // Already frozen
+    if (Object.isFrozen(obj)) {
+      return obj
+    }
+    
+    // Freeze properties first
+    Object.getOwnPropertyNames(obj).forEach(prop => {
+      const value = obj[prop]
+      if (value !== null && typeof value === 'object') {
+        this.deepFreeze(value)
+      }
+    })
+    
+    return Object.freeze(obj)
+  }
+
+  /**
+   * Strip dangerous functions from arguments
+   */
+  private stripFunctions(obj: any): any {
+    if (obj === null || typeof obj !== 'object') {
+      return obj
+    }
+    
+    if (typeof obj === 'function') {
+      return undefined // Remove functions entirely
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.stripFunctions(item))
+    }
+    
+    const stripped: any = {}
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'function') {
+        continue // Skip functions
+      }
+      stripped[key] = this.stripFunctions(value)
+    }
+    
+    return stripped
+  }
+
+  /**
+   * Execute plugin hook in secure sandbox (Node.js only)
+   */
+  private async executePluginInSandbox(
     plugin: AgentKitPlugin,
     hookName: PluginHookName,
     hook: Function,
     args: unknown[]
-  ): Promise<void> {
-    debugLog.operation('plugin hook executing', {
+  ): Promise<any> {
+    if (!this.options.sandbox || !isNodeJS || !vm) {
+      // Fallback to direct execution
+      return this.executePluginHookDirect(plugin, hookName, hook, args)
+    }
+    
+    this.options.observabilityHooks?.onPluginSandboxStart?.(plugin.name, hookName)
+    const sandboxStart = Date.now()
+    
+    try {
+      // Create secure context
+      const context = this.createSandboxContext(this.options.allowedGlobals!)
+      const vmContext = vm.createContext(context)
+      
+      // Strip functions from arguments for security
+      const sanitizedArgs = args.map(arg => this.stripFunctions(this.secureClone(arg)))
+      
+      debugLog.operation('sandbox executing plugin', {
+        plugin: plugin.name,
+        hook: hookName,
+        argsCount: sanitizedArgs.length,
+        contextKeys: Object.keys(context).length
+      }, this.options.debug)
+      
+      // Get the function source and create a completely isolated execution
+      const timeoutMs = this.options.sandboxTimeout!
+      const hookSource = hook.toString()
+      
+      // Extract the function body to avoid issues with function declarations
+      // For anonymous functions, we need to wrap them properly
+      let functionBody = hookSource
+      
+      // Handle different function formats
+      if (hookSource.includes('=>')) {
+        // Arrow function - need to handle differently
+        if (hookSource.includes('{')) {
+          // Block arrow function: args => { ... }
+          const arrowIndex = hookSource.indexOf('=>')
+          const paramsStr = hookSource.substring(0, arrowIndex).trim()
+          const bodyStr = hookSource.substring(arrowIndex + 2).trim()
+          functionBody = `function ${paramsStr} ${bodyStr}`
+        } else {
+          // Expression arrow function: args => expr
+          const arrowIndex = hookSource.indexOf('=>')
+          const paramsStr = hookSource.substring(0, arrowIndex).trim()
+          const exprStr = hookSource.substring(arrowIndex + 2).trim()
+          functionBody = `function ${paramsStr} { return ${exprStr}; }`
+        }
+      }
+      
+      // Create script that completely isolates execution in the VM context
+      const executionScript = `
+        (function() {
+          try {
+            // Define the plugin function in the isolated context
+            const pluginFn = ${functionBody};
+            
+            // Parse arguments from JSON to ensure they're fully deserialized
+            const args = JSON.parse(${JSON.stringify(JSON.stringify(sanitizedArgs))});
+            
+            // Execute the function
+            const result = pluginFn.apply(null, args);
+            
+            // Handle async results by returning them (they'll be awaited outside the VM)
+            return result;
+          } catch (e) {
+            throw new Error('Sandbox execution error: ' + e.message);
+          }
+        })()
+      `
+      
+      // Execute with timeout
+      const result = await this.executeWithSandboxTimeout(
+        () => vm.runInContext(executionScript, vmContext, {
+          timeout: timeoutMs,
+          displayErrors: true, // Enable for better debugging
+          filename: `plugin-${plugin.name}-${hookName}.js`
+        }),
+        timeoutMs,
+        `${plugin.name}.${hookName}`
+      )
+      
+      const duration = Date.now() - sandboxStart
+      this.options.observabilityHooks?.onPluginSandboxEnd?.(plugin.name, hookName, duration)
+      
+      debugLog.operation('sandbox execution completed', {
+        plugin: plugin.name,
+        hook: hookName,
+        duration,
+        hasResult: result !== undefined
+      }, this.options.debug)
+      
+      return result
+      
+    } catch (error) {
+      const duration = Date.now() - sandboxStart
+      this.options.observabilityHooks?.onPluginSandboxEnd?.(plugin.name, hookName, duration)
+      
+      // Re-throw PluginTimeoutError as-is to maintain timeout semantics
+      if (error instanceof PluginTimeoutError) {
+        throw error
+      }
+      
+      if (error instanceof Error) {
+        // Check for common sandbox escape attempts
+        const escapePatter = /(\bglobal\b|\bprocess\b|\brequire\b|\bmodule\b|\bexports\b|constructor|prototype|__proto__)/i
+        const isSandboxViolation = escapePatter.test(error.message) || 
+                                   error.message.includes('is not defined') ||
+                                   error.message.includes('is not a function') ||
+                                   error.message.includes('Cannot read properties of undefined') ||
+                                   error.message.includes('Cannot set properties of undefined')
+        
+        if (isSandboxViolation) {
+          this.options.observabilityHooks?.onPluginSandboxEscape?.(plugin.name, hookName, error.message)
+          throw new PluginSandboxError(plugin.name, hookName, error.message, {
+            context: { originalError: error.message, duration }
+          })
+        }
+        
+        // For legitimate plugin errors, check if they're wrapped in "Sandbox execution error"
+        if (error.message.startsWith('Sandbox execution error: ')) {
+          const originalMessage = error.message.replace('Sandbox execution error: ', '')
+          // Create a plain Error to represent the plugin's intended error
+          const pluginError = new Error(originalMessage)
+          pluginError.stack = error.stack
+          throw pluginError
+        }
+        
+        // Re-throw the original error if it's a legitimate plugin error
+        throw error
+      }
+      
+      throw new PluginSandboxError(plugin.name, hookName, String(error), {
+        context: { originalError: String(error), duration }
+      })
+    }
+  }
+
+  /**
+   * Execute with sandbox-specific timeout
+   */
+  private async executeWithSandboxTimeout<T>(
+    fn: () => T,
+    timeout: number,
+    operation: string
+  ): Promise<T> {
+    let timeoutId: NodeJS.Timeout | undefined
+    
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = this.createTrackedTimeout(() => {
+        reject(new PluginTimeoutError(operation, timeout, {
+          context: { operation, timeoutMs: timeout, type: 'sandbox' }
+        }))
+      }, timeout)
+    })
+
+    const executionPromise = Promise.resolve(fn())
+    
+    try {
+      return await Promise.race([executionPromise, timeoutPromise])
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        this.activeTimeouts.delete(timeoutId)
+      }
+    }
+  }
+
+  /**
+   * Execute a plugin hook with proper async/sync handling (direct/fallback)
+   */
+  private async executePluginHookDirect(
+    plugin: AgentKitPlugin,
+    hookName: PluginHookName,
+    hook: Function,
+    args: unknown[]
+  ): Promise<any> {
+    debugLog.operation('plugin hook executing (direct)', {
       plugin: plugin.name,
       hook: hookName
     }, this.options.debug)
@@ -214,7 +520,31 @@ export class PluginManager {
     
     // If result is a promise, await it
     if (result && typeof result.then === 'function') {
-      await result
+      return await result
+    }
+    
+    return result
+  }
+
+  /**
+   * Execute a plugin hook with proper async/sync handling
+   */
+  private async executePluginHook(
+    plugin: AgentKitPlugin,
+    hookName: PluginHookName,
+    hook: Function,
+    args: unknown[]
+  ): Promise<any> {
+    debugLog.operation('plugin hook executing', {
+      plugin: plugin.name,
+      hook: hookName,
+      sandbox: this.options.sandbox
+    }, this.options.debug)
+
+    if (this.options.sandbox && isNodeJS && vm) {
+      return this.executePluginInSandbox(plugin, hookName, hook, args)
+    } else {
+      return this.executePluginHookDirect(plugin, hookName, hook, args)
     }
   }
 
