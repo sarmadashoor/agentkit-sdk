@@ -3,6 +3,8 @@
  * Implements circuit breaker pattern with failure tracking, timeout, and half-open state
  */
 
+import { debugLog } from './log'
+
 export interface CircuitBreakerOptions {
   /** Number of failures before opening the circuit */
   failureThreshold?: number
@@ -12,6 +14,8 @@ export interface CircuitBreakerOptions {
   enabled?: boolean
   /** Name for logging and metrics */
   name?: string
+  /** Enable debug logging */
+  debug?: boolean
 }
 
 export enum CircuitState {
@@ -28,6 +32,16 @@ export interface CircuitBreakerStats {
   lastSuccessTime?: number
   openedAt?: number
   nextAttemptAt?: number
+}
+
+export interface CircuitBreakerMetrics {
+  totalRequests: number
+  successfulRequests: number
+  failedRequests: number
+  rejectedRequests: number
+  stateTransitions: number
+  averageResponseTime: number
+  uptime: number
 }
 
 export class CircuitBreakerError extends Error {
@@ -52,13 +66,21 @@ export class CircuitBreaker {
   private lastFailureTime?: number
   private lastSuccessTime?: number
   private openedAt?: number
+  private createdAt: number = Date.now()
+  
+  // Metrics tracking
+  private totalRequests = 0
+  private rejectedRequests = 0
+  private stateTransitions = 0
+  private responseTimes: number[] = []
 
   constructor(options: CircuitBreakerOptions = {}) {
     this.options = {
       failureThreshold: options.failureThreshold ?? 5,
       timeout: options.timeout ?? 60000, // 60 seconds
       enabled: options.enabled ?? false,
-      name: options.name ?? 'default'
+      name: options.name ?? 'default',
+      debug: options.debug ?? false
     }
 
     this.validateOptions()
@@ -119,32 +141,74 @@ export class CircuitBreaker {
    * Transition circuit to OPEN state
    */
   private openCircuit(): void {
+    const previousState = this.state
     this.state = CircuitState.OPEN
     this.openedAt = Date.now()
+    this.stateTransitions++
+    
+    debugLog.operation('circuit breaker opened', {
+      name: this.options.name,
+      previousState,
+      newState: this.state,
+      failureCount: this.failureCount,
+      threshold: this.options.failureThreshold
+    }, this.options.debug)
+    
+    console.warn(`[CircuitBreaker:${this.options.name}] Circuit opened after ${this.failureCount} failures`)
   }
 
   /**
    * Transition circuit to HALF_OPEN state
    */
   private halfOpenCircuit(): void {
+    const previousState = this.state
     this.state = CircuitState.HALF_OPEN
+    this.stateTransitions++
+    
+    debugLog.operation('circuit breaker half-open', {
+      name: this.options.name,
+      previousState,
+      newState: this.state,
+      timeOpen: this.openedAt ? Date.now() - this.openedAt : 0
+    }, this.options.debug)
+    
+    console.log(`[CircuitBreaker:${this.options.name}] Circuit transitioned to half-open, attempting recovery`)
   }
 
   /**
    * Transition circuit to CLOSED state (reset)
    */
   private closeCircuit(): void {
+    const previousState = this.state
     this.state = CircuitState.CLOSED
     this.failureCount = 0
     this.openedAt = undefined
+    this.stateTransitions++
+    
+    debugLog.operation('circuit breaker closed', {
+      name: this.options.name,
+      previousState,
+      newState: this.state,
+      successCount: this.successCount
+    }, this.options.debug)
+    
+    console.log(`[CircuitBreaker:${this.options.name}] Circuit recovered and closed successfully`)
   }
 
   /**
    * Record a successful operation
    */
-  private recordSuccess(): void {
+  private recordSuccess(responseTime?: number): void {
     this.successCount++
     this.lastSuccessTime = Date.now()
+    
+    if (responseTime !== undefined) {
+      this.responseTimes.push(responseTime)
+      // Keep only last 100 response times for average calculation
+      if (this.responseTimes.length > 100) {
+        this.responseTimes.shift()
+      }
+    }
 
     if (this.state === CircuitState.HALF_OPEN) {
       // Success in half-open state closes the circuit
@@ -155,9 +219,17 @@ export class CircuitBreaker {
   /**
    * Record a failed operation
    */
-  private recordFailure(): void {
+  private recordFailure(responseTime?: number): void {
     this.failureCount++
     this.lastFailureTime = Date.now()
+    
+    if (responseTime !== undefined) {
+      this.responseTimes.push(responseTime)
+      // Keep only last 100 response times for average calculation
+      if (this.responseTimes.length > 100) {
+        this.responseTimes.shift()
+      }
+    }
 
     if (this.state === CircuitState.HALF_OPEN) {
       // Failure in half-open state opens the circuit again
@@ -177,6 +249,8 @@ export class CircuitBreaker {
       return fn()
     }
 
+    this.totalRequests++
+
     // Check if we should attempt reset from OPEN to HALF_OPEN
     if (this.shouldAttemptReset()) {
       this.halfOpenCircuit()
@@ -184,15 +258,45 @@ export class CircuitBreaker {
 
     // If circuit is open, reject immediately
     if (this.state === CircuitState.OPEN) {
+      this.rejectedRequests++
+      
+      debugLog.operation('circuit breaker request rejected', {
+        name: this.options.name,
+        state: this.state,
+        rejectedRequests: this.rejectedRequests,
+        totalRequests: this.totalRequests
+      }, this.options.debug)
+      
       throw new CircuitBreakerError(this.options.name, this.getStats())
     }
 
+    const startTime = Date.now()
+    
     try {
       const result = await fn()
-      this.recordSuccess()
+      const responseTime = Date.now() - startTime
+      this.recordSuccess(responseTime)
+      
+      debugLog.operation('circuit breaker request success', {
+        name: this.options.name,
+        state: this.state,
+        responseTime,
+        successCount: this.successCount
+      }, this.options.debug)
+      
       return result
     } catch (error) {
-      this.recordFailure()
+      const responseTime = Date.now() - startTime
+      this.recordFailure(responseTime)
+      
+      debugLog.operation('circuit breaker request failed', {
+        name: this.options.name,
+        state: this.state,
+        responseTime,
+        failureCount: this.failureCount,
+        error: error instanceof Error ? error.message : String(error)
+      }, this.options.debug)
+      
       throw error
     }
   }
@@ -227,5 +331,26 @@ export class CircuitBreaker {
     }
 
     return this.state !== CircuitState.OPEN
+  }
+
+  /**
+   * Get comprehensive metrics for monitoring and alerting
+   */
+  getMetrics(): CircuitBreakerMetrics {
+    const averageResponseTime = this.responseTimes.length > 0
+      ? this.responseTimes.reduce((sum, time) => sum + time, 0) / this.responseTimes.length
+      : 0
+    
+    const uptime = Date.now() - this.createdAt
+    
+    return {
+      totalRequests: this.totalRequests,
+      successfulRequests: this.successCount,
+      failedRequests: this.totalRequests - this.successCount - this.rejectedRequests,
+      rejectedRequests: this.rejectedRequests,
+      stateTransitions: this.stateTransitions,
+      averageResponseTime,
+      uptime
+    }
   }
 }

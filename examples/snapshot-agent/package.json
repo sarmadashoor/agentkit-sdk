@@ -1,0 +1,32 @@
+{
+  "name": "snapshot-agent",
+  "version": "1.0.0",
+  "description": "Example agent demonstrating real-world AgentKit SDK integration",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "dev": "tsx src/index.ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@agentkit/sdk": "workspace:*",
+    "@agentkit/registry": "workspace:*",
+    "@agentkit/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.6.0"
+  },
+  "keywords": [
+    "agentkit",
+    "sdk",
+    "example",
+    "agent",
+    "integration"
+  ]
+}

@@ -91,6 +91,8 @@ export interface ConnectAgentOptions {
   circuitBreaker?: CircuitBreakerConfig
   // Feature flags
   features?: FeatureFlags
+  // Plugin system
+  plugins?: any[] // Will be typed as AgentKitPlugin[] in the SDK package to avoid circular dependency
 }
 
 export interface AgentRuntimeHandle {
@@ -195,7 +197,9 @@ export const ConnectAgentOptionsSchema = z.object({
   // Circuit breaker configuration
   circuitBreaker: CircuitBreakerConfigSchema,
   // Feature flags
-  features: FeatureFlagsSchema
+  features: FeatureFlagsSchema,
+  // Plugin system
+  plugins: z.array(z.any()).optional() // Will be validated in the SDK package
 })
 
 export const AgentMetadataSchema = z.object({

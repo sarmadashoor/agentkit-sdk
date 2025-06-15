@@ -17,6 +17,7 @@ import { validateAgentConfig, validateTransportConfig } from './validation'
 import { ObservabilityTracker } from './observability'
 import { BoundedExecutor } from './boundedExecutor'
 import { CircuitBreaker } from './circuitBreaker'
+import { PluginManager, AgentKitPlugin, AgentContext, SendPayload } from './plugins'
 
 export class AgentManager {
   private agent: Agent
@@ -31,6 +32,7 @@ export class AgentManager {
   private observabilityTracker: ObservabilityTracker
   private boundedExecutor?: BoundedExecutor
   private circuitBreaker?: CircuitBreaker
+  private pluginManager: PluginManager
 
   constructor(
     agent: Agent, 
@@ -62,8 +64,21 @@ export class AgentManager {
       this.circuitBreaker = new CircuitBreaker({
         ...options.circuitBreaker,
         enabled: true,
-        name: `circuit-breaker-${this.agentId}-${this.transport.id}`
+        name: `circuit-breaker-${this.agentId}-${this.transport.id}`,
+        debug: options.debug || false
       })
+    }
+    
+    // Initialize plugin manager
+    this.pluginManager = new PluginManager({
+      debug: options.debug || false
+    })
+    
+    // Register plugins if provided
+    if (options.plugins) {
+      for (const plugin of options.plugins as AgentKitPlugin[]) {
+        this.pluginManager.register(plugin)
+      }
     }
 
     debugLog.lifecycle('constructed', 'AgentManager', {
@@ -203,6 +218,14 @@ export class AgentManager {
         this.isInitialized = true
         debugLog.lifecycle('initialized', 'AgentManager', { requestId }, this.options.debug)
         
+        // Call plugin onInit hooks
+        await this.callPluginHook('onInit', {
+          agentId: this.agentId,
+          transportId: this.transport.id,
+          requestId,
+          timestamp: Date.now()
+        })
+        
         // Call onInit lifecycle hook
         this.callOnInit()
       },
@@ -304,6 +327,17 @@ export class AgentManager {
       requestId
     }, this.options.debug)
 
+    // Call plugin onSend hooks
+    await this.callPluginHook('onSend', {
+      input,
+      metadata: {}
+    }, {
+      agentId: this.agentId,
+      transportId: this.transport.id,
+      requestId,
+      timestamp: Date.now()
+    })
+
     let output: unknown
 
     try {
@@ -346,6 +380,15 @@ export class AgentManager {
           }
         }
       )
+      
+      // Call plugin onError hooks
+      await this.callPluginHook('onError', handleError, {
+        agentId: this.agentId,
+        transportId: this.transport.id,
+        requestId,
+        timestamp: Date.now()
+      })
+      
       this.callOnError(handleError)
       throw handleError
     }
@@ -389,6 +432,15 @@ export class AgentManager {
           }
         }
       )
+      
+      // Call plugin onError hooks
+      await this.callPluginHook('onError', sendError, {
+        agentId: this.agentId,
+        transportId: this.transport.id,
+        requestId,
+        timestamp: Date.now()
+      })
+      
       this.callOnError(sendError)
       throw sendError
     }
@@ -495,6 +547,14 @@ export class AgentManager {
         this.isInitialized = false
 
         debugLog.lifecycle('shutdown complete', 'AgentManager', { requestId }, this.options.debug)
+        
+        // Call plugin onShutdown hooks
+        await this.callPluginHook('onShutdown', {
+          agentId: this.agentId,
+          transportId: this.transport.id,
+          requestId,
+          timestamp: Date.now()
+        })
         
         // Call onShutdown lifecycle hook
         this.callOnShutdown()
@@ -637,6 +697,24 @@ export class AgentManager {
         requestedScopes,
         supportedScopes 
       }, this.options.debug)
+    }
+  }
+
+  /**
+   * Helper method to call plugin hooks safely
+   */
+  private async callPluginHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<void>
+  private async callPluginHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<void>
+  private async callPluginHook(hookName: 'onError', error: Error, context: AgentContext): Promise<void>
+  private async callPluginHook(hookName: string, ...args: any[]): Promise<void> {
+    try {
+      await this.pluginManager.executeHook(hookName as any, ...args)
+    } catch (error) {
+      // Plugin errors should not break the main flow
+      debugLog.error('plugin hook execution', error as Error, this.options.debug)
+      if (this.options.debug) {
+        console.warn(`[AgentKit] Plugin hook '${hookName}' failed:`, error)
+      }
     }
   }
 }
