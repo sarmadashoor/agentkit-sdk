@@ -1,4 +1,4 @@
-import { Agent } from '@agentkit/types'
+import { Agent, AgentInput, AgentOutput } from '@agentkit/types'
 import { z } from 'zod'
 
 // Configuration schema for DummyAgent
@@ -37,7 +37,7 @@ export class DummyAgent implements Agent {
     await new Promise(resolve => setTimeout(resolve, this.config.processingDelay || 10))
   }
 
-  async handle(input: unknown): Promise<unknown> {
+  async handle(input: AgentInput): Promise<AgentOutput> {
     if (!this.initialized) {
       throw new Error('Agent not initialized. Call init() first.')
     }
@@ -109,7 +109,7 @@ export class TestAgent implements Agent {
     await new Promise(resolve => setTimeout(resolve, 10))
   }
 
-  async handle(input: unknown): Promise<unknown> {
+  async handle(input: AgentInput): Promise<AgentOutput> {
     if (!this.initialized) {
       throw new Error('Agent not initialized. Call init() first.')
     }

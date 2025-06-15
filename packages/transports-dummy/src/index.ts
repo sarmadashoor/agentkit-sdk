@@ -1,4 +1,4 @@
-import { Transport } from '@agentkit/types'
+import { Transport, TransportConfig, TransportMessage } from '@agentkit/types'
 import { z } from 'zod'
 
 // Configuration schema for DummyTransport
@@ -36,7 +36,7 @@ export class DummyTransport implements Transport {
     this.initialized = true
     
     // Simulate async initialization
-    await new Promise(resolve => setTimeout(resolve, this.config.responseDelay || 5))
+    await new Promise<void>(resolve => setTimeout(resolve, this.config.responseDelay ?? 5))
   }
 
   async send(message: unknown): Promise<void> {
@@ -69,7 +69,7 @@ export class DummyTransport implements Transport {
     }
     
     // Simulate async send
-    await new Promise(resolve => setTimeout(resolve, this.config.responseDelay || 5))
+    await new Promise<void>(resolve => setTimeout(resolve, this.config.responseDelay ?? 5))
     
     // Trigger callbacks for received messages
     if (this.callbacks.length > 0 && this.messageQueue.length > 0) {
@@ -78,7 +78,7 @@ export class DummyTransport implements Transport {
     }
   }
 
-  async receive(): Promise<unknown> {
+  async receive(): Promise<TransportMessage> {
     if (!this.initialized) {
       throw new Error('Transport not initialized. Call init() first.')
     }
@@ -88,15 +88,18 @@ export class DummyTransport implements Transport {
     }
     
     // Simulate async receive
-    await new Promise(resolve => setTimeout(resolve, this.config.responseDelay || 5))
+    await new Promise<void>(resolve => setTimeout(resolve, this.config.responseDelay ?? 5))
     
-    const message = this.messageQueue.shift() || null
+    const message = this.messageQueue.shift()
+    if (!message) {
+      return { content: null, metadata: { transportId: this.id, timestamp: new Date().toISOString() } }
+    }
     
-    if (this.config.logMessages && message) {
+    if (this.config.logMessages) {
       console.log(`[${this.name}] Message received:`, message)
     }
     
-    return message
+    return { content: message, metadata: { transportId: this.id, timestamp: new Date().toISOString() } }
   }
 
   // Method to register callback for messages (useful for testing)
@@ -127,7 +130,7 @@ export class DummyTransport implements Transport {
 export class LegacyDummyTransport implements Transport {
   id = 'dummy-transport'
   name = 'Dummy Transport'
-  config?: unknown
+  config?: TransportConfig
   private messageQueue: unknown[] = []
   private debug: boolean = false
 
@@ -153,13 +156,14 @@ export class LegacyDummyTransport implements Transport {
     await new Promise(resolve => setTimeout(resolve, 5))
   }
 
-  async receive(): Promise<unknown> {
+  async receive(): Promise<TransportMessage> {
     if (this.debug) {
       console.log('[DummyTransport] Receiving message')
     }
     // Simulate async receive
-    await new Promise(resolve => setTimeout(resolve, 5))
-    return this.messageQueue.shift() || null
+    await new Promise<void>(resolve => setTimeout(resolve, 5))
+    const message = this.messageQueue.shift()
+    return { content: message || null, metadata: { transportId: this.id, timestamp: new Date().toISOString() } }
   }
 
   // Helper method for testing
