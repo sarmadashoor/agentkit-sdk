@@ -17,6 +17,7 @@ import {
   PluginTimeoutError 
 } from '../errors'
 import { debugLog } from '../log'
+import { deepClone, isCloneable } from '../utils/deepClone'
 
 /**
  * PluginManager handles registration and execution of AgentKit plugins
@@ -39,6 +40,12 @@ export class PluginManager {
       failFast: options.failFast ?? false,
       observabilityHooks: options.observabilityHooks
     }
+    
+    debugLog.lifecycle('plugin manager created', {
+      hookTimeout: this.options.hookTimeout,
+      failFast: this.options.failFast,
+      debug: this.options.debug
+    }, this.options.debug)
   }
 
   /**
@@ -63,7 +70,7 @@ export class PluginManager {
     debugLog.operation('plugin registered', {
       name: plugin.name,
       version: plugin.version,
-      hooks: hooks.filter(h => !!plugin[h])
+      hooks: hooks.filter(h => !!plugin.hooks?.[h])
     }, this.options.debug)
   }
 
@@ -87,11 +94,11 @@ export class PluginManager {
     debugLog.operation('plugin hook execution start', {
       hook: hookName,
       pluginCount: this.plugins.length,
-      hasPlugins: this.plugins.some(p => !!p[hookName])
+      hasPlugins: this.plugins.some(p => !!p.hooks?.[hookName])
     }, this.options.debug)
 
     for (const plugin of this.plugins) {
-      const hook = plugin[hookName]
+      const hook = plugin.hooks?.[hookName]
       if (!hook) continue
 
       const result = await this.executePluginWithObservability(plugin, hookName, hook, args)
@@ -118,47 +125,68 @@ export class PluginManager {
 
   /**
    * Create immutable copies of arguments to prevent plugin mutation
+   * Uses secure deep cloning with circular reference protection
    */
   private createImmutableArgs(hookName: PluginHookName, args: [AgentContext] | [SendPayload, AgentContext] | [Error | AgentKitError, AgentContext]): unknown[] {
     switch (hookName) {
       case 'onInit':
       case 'onShutdown':
         // Single context argument
-        return [this.deepClone(args[0])]
+        return [this.secureClone(args[0])]
         
       case 'onSend':
         // Payload and context arguments
-        return [this.deepClone(args[0]), this.deepClone(args[1])]
+        return [this.secureClone(args[0]), this.secureClone(args[1])]
         
       case 'onError':
         // Error and context arguments
-        // Note: We don't deep clone the error to preserve stack trace
+        // Note: We don't deep clone the error to preserve stack trace and Error object integrity
         const error = args[0]
-        const context = this.deepClone(args[1])
+        const context = this.secureClone(args[1])
         return [error, context]
         
       default:
         // Type-safe fallback that shouldn't be reached with proper typing
-        return args.map((arg: unknown) => this.deepClone(arg))
+        return args.map((arg: unknown) => this.secureClone(arg))
     }
   }
 
   /**
-   * Deep clone an object to prevent mutation
+   * Securely clone data with validation and circular reference protection
    */
-  private deepClone<T>(obj: T): T {
-    if (obj === null || typeof obj !== 'object') return obj
-    if (obj instanceof Date) return new Date(obj.getTime()) as T
-    if (obj instanceof Array) return obj.map(item => this.deepClone(item)) as T
-    if (obj instanceof Error) return obj // Don't clone errors
-    
-    const cloned = {} as T
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        cloned[key] = this.deepClone(obj[key])
+  private secureClone<T>(obj: T): T {
+    // Check if the object is cloneable first
+    if (!isCloneable(obj)) {
+      debugLog.warn('Attempted to clone non-cloneable object', {
+        type: typeof obj,
+        constructor: obj?.constructor?.name
+      }, this.options.debug)
+      
+      // Return a safe fallback for non-cloneable objects
+      if (obj === null || typeof obj !== 'object') {
+        return obj
       }
+      
+      // For objects, return a shallow copy of enumerable properties
+      return { ...obj } as T
     }
-    return cloned
+    
+    try {
+      return deepClone(obj)
+    } catch (error) {
+      debugLog.error('Deep clone failed, falling back to shallow copy', error as Error, this.options.debug)
+      
+      // Safe fallback
+      if (obj === null || typeof obj !== 'object') {
+        return obj
+      }
+      
+      if (Array.isArray(obj)) {
+        return [...obj] as T
+      }
+      
+      return { ...obj } as T
+    }
   }
 
   /**
@@ -309,7 +337,7 @@ export class PluginManager {
     const hooks: PluginHookName[] = ['onInit', 'onSend', 'onError', 'onShutdown']
     
     for (const hookName of hooks) {
-      const hook = plugin[hookName]
+      const hook = plugin.hooks?.[hookName]
       if (!hook) continue
       
       if (typeof hook !== 'function') {
