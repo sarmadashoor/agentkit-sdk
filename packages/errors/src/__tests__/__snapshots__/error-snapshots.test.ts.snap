@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Error System Snapshots > Error Hierarchy > error serialization and deserialization 1`] = `
+{
+  "category": "resource",
+  "code": "QUEUE_FULL",
+  "context": {
+    "maxSize": 50,
+    "size": 100,
+  },
+  "message": "Queue is full: request-queue",
+  "name": "QueueFullError",
+  "stack": "QueueFullError: Queue is full: request-queue
+    at /home/s/dev/agentkit-sdk/packages/errors/src/__tests__/error-snapshots.test.ts:153:24
+    at file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:135:14
+    at file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:60:26
+    at runTest (file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:781:17)
+    at runSuite (file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:909:15)
+    at runSuite (file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:909:15)
+    at runSuite (file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:909:15)
+    at runFiles (file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:958:5)
+    at startTests (file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:967:3)
+    at file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/vitest@1.6.1_@types+node@20.19.0/node_modules/vitest/dist/chunks/runtime-runBaseTests.oAvMKtQC.js:116:7",
+  "timestamp": Any<String>,
+}
+`;

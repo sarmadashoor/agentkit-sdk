@@ -26,6 +26,7 @@
     "test:browser:headed": "playwright test --headed",
     "test:all": "npm run test && npm run test:browser",
     "serve:test": "node tests/test-server.js",
+    "validate:browser": "node validate-browser.js",
     "clean": "rm -rf dist"
   },
   "keywords": [

@@ -16,6 +16,7 @@ export type ErrorCategory =
   | 'validation'    // Input validation and schema errors
   | 'authentication' // Auth and permission errors
   | 'resource'      // Resource management errors (quota, limits)
+  | 'plugin'        // Plugin-related errors (hooks, validation)
   | 'internal'      // Internal SDK errors (bugs, unexpected states)
 
 /**
@@ -71,6 +72,19 @@ export type ErrorCode =
   | 'AUTHORIZATION_FAILED' 
   | 'INVALID_API_KEY'
   | 'TOKEN_EXPIRED'
+  
+  // Plugin System
+  | 'PLUGIN_VALIDATION_FAILED'
+  | 'PLUGIN_HOOK_FAILED'
+  | 'PLUGIN_REGISTRATION_FAILED'
+  | 'PLUGIN_TIMEOUT'
+  | 'PLUGIN_INVALID_SIGNATURE'
+  
+  // Circuit Breaker
+  | 'CIRCUIT_BREAKER_OPEN'
+  | 'CIRCUIT_BREAKER_CONFIG_INVALID'
+  | 'CIRCUIT_BREAKER_STATE_ERROR'
+  | 'CIRCUIT_BREAKER_TIMEOUT'
   
   // Internal
   | 'INTERNAL_ERROR'

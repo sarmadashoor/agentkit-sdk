@@ -1,70 +1,40 @@
 import { z } from 'zod'
 import { AgentKitError } from '../errors'
 
+// Re-export types from @agentkit/types for backwards compatibility
+export type { AgentContext, SendPayload, PluginHookName } from '@agentkit/types'
+
+// Import PluginHookName for local usage
+import type { PluginHookName } from '@agentkit/types'
+
 /**
- * Context provided to all plugin hooks
+ * Plugin execution result with metadata
  */
-export interface AgentContext {
-  /** The ID of the agent being used */
-  agentId: string
-  /** The ID of the transport being used */
-  transportId: string
-  /** Unique request ID for tracing */
-  requestId: string
-  /** Timestamp of the operation */
-  timestamp: number
-  /** Additional metadata that may be available */
-  metadata?: Record<string, unknown>
+export interface PluginExecutionResult {
+  pluginName: string
+  hookName: PluginHookName
+  success: boolean
+  duration: number
+  error?: Error
+  timeout?: boolean
 }
 
 /**
- * Payload for the onSend hook
+ * Observability hooks for plugin manager events
  */
-export interface SendPayload {
-  /** The input being sent to the agent */
-  input: unknown
-  /** Additional metadata about the send operation */
-  metadata: Record<string, unknown>
+export interface PluginManagerObservabilityHooks {
+  /** Called when a plugin times out */
+  onPluginTimeout?(pluginName: string, hookName: PluginHookName, timeoutMs: number): void
+  /** Called when a plugin throws an error */
+  onPluginError?(pluginName: string, hookName: PluginHookName, error: Error): void
+  /** Called when a plugin executes successfully */
+  onPluginSuccess?(pluginName: string, hookName: PluginHookName, duration: number): void
+  /** Called before plugin execution starts */
+  onPluginStart?(pluginName: string, hookName: PluginHookName): void
 }
 
-/**
- * AgentKit Plugin Interface
- * Plugins can hook into various lifecycle events
- */
-export interface AgentKitPlugin {
-  /** Unique name for the plugin */
-  name: string
-  /** Semantic version of the plugin */
-  version: string
-  /** Optional description of what the plugin does */
-  description?: string
-  
-  /**
-   * Called when the agent is initialized
-   * @param context - The agent context
-   */
-  onInit?(context: AgentContext): void
-  
-  /**
-   * Called before sending data to the agent
-   * @param payload - The data being sent
-   * @param context - The agent context
-   */
-  onSend?(payload: SendPayload, context: AgentContext): void
-  
-  /**
-   * Called when an error occurs
-   * @param error - The error that occurred
-   * @param context - The agent context
-   */
-  onError?(error: Error | AgentKitError, context: AgentContext): void
-  
-  /**
-   * Called when the agent is shutting down
-   * @param context - The agent context
-   */
-  onShutdown?(context: AgentContext): void
-}
+// Re-export AgentKitPlugin from @agentkit/types
+export type { AgentKitPlugin } from '@agentkit/types'
 
 /**
  * Configuration options for the PluginManager
@@ -74,55 +44,19 @@ export interface PluginManagerOptions {
   debug?: boolean
   /** Maximum time to wait for a plugin hook (ms) */
   hookTimeout?: number
+  /** Observability hooks for monitoring plugin execution */
+  observabilityHooks?: PluginManagerObservabilityHooks
+  /** Whether to fail fast on plugin errors (default: false - continue execution) */
+  failFast?: boolean
 }
 
 /**
  * Zod schemas for runtime validation
  */
 
-// Context schema
-export const AgentContextSchema = z.object({
-  agentId: z.string(),
-  transportId: z.string(),
-  requestId: z.string(),
-  timestamp: z.number(),
-  metadata: z.record(z.unknown()).optional()
-})
+// Re-export schemas from @agentkit/types
+export { AgentContextSchema, SendPayloadSchema, AgentKitPluginSchema } from '@agentkit/types'
 
-// SendPayload schema
-export const SendPayloadSchema = z.object({
-  input: z.unknown(),
-  metadata: z.record(z.unknown())
-})
+// Re-export type guard from @agentkit/types
+export { isAgentKitPlugin } from '@agentkit/types'
 
-// Plugin hook schemas - simplified for better compatibility
-const functionSchema = z.function().optional()
-
-const onInitSchema = functionSchema
-const onSendSchema = functionSchema  
-const onErrorSchema = functionSchema
-const onShutdownSchema = functionSchema
-
-// Complete plugin schema
-export const AgentKitPluginSchema = z.object({
-  name: z.string().min(1),
-  version: z.string().regex(/^\d+\.\d+\.\d+$/),
-  description: z.string().optional(),
-  onInit: onInitSchema,
-  onSend: onSendSchema,
-  onError: onErrorSchema,
-  onShutdown: onShutdownSchema
-})
-
-// Type guards
-export function isAgentKitPlugin(value: unknown): value is AgentKitPlugin {
-  try {
-    AgentKitPluginSchema.parse(value)
-    return true
-  } catch {
-    return false
-  }
-}
-
-// Hook names for type safety
-export type PluginHookName = 'onInit' | 'onSend' | 'onError' | 'onShutdown'

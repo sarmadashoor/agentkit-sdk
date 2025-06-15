@@ -83,6 +83,23 @@ export {
   ValidationHelpers
 } from './validation'
 
+// Plugin errors
+export {
+  PluginValidationError,
+  PluginHookError,
+  PluginRegistrationError,
+  PluginTimeoutError,
+  PluginSignatureError
+} from './plugin'
+
+// Circuit breaker errors
+export {
+  CircuitBreakerError,
+  CircuitBreakerConfigError,
+  CircuitBreakerStateError,
+  CircuitBreakerTimeoutError
+} from './circuit-breaker'
+
 /**
  * Error factory functions for common scenarios
  */
@@ -183,6 +200,27 @@ export class ErrorTypeGuards {
    */
   static isAuthError(error: unknown): boolean {
     return isAgentKitError(error) && (error as AgentKitError).category === 'authentication'
+  }
+
+  /**
+   * Check if error is a plugin error
+   */
+  static isPluginError(error: unknown): boolean {
+    return isAgentKitError(error) && (error as AgentKitError).category === 'plugin'
+  }
+
+  /**
+   * Check if error is a resource exhaustion error
+   */
+  static isResourceError(error: unknown): boolean {
+    return isAgentKitError(error) && (error as AgentKitError).category === 'resource'
+  }
+
+  /**
+   * Check if error is an internal SDK error
+   */
+  static isInternalError(error: unknown): boolean {
+    return isAgentKitError(error) && (error as AgentKitError).category === 'internal'
   }
 }
 

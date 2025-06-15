@@ -75,6 +75,15 @@ export class BrowserTransport implements Transport {
     try {
       await this.makeRequest('POST', message)
     } catch (error) {
+      // Re-throw domain-specific errors directly, wrap others
+      if (error instanceof HttpError || 
+          error instanceof NetworkError || 
+          error instanceof RequestTimeoutError || 
+          error instanceof CorsError ||
+          error instanceof SerializationError) {
+        throw error
+      }
+      
       throw new TransportSendError('Failed to send message', {
         cause: error as Error,
         context: { transportId: this.id, messageType: typeof message }
@@ -207,10 +216,10 @@ export class BrowserTransport implements Transport {
         try {
           return await response.json()
         } catch (error) {
-          throw new SerializationError('deserialize', 'JSON', {
-            cause: error as Error,
-            context: { operation: 'deserialize', format: 'json' }
-          })
+          const message = `Failed to parse response JSON: ${(error as Error).message}`
+          const parseError = new Error(message)
+          parseError.name = 'SerializationError'
+          throw parseError
         }
       }
 
@@ -226,8 +235,16 @@ export class BrowserTransport implements Transport {
         }
         
         // Handle network/CORS errors
-        if (error.message.includes('fetch') || error.message.includes('CORS')) {
-          throw new CorsError(`Network/CORS error: ${error.message}`, {
+        if (error.message.includes('Failed to fetch')) {
+          throw new NetworkError(`Network error - this may be a CORS issue: ${error.message}`, {
+            cause: error,
+            context: { endpoint: this.config.endpoint }
+          })
+        }
+        
+        // Handle generic network errors
+        if (error.message.includes('Network error')) {
+          throw new NetworkError(error.message, {
             cause: error,
             context: { endpoint: this.config.endpoint }
           })

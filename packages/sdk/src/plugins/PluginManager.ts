@@ -1,12 +1,21 @@
-import { 
-  AgentKitPlugin, 
-  AgentContext, 
+import type { 
+  AgentKitPlugin,
+  AgentContext,
   SendPayload,
+  PluginHookName
+} from '@agentkit/types'
+import { 
   PluginManagerOptions,
   AgentKitPluginSchema,
-  PluginHookName
+  PluginExecutionResult,
+  PluginManagerObservabilityHooks
 } from './types'
-import { AgentKitError } from '../errors'
+import { 
+  AgentKitError,
+  PluginValidationError,
+  PluginSignatureError,
+  PluginTimeoutError 
+} from '../errors'
 import { debugLog } from '../log'
 
 /**
@@ -15,12 +24,16 @@ import { debugLog } from '../log'
  */
 export class PluginManager {
   private plugins: AgentKitPlugin[] = []
-  private options: Required<PluginManagerOptions>
+  private options: Required<Omit<PluginManagerOptions, 'observabilityHooks'>> & {
+    observabilityHooks?: PluginManagerObservabilityHooks
+  }
 
   constructor(options: PluginManagerOptions = {}) {
     this.options = {
       debug: options.debug ?? false,
-      hookTimeout: options.hookTimeout ?? 5000
+      hookTimeout: options.hookTimeout ?? 5000,
+      failFast: options.failFast ?? false,
+      observabilityHooks: options.observabilityHooks
     }
   }
 
@@ -32,7 +45,9 @@ export class PluginManager {
     try {
       AgentKitPluginSchema.parse(plugin)
     } catch (error) {
-      throw new Error(`Invalid plugin "${plugin.name}": ${error}`)
+      throw new PluginValidationError(plugin.name || 'unknown', String(error), {
+        context: { plugin: plugin.name, validationError: error }
+      })
     }
 
     // Validate hook functions are actually functions and have correct signatures
@@ -58,11 +73,12 @@ export class PluginManager {
   /**
    * Execute a hook on all plugins that implement it
    */
-  async executeHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<void>
-  async executeHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<void>
-  async executeHook(hookName: 'onError', error: Error | AgentKitError, context: AgentContext): Promise<void>
-  async executeHook(hookName: PluginHookName, ...args: any[]): Promise<void> {
+  async executeHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<PluginExecutionResult[]>
+  async executeHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<PluginExecutionResult[]>
+  async executeHook(hookName: 'onError', error: Error | AgentKitError, context: AgentContext): Promise<PluginExecutionResult[]>
+  async executeHook(hookName: PluginHookName, ...args: any[]): Promise<PluginExecutionResult[]> {
     const startTime = Date.now()
+    const results: PluginExecutionResult[] = []
     
     debugLog.operation('plugin hook execution start', {
       hook: hookName,
@@ -74,29 +90,26 @@ export class PluginManager {
       const hook = plugin[hookName]
       if (!hook) continue
 
-      try {
-        // Create immutable copies of arguments to prevent mutation
-        const immutableArgs = this.createImmutableArgs(hookName, args)
-        
-        // Execute hook with timeout protection
-        await this.executeWithTimeout(
-          () => this.executePluginHook(plugin, hookName, hook, immutableArgs),
-          this.options.hookTimeout,
-          `${plugin.name}.${hookName}`
-        )
-        
-      } catch (error) {
-        // Log error but continue execution
-        this.handlePluginError(plugin, hookName, error)
+      const result = await this.executePluginWithObservability(plugin, hookName, hook, args)
+      results.push(result)
+      
+      // If failFast is enabled and plugin failed, throw error
+      if (this.options.failFast && !result.success) {
+        throw result.error || new Error(`Plugin ${plugin.name}.${hookName} failed`)
       }
     }
 
-    const duration = Date.now() - startTime
+    const totalDuration = Date.now() - startTime
     debugLog.operation('plugin hook execution complete', {
       hook: hookName,
-      duration,
-      executedCount: this.plugins.filter(p => !!p[hookName]).length
+      totalDuration,
+      executedCount: results.length,
+      successCount: results.filter(r => r.success).length,
+      errorCount: results.filter(r => !r.success && !r.timeout).length,
+      timeoutCount: results.filter(r => r.timeout).length
     }, this.options.debug)
+
+    return results
   }
 
   /**
@@ -144,50 +157,113 @@ export class PluginManager {
   }
 
   /**
-   * Execute a plugin hook with proper error handling
+   * Execute a plugin hook with proper async/sync handling
    */
-  private executePluginHook(
+  private async executePluginHook(
     plugin: AgentKitPlugin,
     hookName: PluginHookName,
     hook: Function,
     args: any[]
-  ): void {
+  ): Promise<void> {
     debugLog.operation('plugin hook executing', {
       plugin: plugin.name,
       hook: hookName
     }, this.options.debug)
 
-    // Execute synchronously (plugins should be sync)
+    // Execute the hook (can be sync or async)
     const result = hook.apply(plugin, args)
     
-    // Ensure plugins don't return promises
+    // If result is a promise, await it
     if (result && typeof result.then === 'function') {
-      throw new Error(`Plugin "${plugin.name}" hook "${hookName}" must be synchronous`)
+      await result
     }
   }
 
   /**
-   * Execute a function with timeout protection
+   * Execute a plugin with full observability and timeout protection
+   */
+  private async executePluginWithObservability(
+    plugin: AgentKitPlugin,
+    hookName: PluginHookName,
+    hook: Function,
+    args: any[]
+  ): Promise<PluginExecutionResult> {
+    const startTime = Date.now()
+    const immutableArgs = this.createImmutableArgs(hookName, args)
+    
+    // Notify observability hook of plugin start
+    this.options.observabilityHooks?.onPluginStart?.(plugin.name, hookName)
+    
+    try {
+      // Execute with timeout using Promise.race
+      await this.executeWithTimeout(
+        () => this.executePluginHook(plugin, hookName, hook, immutableArgs),
+        this.options.hookTimeout,
+        `${plugin.name}.${hookName}`
+      )
+      
+      const duration = Date.now() - startTime
+      
+      // Notify observability hook of success
+      this.options.observabilityHooks?.onPluginSuccess?.(plugin.name, hookName, duration)
+      
+      debugLog.operation('plugin hook success', {
+        plugin: plugin.name,
+        hook: hookName,
+        duration
+      }, this.options.debug)
+      
+      return {
+        pluginName: plugin.name,
+        hookName,
+        success: true,
+        duration
+      }
+      
+    } catch (error) {
+      const duration = Date.now() - startTime
+      const isTimeout = error instanceof PluginTimeoutError
+      
+      // Notify observability hooks
+      if (isTimeout) {
+        this.options.observabilityHooks?.onPluginTimeout?.(plugin.name, hookName, this.options.hookTimeout)
+      } else {
+        this.options.observabilityHooks?.onPluginError?.(plugin.name, hookName, error as Error)
+      }
+      
+      // Log error
+      this.handlePluginError(plugin, hookName, error)
+      
+      return {
+        pluginName: plugin.name,
+        hookName,
+        success: false,
+        duration,
+        error: error as Error,
+        timeout: isTimeout
+      }
+    }
+  }
+
+  /**
+   * Execute a function with timeout protection using Promise.race
    */
   private async executeWithTimeout<T>(
-    fn: () => T,
+    fn: () => Promise<T> | T,
     timeout: number,
     operation: string
   ): Promise<T> {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        reject(new Error(`Plugin operation "${operation}" timed out after ${timeout}ms`))
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new PluginTimeoutError(operation, timeout, {
+          context: { operation, timeoutMs: timeout }
+        }))
       }, timeout)
-
-      try {
-        const result = fn()
-        clearTimeout(timer)
-        resolve(result)
-      } catch (error) {
-        clearTimeout(timer)
-        reject(error)
-      }
     })
+
+    const executionPromise = Promise.resolve(fn())
+    
+    return Promise.race([executionPromise, timeoutPromise])
   }
 
   /**
@@ -222,7 +298,9 @@ export class PluginManager {
       if (!hook) continue
       
       if (typeof hook !== 'function') {
-        throw new Error(`Invalid plugin "${plugin.name}": ${hookName} must be a function`)
+        throw new PluginSignatureError(plugin.name, hookName, 'must be a function', {
+          context: { hookType: typeof hook }
+        })
       }
       
       // Validate function signature by checking length (parameter count)
@@ -235,27 +313,30 @@ export class PluginManager {
           case 'onInit':
           case 'onShutdown':
             if (hook.length !== 1 && hook.length !== 0) { // Allow 0 for () => {} style
-              throw new Error(`Invalid plugin "${plugin.name}": ${hookName} must accept exactly 1 parameter (context)`)
+              throw new PluginSignatureError(plugin.name, hookName, 'must accept exactly 1 parameter (context)', {
+                context: { expectedParams: 1, actualParams: hook.length }
+              })
             }
             break
           case 'onSend':
             if (hook.length !== 2 && hook.length !== 0) { // Allow 0 for () => {} style
-              throw new Error(`Invalid plugin "${plugin.name}": ${hookName} must accept exactly 2 parameters (payload, context)`)
+              throw new PluginSignatureError(plugin.name, hookName, 'must accept exactly 2 parameters (payload, context)', {
+                context: { expectedParams: 2, actualParams: hook.length }
+              })
             }
             break
           case 'onError':
             if (hook.length !== 2 && hook.length !== 0) { // Allow 0 for () => {} style
-              throw new Error(`Invalid plugin "${plugin.name}": ${hookName} must accept exactly 2 parameters (error, context)`)
+              throw new PluginSignatureError(plugin.name, hookName, 'must accept exactly 2 parameters (error, context)', {
+                context: { expectedParams: 2, actualParams: hook.length }
+              })
             }
             break
         }
       }
       
-      // Test if function is async (should be sync)
-      const isAsync = hook.constructor.name === 'AsyncFunction' || hook.toString().includes('async')
-      if (isAsync) {
-        throw new Error(`Invalid plugin "${plugin.name}": ${hookName} must be synchronous (not async)`)
-      }
+      // Note: We now support both sync and async functions
+      // No need to check for async functions anymore
     }
   }
 

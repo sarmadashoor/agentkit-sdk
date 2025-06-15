@@ -1,4 +1,4 @@
-import { AgentMetadata, AgentMetadataSchema, Transport, TransportSchema } from '@agentkit/types'
+import { AgentMetadata, AgentMetadataSchema, Transport, TransportSchema, AgentRegistryInterface } from '@agentkit/types'
 import { 
   DuplicateAgentIdError, 
   DuplicateTransportIdError, 
@@ -9,7 +9,7 @@ import {
 } from '@agentkit/errors'
 import { z } from 'zod'
 
-export class AgentRegistry {
+export class AgentRegistry implements AgentRegistryInterface {
   private agents = new Map<string, AgentMetadata>()
   private transports = new Map<string, Transport>()
 

@@ -1,0 +1,56 @@
+name: Type Safety Validation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  type-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build all packages
+      run: npm run build
+    
+    - name: Run TypeScript type checks
+      run: |
+        # Type check the main packages
+        cd packages/types && npx tsc --noEmit
+        cd ../registry && npx tsc --noEmit
+        cd ../sdk && npx tsc --noEmit
+        cd ../..
+    
+    - name: Validate plugin type safety
+      run: |
+        # Check that plugin types compile correctly
+        npx tsc --noEmit packages/types/src/__tests__/plugin-types.dts-spec.ts
+        npx tsc --noEmit examples/typescript-plugin-example.ts
+    
+    - name: Run plugin type tests
+      run: |
+        cd packages/sdk
+        npm test -- plugin-type-import.test.ts --run
+        npm test -- plugin-interface-compatibility.test.ts --run
+    
+    - name: Check for circular dependencies
+      run: |
+        npx madge --circular packages/*/src/index.ts
+        if [ $? -ne 0 ]; then
+          echo "❌ Circular dependencies detected!"
+          exit 1
+        else
+          echo "✅ No circular dependencies found"
+        fi

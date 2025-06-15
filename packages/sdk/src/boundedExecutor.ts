@@ -8,7 +8,9 @@ import {
   QueueFullError,
   PayloadTooLargeError,
   RequestTimeoutError,
-  ResourceExhaustedError
+  ResourceExhaustedError,
+  AgentShutdownError,
+  InvalidConfigurationError
 } from '@agentkit/errors'
 
 interface QueuedRequest<T> {
@@ -40,16 +42,24 @@ export class BoundedExecutor {
 
   private validateLimits(): void {
     if (this.limits.maxConcurrentRequests < 1) {
-      throw new Error('maxConcurrentRequests must be >= 1')
+      throw new InvalidConfigurationError('maxConcurrentRequests must be >= 1', {
+        context: { configKey: 'maxConcurrentRequests', value: this.limits.maxConcurrentRequests }
+      })
     }
     if (this.limits.maxQueueSize < 0) {
-      throw new Error('maxQueueSize must be >= 0')
+      throw new InvalidConfigurationError('maxQueueSize must be >= 0', {
+        context: { configKey: 'maxQueueSize', value: this.limits.maxQueueSize }
+      })
     }
     if (this.limits.requestTimeoutMs < 1) {
-      throw new Error('requestTimeoutMs must be >= 1')
+      throw new InvalidConfigurationError('requestTimeoutMs must be >= 1', {
+        context: { configKey: 'requestTimeoutMs', value: this.limits.requestTimeoutMs }
+      })
     }
     if (this.limits.maxPayloadSize < 1) {
-      throw new Error('maxPayloadSize must be >= 1')
+      throw new InvalidConfigurationError('maxPayloadSize must be >= 1', {
+        context: { configKey: 'maxPayloadSize', value: this.limits.maxPayloadSize }
+      })
     }
   }
 
@@ -267,5 +277,28 @@ export class BoundedExecutor {
    */
   isIdle(): boolean {
     return this.activeRequests === 0 && this.requestQueue.length === 0
+  }
+
+  /**
+   * Shutdown the executor gracefully, rejecting all queued requests
+   */
+  async shutdown(): Promise<void> {
+    // Reject all queued requests
+    const queuedRequests = [...this.requestQueue]
+    this.requestQueue.length = 0
+    
+    for (const request of queuedRequests) {
+      request.reject(new AgentShutdownError('BoundedExecutor shutdown', {
+        context: { requestId: request.id }
+      }))
+    }
+
+    // Wait for active requests to complete (with timeout)
+    const maxWaitTime = 5000 // 5 seconds max wait
+    const startTime = Date.now()
+    
+    while (this.activeRequests > 0 && (Date.now() - startTime) < maxWaitTime) {
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
   }
 }

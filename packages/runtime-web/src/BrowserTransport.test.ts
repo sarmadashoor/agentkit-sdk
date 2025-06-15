@@ -155,7 +155,7 @@ describe('BrowserTransport', () => {
       mockFetch.mockRejectedValueOnce(timeoutError)
 
       await expect(transport.send({ test: 'data' }))
-        .rejects.toThrow('Request timeout')
+        .rejects.toThrow('Request timed out after 5000ms')
     })
 
     it('should handle CORS errors', async () => {

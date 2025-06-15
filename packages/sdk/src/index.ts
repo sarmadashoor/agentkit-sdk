@@ -272,18 +272,29 @@ export const AgentRegistryLegacy = {
 }
 export { AgentManager } from './AgentManager'
 export { BoundedExecutor } from './boundedExecutor'
-export { CircuitBreaker, CircuitState, CircuitBreakerError } from './circuitBreaker'
+export { CircuitBreaker, CircuitState } from './circuitBreaker'
 export {
   PluginManager,
   LoggingPlugin,
   createLoggingPlugin,
+  PluginManagerOptions
+} from './plugins'
+
+// Re-export plugin types from @agentkit/types
+export type {
   AgentKitPlugin,
   AgentContext,
   SendPayload,
-  PluginManagerOptions,
-  PluginHookName,
+  PluginHookName
+} from '@agentkit/types'
+
+// Re-export plugin schemas and utilities from @agentkit/types
+export {
   AgentContextSchema,
   SendPayloadSchema,
   AgentKitPluginSchema,
   isAgentKitPlugin
-} from './plugins'
+} from '@agentkit/types'
+
+// Re-export all errors for convenience
+export * from './errors'

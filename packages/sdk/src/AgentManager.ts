@@ -2,7 +2,7 @@ import {
   Agent, 
   Transport, 
   AgentRuntimeHandle,
-  ConnectAgentOptions
+  ConnectAgentOptions as BaseConnectAgentOptions
 } from '@agentkit/types'
 import { 
   AgentInitError,
@@ -19,6 +19,11 @@ import { BoundedExecutor } from './boundedExecutor'
 import { CircuitBreaker } from './circuitBreaker'
 import { PluginManager, AgentKitPlugin, AgentContext, SendPayload } from './plugins'
 
+// Extended ConnectAgentOptions to include plugins
+interface ConnectAgentOptions extends BaseConnectAgentOptions {
+  plugins?: AgentKitPlugin[]
+}
+
 export class AgentManager {
   private agent: Agent
   private transport: Transport
@@ -27,10 +32,10 @@ export class AgentManager {
   private isShutdown = false
   private registeredScopes: string[]
   private agentId: string // Authoritative agent ID
-  private sendQueue: Promise<void> = Promise.resolve() // Concurrency protection
+  private shutdownLock = false // Prevents concurrent shutdown operations
   private cleanupCalled = false // Prevent multiple cleanup calls
   private observabilityTracker: ObservabilityTracker
-  private boundedExecutor?: BoundedExecutor
+  private boundedExecutor: BoundedExecutor // Always use bounded executor for concurrency control
   private circuitBreaker?: CircuitBreaker
   private pluginManager: PluginManager
 
@@ -54,10 +59,14 @@ export class AgentManager {
       options.debug || false
     )
     
-    // Initialize bounded executor if resource limits are provided
-    if (options.resourceLimits) {
-      this.boundedExecutor = new BoundedExecutor(options.resourceLimits)
-    }
+    // Always initialize bounded executor for concurrency control and backpressure
+    // Use provided limits or sensible defaults
+    this.boundedExecutor = new BoundedExecutor(options.resourceLimits || {
+      maxConcurrentRequests: 10,
+      maxQueueSize: 50,
+      requestTimeoutMs: 30000,
+      maxPayloadSize: 1024 * 1024 // 1MB
+    })
     
     // Initialize circuit breaker if enabled via feature flags
     if (options.features?.enableCircuitBreaker) {
@@ -76,7 +85,7 @@ export class AgentManager {
     
     // Register plugins if provided
     if (options.plugins) {
-      for (const plugin of options.plugins as AgentKitPlugin[]) {
+      for (const plugin of options.plugins) {
         this.pluginManager.register(plugin)
       }
     }
@@ -238,8 +247,9 @@ export class AgentManager {
   }
 
   async send(input: unknown): Promise<void> {
+    // Fail immediately if shutdown - no queuing allowed
     if (this.isShutdown) {
-      throw new AgentHandleError('AgentManager has been shutdown', {
+      throw new AgentShutdownError('AgentManager has been shutdown', {
         context: { agentId: this.agentId, transportId: this.transport.id }
       })
     }
@@ -250,44 +260,13 @@ export class AgentManager {
       })
     }
 
-    // If bounded executor is enabled, use it for resource management
-    if (this.boundedExecutor) {
-      return this.boundedExecutor.execute(
-        `send-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        async () => {
-          // Wrap with circuit breaker if enabled
-          const operationFn = async () => {
-            return this.observabilityTracker.trackRequest(
-              'send',
-              this.agentId,
-              this.transport.id,
-              async (requestId) => {
-                await this.processSendOperation(input, requestId)
-              },
-              {
-                inputType: typeof input,
-                hasInput: input !== undefined && input !== null
-              }
-            )
-          }
-          
-          if (this.circuitBreaker) {
-            return this.circuitBreaker.execute(operationFn)
-          }
-          
-          return operationFn()
-        },
-        input // Pass input as payload for size validation
-      )
-    }
-
-    // Fallback to original queue-based approach for backward compatibility
-    this.sendQueue = this.sendQueue
-      .catch(() => {}) // Prevent error propagation from previous operations
-      .then(async () => {
-        // Check again after waiting in queue
+    // Use bounded executor for all send operations with proper concurrency control
+    return this.boundedExecutor.execute(
+      `send-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      async () => {
+        // Double-check shutdown status after waiting in queue
         if (this.isShutdown) {
-          throw new AgentHandleError('AgentManager has been shutdown', {
+          throw new AgentShutdownError('AgentManager has been shutdown during operation', {
             context: { agentId: this.agentId, transportId: this.transport.id }
           })
         }
@@ -309,13 +288,13 @@ export class AgentManager {
         }
         
         if (this.circuitBreaker) {
-          await this.circuitBreaker.execute(operationFn)
-        } else {
-          await operationFn()
+          return this.circuitBreaker.execute(operationFn)
         }
-      })
-
-    return this.sendQueue
+        
+        return operationFn()
+      },
+      input // Pass input as payload for size validation
+    )
   }
 
   private async processSendOperation(input: unknown, requestId: string): Promise<void> {
@@ -469,6 +448,15 @@ export class AgentManager {
   }
 
   async shutdown(): Promise<void> {
+    // Implement shutdown lock to prevent concurrent shutdown operations
+    if (this.shutdownLock) {
+      // Wait for existing shutdown to complete
+      while (this.shutdownLock && !this.isShutdown) {
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+      return
+    }
+
     if (this.isShutdown) {
       debugLog.operation('shutdown (already shutdown)', { agentId: this.agentId }, this.options.debug)
       return // Already shutdown
@@ -480,94 +468,116 @@ export class AgentManager {
       })
     }
 
-    // Track shutdown with observability
-    return this.observabilityTracker.trackRequest(
-      'shutdown',
-      this.agentId,
-      this.transport.id,
-      async (requestId) => {
-        debugLog.lifecycle('shutdown start', 'AgentManager', {
-          agentId: this.agentId,
-          transportId: this.transport.id,
-          requestId
-        }, this.options.debug)
+    // Acquire shutdown lock
+    this.shutdownLock = true
 
-        try {
-          // Shutdown agent
-          debugLog.lifecycle('shutdown start', 'Agent', { 
-            agentId: this.agentId, 
-            requestId 
-          }, this.options.debug)
-          
-          await this.agent.shutdown()
-          
-          debugLog.lifecycle('shutdown complete', 'Agent', { 
-            agentId: this.agentId, 
-            requestId 
+    try {
+      // Track shutdown with observability
+      return await this.observabilityTracker.trackRequest(
+        'shutdown',
+        this.agentId,
+        this.transport.id,
+        async (requestId) => {
+          debugLog.lifecycle('shutdown start', 'AgentManager', {
+            agentId: this.agentId,
+            transportId: this.transport.id,
+            requestId
           }, this.options.debug)
 
-        } catch (error) {
-          debugLog.error('agent shutdown', error as Error, this.options.debug)
-          
-          // Track the specific error phase
-          this.observabilityTracker.trackError(
-            error as Error,
-            'shutdown',
-            this.agentId,
-            this.transport.id,
-            { phase: 'shutdown', requestId }
-          )
-
-          const shutdownError = new AgentShutdownError(
-            `Agent "${this.agentId}" failed to shutdown: ${getErrorMessage(error)}`,
-            { 
-              cause: error instanceof Error ? error : new Error(String(error)),
-              context: { 
-                agentId: this.agentId, 
-                agentName: this.agent.name,
-                requestId
-              }
-            }
-          )
-          this.callOnError(shutdownError)
-          
-          // Mark as shutdown and call cleanup even if agent shutdown failed
+          // Mark as shutdown first to prevent new operations
           this.isShutdown = true
-          this.isInitialized = false
-          
-          // Call onShutdown and onCleanup hooks even on failure
-          this.callOnShutdown()
-          this.callOnCleanup()
-          
-          throw shutdownError
-        }
-        
-        // Transport doesn't have shutdown in the interface, but we mark manager as shutdown
-        this.isShutdown = true
-        this.isInitialized = false
 
-        debugLog.lifecycle('shutdown complete', 'AgentManager', { requestId }, this.options.debug)
-        
-        // Call plugin onShutdown hooks
-        await this.callPluginHook('onShutdown', {
-          agentId: this.agentId,
-          transportId: this.transport.id,
-          requestId,
-          timestamp: Date.now()
-        })
-        
-        // Call onShutdown lifecycle hook
-        this.callOnShutdown()
-        
-        // Call onCleanup lifecycle hook after successful shutdown
-        this.callOnCleanup()
-      },
-      {
-        agentName: this.agent.name,
-        transportName: this.transport.name,
-        wasInitialized: this.isInitialized
-      }
-    )
+          // Shutdown bounded executor to reject queued operations and wait for active ones
+          debugLog.lifecycle('shutdown start', 'BoundedExecutor', { 
+            activeRequests: this.boundedExecutor.getStats().activeRequests,
+            queuedRequests: this.boundedExecutor.getStats().queuedRequests,
+            requestId 
+          }, this.options.debug)
+          
+          await this.boundedExecutor.shutdown()
+          
+          debugLog.lifecycle('shutdown complete', 'BoundedExecutor', { 
+            requestId 
+          }, this.options.debug)
+
+          try {
+            // Shutdown agent
+            debugLog.lifecycle('shutdown start', 'Agent', { 
+              agentId: this.agentId, 
+              requestId 
+            }, this.options.debug)
+            
+            await this.agent.shutdown()
+            
+            debugLog.lifecycle('shutdown complete', 'Agent', { 
+              agentId: this.agentId, 
+              requestId 
+            }, this.options.debug)
+
+          } catch (error) {
+            debugLog.error('agent shutdown', error as Error, this.options.debug)
+            
+            // Track the specific error phase
+            this.observabilityTracker.trackError(
+              error as Error,
+              'shutdown',
+              this.agentId,
+              this.transport.id,
+              { phase: 'shutdown', requestId }
+            )
+
+            const shutdownError = new AgentShutdownError(
+              `Agent "${this.agentId}" failed to shutdown: ${getErrorMessage(error)}`,
+              { 
+                cause: error instanceof Error ? error : new Error(String(error)),
+                context: { 
+                  agentId: this.agentId, 
+                  agentName: this.agent.name,
+                  requestId
+                }
+              }
+            )
+            this.callOnError(shutdownError)
+            
+            // Mark as shutdown and call cleanup even if agent shutdown failed
+            this.isInitialized = false
+            
+            // Call onShutdown and onCleanup hooks even on failure
+            this.callOnShutdown()
+            this.callOnCleanup()
+            
+            throw shutdownError
+          }
+          
+          // Finalize shutdown state
+          this.isInitialized = false
+
+          debugLog.lifecycle('shutdown complete', 'AgentManager', { requestId }, this.options.debug)
+          
+          // Call plugin onShutdown hooks
+          await this.callPluginHook('onShutdown', {
+            agentId: this.agentId,
+            transportId: this.transport.id,
+            requestId,
+            timestamp: Date.now()
+          })
+          
+          // Call onShutdown lifecycle hook
+          this.callOnShutdown()
+          
+          // Call onCleanup lifecycle hook after successful shutdown
+          this.callOnCleanup()
+        },
+        {
+          agentName: this.agent.name,
+          transportName: this.transport.name,
+          wasInitialized: this.isInitialized
+        }
+      )
+    } finally {
+      // Always release shutdown lock
+      this.shutdownLock = false
+    }
   }
 
   createRuntimeHandle(): AgentRuntimeHandle {
@@ -708,9 +718,27 @@ export class AgentManager {
   private async callPluginHook(hookName: 'onError', error: Error, context: AgentContext): Promise<void>
   private async callPluginHook(hookName: string, ...args: any[]): Promise<void> {
     try {
-      await this.pluginManager.executeHook(hookName as any, ...args)
+      let results
+      if (hookName === 'onSend' && args.length === 2) {
+        results = await this.pluginManager.executeHook('onSend', args[0], args[1])
+      } else if ((hookName === 'onInit' || hookName === 'onShutdown' || hookName === 'onError') && args.length === 1) {
+        results = await this.pluginManager.executeHook(hookName as any, args[0])
+      } else if (hookName === 'onError' && args.length === 2) {
+        results = await this.pluginManager.executeHook('onError', args[0], args[1])
+      } else {
+        // Fallback - should not happen with proper typing
+        throw new Error(`Invalid plugin hook call: ${hookName} with ${args.length} arguments`)
+      }
+      
+      // Log any plugin failures for debugging
+      const failures = results.filter(r => !r.success)
+      if (failures.length > 0 && this.options.debug) {
+        failures.forEach(failure => {
+          console.warn(`[AgentKit] Plugin '${failure.pluginName}' failed in '${failure.hookName}':`, failure.error)
+        })
+      }
     } catch (error) {
-      // Plugin errors should not break the main flow
+      // Plugin execution should not break the main flow
       debugLog.error('plugin hook execution', error as Error, this.options.debug)
       if (this.options.debug) {
         console.warn(`[AgentKit] Plugin hook '${hookName}' failed:`, error)

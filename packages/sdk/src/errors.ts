@@ -65,6 +65,19 @@ export {
   RequiredFieldMissingError,
   ValidationHelpers,
 
+  // Plugin errors
+  PluginValidationError,
+  PluginHookError,
+  PluginRegistrationError,
+  PluginTimeoutError,
+  PluginSignatureError,
+
+  // Circuit breaker errors
+  CircuitBreakerError,
+  CircuitBreakerConfigError,
+  CircuitBreakerStateError,
+  CircuitBreakerTimeoutError,
+
   // Utility classes
   ErrorFactory,
   ErrorTypeGuards

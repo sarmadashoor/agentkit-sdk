@@ -77,7 +77,7 @@ export interface ConnectAgentOptions {
   onOutput?: (message: unknown) => void
   debug?: boolean
   // Registry instance for agent/transport lookup
-  registry?: Registry
+  registry?: AgentRegistryInterface
   // Lifecycle event hooks
   onInit?: (agentId: string) => void
   onShutdown?: (agentId: string) => void
@@ -209,6 +209,38 @@ const RegistrySchema = z.object({
   remove: z.function().args(z.string()).returns(z.boolean())
 })
 
+// Agent metadata schema (defined early for use in other schemas)
+export const AgentMetadataSchema = z.object({
+  id: z.string().min(1, 'Agent ID cannot be empty'),
+  name: z.string().min(1, 'Agent name cannot be empty'),
+  version: z.string().min(1, 'Agent version cannot be empty'),
+  description: z.string().optional(),
+  supportedScopes: z.array(z.string()).optional(),
+  factory: z.function().returns(AgentSchema)
+})
+
+// AgentRegistry schema for validation
+const AgentRegistrySchema = z.object({
+  // Agent methods
+  register: z.function().args(AgentMetadataSchema).returns(z.void()),
+  lookup: z.function().args(z.string()).returns(AgentMetadataSchema),
+  getAgent: z.function().args(z.string()).returns(AgentMetadataSchema.optional()),
+  removeAgent: z.function().args(z.string()).returns(z.boolean()),
+  listAgents: z.function().returns(z.array(z.string())),
+  hasAgent: z.function().args(z.string()).returns(z.boolean()),
+  // Transport methods
+  registerTransport: z.function().args(TransportSchema).returns(z.void()),
+  lookupTransport: z.function().args(z.string()).returns(TransportSchema),
+  getTransport: z.function().args(z.string()).returns(TransportSchema.optional()),
+  removeTransport: z.function().args(z.string()).returns(z.boolean()),
+  listTransports: z.function().returns(z.array(z.string())),
+  hasTransport: z.function().args(z.string()).returns(z.boolean()),
+  // General methods
+  clear: z.function().returns(z.void()),
+  agentCount: z.number(),
+  transportCount: z.number()
+})
+
 export const ConnectAgentOptionsSchema = z.object({
   agent: z.union([z.string(), AgentSchema]),
   transport: z.union([z.string(), TransportSchema]),
@@ -217,7 +249,7 @@ export const ConnectAgentOptionsSchema = z.object({
   onOutput: z.function().args(z.unknown()).returns(z.void()).optional(),
   debug: z.boolean().optional(),
   // Registry instance for agent/transport lookup
-  registry: RegistrySchema.optional(),
+  registry: AgentRegistrySchema.optional(),
   // Lifecycle event hooks
   onInit: z.function().args(z.string()).returns(z.void()).optional(),
   onShutdown: z.function().args(z.string()).returns(z.void()).optional(),
@@ -233,15 +265,6 @@ export const ConnectAgentOptionsSchema = z.object({
   features: FeatureFlagsSchema,
   // Plugin system
   plugins: z.array(AgentKitPluginSchema).optional()
-})
-
-export const AgentMetadataSchema = z.object({
-  id: z.string().min(1, 'Agent ID cannot be empty'),
-  name: z.string().min(1, 'Agent name cannot be empty'),
-  version: z.string().min(1, 'Agent version cannot be empty'),
-  description: z.string().optional(),
-  supportedScopes: z.array(z.string()).optional(),
-  factory: z.function().returns(AgentSchema)
 })
 
 export type ValidatedAgent = z.infer<typeof AgentSchema>
@@ -331,6 +354,32 @@ export interface Registry<T = any> {
   list(): ReadonlyArray<string>
   has(id: string): boolean
   remove(id: string): boolean
+}
+
+/**
+ * Agent registry interface with specific methods for agents and transports
+ */
+export interface AgentRegistryInterface {
+  // Agent methods
+  register(metadata: AgentMetadata): void
+  lookup(agentId: string): AgentMetadata
+  getAgent(agentId: string): AgentMetadata | undefined
+  removeAgent(agentId: string): boolean
+  listAgents(): string[]
+  hasAgent(agentId: string): boolean
+  
+  // Transport methods
+  registerTransport(transport: Transport): void
+  lookupTransport(transportId: string): Transport
+  getTransport(transportId: string): Transport | undefined
+  removeTransport(transportId: string): boolean
+  listTransports(): string[]
+  hasTransport(transportId: string): boolean
+  
+  // General methods
+  clear(): void
+  agentCount: number
+  transportCount: number
 }
 
 // Export schemas for external use

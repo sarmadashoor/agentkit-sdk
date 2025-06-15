@@ -249,7 +249,18 @@ export const testUtils = {
 
 // Make test utils available globally for easy access in tests
 declare global {
-  var testUtils: typeof testUtils
+  var testUtils: {
+    resetMocks: () => void
+    mockFetchSuccess: (responseData: any, status?: number) => void
+    mockFetchError: (error: Error) => void
+    mockFetchNetworkError: () => void
+    mockFetchTimeout: () => void
+    getMocks: () => {
+      fetch: any
+      abort: any
+      abortController: any
+    }
+  }
 }
 
 global.testUtils = testUtils

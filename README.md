@@ -136,6 +136,67 @@ const handle = await connectAgent({
 })
 ```
 
+**Resource Limits and Concurrency Control:**
+
+```typescript
+const handle = await connectAgent({
+  agent: 'my-agent',
+  transport: 'dummy',
+  resourceLimits: {
+    maxConcurrentRequests: 10,
+    maxQueueSize: 50,
+    requestTimeoutMs: 30000,
+    maxPayloadSize: 1024 * 1024 // 1MB
+  }
+})
+```
+
+### Shutdown Safety and Concurrency
+
+AgentKit provides robust shutdown safety with built-in race condition prevention:
+
+**Guaranteed Shutdown Safety:**
+- ✅ All queued operations are properly rejected with `AgentShutdownError`
+- ✅ Active operations are allowed to complete within a timeout window
+- ✅ No new operations can be queued after shutdown begins
+- ✅ Multiple shutdown calls are safely handled (idempotent)
+- ✅ Memory leaks are prevented through proper timer and promise cleanup
+
+**Race Condition Prevention:**
+```typescript
+// Safe concurrent operations
+const operations = [
+  handle.send({ message: 'first' }),
+  handle.send({ message: 'second' }),
+  handle.send({ message: 'third' })
+]
+
+// Safe shutdown during operations
+setTimeout(() => handle.shutdown(), 100)
+
+// All operations will either complete or fail with AgentShutdownError
+const results = await Promise.allSettled(operations)
+```
+
+**Error Handling After Shutdown:**
+```typescript
+try {
+  await handle.send({ message: 'after shutdown' })
+} catch (error) {
+  if (error instanceof AgentShutdownError) {
+    console.log('Operation rejected: agent has been shutdown')
+    // Handle graceful degradation
+  }
+}
+```
+
+**Bounded Execution and Backpressure:**
+AgentKit uses a built-in bounded executor that provides:
+- Automatic concurrency limiting based on `resourceLimits`
+- Queue management with configurable backpressure
+- Timeout handling for long-running operations
+- Graceful error propagation without hanging
+
 ## Project Structure
 
 ```
