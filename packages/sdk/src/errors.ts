@@ -33,6 +33,7 @@ export {
   TransportInitError,
   TransportSendError,
   TransportReceiveError,
+  TransportBackpressureError,
   NetworkError,
   RequestTimeoutError,
   ConnectionFailedError,

@@ -12,6 +12,7 @@ import {
   AgentShutdownError,
   TransportInitError,
   TransportSendError,
+  TransportBackpressureError,
   getErrorMessage
 } from './errors'
 import { debugLog } from './log'
@@ -394,6 +395,32 @@ export class AgentManager {
     }
 
     try {
+      // Check transport backpressure before sending
+      if (!this.transport.canAcceptMore()) {
+        const backpressureError = new TransportBackpressureError(
+          this.transport.id,
+          `Transport "${this.transport.id}" is under backpressure and cannot accept more messages`,
+          undefined, // currentLoad unknown
+          undefined  // maxCapacity unknown
+        )
+        
+        debugLog.warn('transport backpressure detected', {
+          transportId: this.transport.id,
+          requestId
+        }, this.options.debug)
+        
+        // Track backpressure as an error
+        this.observabilityTracker.trackError(
+          backpressureError,
+          'send',
+          this.agentId,
+          this.transport.id,
+          { phase: 'backpressure', requestId, outputType: typeof output }
+        )
+        
+        throw backpressureError
+      }
+
       // Send output through transport
       debugLog.lifecycle('send start', 'Transport', {
         transportId: this.transport.id,
