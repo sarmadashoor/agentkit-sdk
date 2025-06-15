@@ -9,11 +9,18 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "pnpm -r --parallel run build",
-    "test": "pnpm -r --parallel run test",
-    "clean": "pnpm -r --parallel run clean",
-    "lint": "pnpm -r --parallel run lint",
-    "typecheck": "pnpm -r --parallel run typecheck",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:node": "npm run test --workspaces --if-present -- --exclude=@agentkit/runtime-web",
+    "test:browser": "cd packages/runtime-web && npm test",
+    "test:all": "npm run test",
+    "clean": "npm run clean --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "validate:observability": "node scripts/validate-observability.js",
+    "validate:scripts": "node scripts/validate-package-scripts.js",
+    "validate:tsconfig": "node scripts/validate-tsconfig.js",
+    "validate:all": "npm run validate:scripts && npm run validate:tsconfig && npm run validate:observability",
     "build:npm": "./scripts/build-all.sh",
     "test:npm": "./scripts/test-all.sh",
     "typecheck:npm": "./scripts/typecheck.sh"
