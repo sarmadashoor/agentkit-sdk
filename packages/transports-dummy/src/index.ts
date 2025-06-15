@@ -1,4 +1,4 @@
-import { Transport, TransportConfig, TransportMessage } from '@agentkit/types'
+import { Transport, TransportConfig, TransportMessage, TransportStatus } from '@agentkit/types'
 import { z } from 'zod'
 
 // Configuration schema for DummyTransport
@@ -6,7 +6,10 @@ export const DummyTransportConfigSchema = z.object({
   debug: z.boolean().optional(),
   logMessages: z.boolean().optional().default(true),
   responseDelay: z.number().optional().default(5),
-  fixedResponse: z.unknown().optional()
+  fixedResponse: z.unknown().optional(),
+  // Backpressure configuration
+  maxQueueSize: z.number().min(1).optional().default(100),
+  enableBackpressure: z.boolean().optional().default(true)
 })
 
 export type DummyTransportConfig = z.infer<typeof DummyTransportConfigSchema>
@@ -44,6 +47,11 @@ export class DummyTransport implements Transport {
       throw new Error('Transport not initialized. Call init() first.')
     }
     
+    // Check backpressure before accepting the message
+    if (this.config.enableBackpressure && !this.canAcceptMore()) {
+      throw new Error(`Transport "${this.id}" queue is full (${this.messageQueue.length}/${this.config.maxQueueSize}). Cannot accept more messages.`)
+    }
+    
     if (this.config.debug) {
       console.log('[DummyTransport] Sending message:', message)
     }
@@ -56,16 +64,23 @@ export class DummyTransport implements Transport {
     } else {
       // Default behavior: echo the message with transformation
       const response = {
-        echoed: message,
-        transportId: this.id,
-        timestamp: new Date().toISOString()
+        result: `echo:${JSON.stringify(message)}`,
+        metadata: {
+          agentId: 'dummy-agent',
+          version: '1.0.0',
+          timestamp: new Date().toISOString(),
+          initData: { ready: true, timestamp: new Date().toISOString() }
+        }
       }
       this.messageQueue.push(response)
     }
     
     // Log messages if enabled
     if (this.config.logMessages) {
-      console.log(`[${this.name}] Message sent:`, message)
+      const responseToLog = this.config.fixedResponse !== undefined ? 
+        this.config.fixedResponse : 
+        { result: `echo:${JSON.stringify(message)}`, metadata: { agentId: 'dummy-agent', version: '1.0.0' } }
+      console.log(`[${this.name}] Message sent:`, responseToLog)
     }
     
     // Simulate async send
@@ -123,6 +138,32 @@ export class DummyTransport implements Transport {
 
   isInitialized(): boolean {
     return this.initialized
+  }
+
+  // Backpressure API implementation
+  canAcceptMore(): boolean {
+    if (!this.config.enableBackpressure) {
+      return true // Backpressure disabled
+    }
+    
+    return this.messageQueue.length < (this.config.maxQueueSize ?? 100)
+  }
+
+  getStatus(): TransportStatus {
+    const queueSize = this.messageQueue.length
+    const maxQueueSize = this.config.maxQueueSize ?? 100
+    const canAcceptMore = this.config.enableBackpressure ? 
+      queueSize < maxQueueSize : true
+
+    return {
+      canAcceptMore,
+      queueSize,
+      maxQueueSize: this.config.enableBackpressure ? maxQueueSize : undefined,
+      isHealthy: this.initialized,
+      healthMessage: this.initialized ? 
+        'Transport operational' : 
+        'Transport not initialized'
+    }
   }
 }
 

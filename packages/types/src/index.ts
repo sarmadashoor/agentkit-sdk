@@ -46,6 +46,22 @@ export interface TransportMessage {
   [key: string]: unknown
 }
 
+/**
+ * Transport capacity and health status
+ */
+export interface TransportStatus {
+  /** Whether the transport can accept more messages */
+  canAcceptMore: boolean
+  /** Current number of pending/queued messages */
+  queueSize: number
+  /** Maximum queue capacity (undefined = unlimited) */
+  maxQueueSize?: number
+  /** Whether the transport is healthy and operational */
+  isHealthy: boolean
+  /** Optional health details or error message */
+  healthMessage?: string
+}
+
 export interface Transport {
   id: string
   name: string
@@ -53,6 +69,12 @@ export interface Transport {
   send: (message: TransportMessage) => Promise<void>
   receive: () => Promise<TransportMessage>
   config?: TransportConfig
+  
+  // Backpressure API
+  /** Check if transport can accept more messages (backpressure indicator) */
+  canAcceptMore?: () => boolean
+  /** Get detailed transport status including capacity and health */
+  getStatus?: () => TransportStatus
 }
 
 export interface ObservabilityHooks {
@@ -172,13 +194,24 @@ export const AgentSchema = z.object({
 const TransportConfigSchema = z.record(z.unknown())
 const TransportMessageSchema = z.record(z.unknown())
 
+export const TransportStatusSchema = z.object({
+  canAcceptMore: z.boolean(),
+  queueSize: z.number().min(0),
+  maxQueueSize: z.number().min(0).optional(),
+  isHealthy: z.boolean(),
+  healthMessage: z.string().optional()
+})
+
 export const TransportSchema = z.object({
   id: z.string().min(1, 'Transport ID cannot be empty'),
   name: z.string().min(1, 'Transport name cannot be empty'),
   init: z.function().args(TransportConfigSchema.optional()).returns(z.promise(z.void())),
   send: z.function().args(TransportMessageSchema).returns(z.promise(z.void())),
   receive: z.function().returns(z.promise(TransportMessageSchema)),
-  config: TransportConfigSchema.optional()
+  config: TransportConfigSchema.optional(),
+  // Optional backpressure methods
+  canAcceptMore: z.function().returns(z.boolean()).optional(),
+  getStatus: z.function().returns(TransportStatusSchema).optional()
 })
 
 const RequestMetadataSchema = z.object({

@@ -671,6 +671,27 @@ export class AgentManager {
     }
   }
 
+  /**
+   * Get transport status including backpressure information
+   */
+  getTransportStatus() {
+    if (typeof this.transport.getStatus === 'function') {
+      return this.transport.getStatus()
+    }
+    
+    // Fallback for transports without getStatus
+    const canAcceptMore = typeof this.transport.canAcceptMore === 'function' ?
+      this.transport.canAcceptMore() : true
+    
+    return {
+      canAcceptMore,
+      queueSize: 0, // Unknown
+      maxQueueSize: undefined,
+      isHealthy: this.isInitialized && !this.isShutdown,
+      healthMessage: this.isInitialized ? 'Transport operational' : 'Transport not ready'
+    }
+  }
+
   // Lifecycle hook helpers - wrapped in try/catch to avoid cascading failures
   private callOnInit(): void {
     if (this.options.onInit) {
