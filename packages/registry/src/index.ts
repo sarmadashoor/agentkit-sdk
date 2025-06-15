@@ -14,9 +14,10 @@ export class AgentRegistry implements AgentRegistryInterface {
   private agents = new Map<string, Readonly<AgentMetadata>>()
   private transports = new Map<string, Readonly<Transport>>()
   private frozen = false // Track if registry has been frozen
+  private sealed = false // Track if registry has been sealed
 
   register(metadata: AgentMetadata): void {
-    this.checkNotFrozen('register agent')
+    this.checkNotSealed('register agent')
     
     // Validate structure but store original to preserve all fields
     try {
@@ -39,7 +40,7 @@ export class AgentRegistry implements AgentRegistryInterface {
   }
 
   registerTransport(transport: Transport): void {
-    this.checkNotFrozen('register transport')
+    this.checkNotSealed('register transport')
     
     // Validate structure but store original to preserve context
     try {
@@ -92,18 +93,18 @@ export class AgentRegistry implements AgentRegistryInterface {
 
   // Cleanup and disposal methods
   clear(): void {
-    this.checkNotFrozen('clear registry')
+    this.checkNotSealed('clear registry')
     this.agents.clear()
     this.transports.clear()
   }
 
   removeAgent(agentId: string): boolean {
-    this.checkNotFrozen('remove agent')
+    this.checkNotSealed('remove agent')
     return this.agents.delete(agentId)
   }
 
   removeTransport(transportId: string): boolean {
-    this.checkNotFrozen('remove transport')
+    this.checkNotSealed('remove transport')
     return this.transports.delete(transportId)
   }
 
@@ -157,6 +158,57 @@ export class AgentRegistry implements AgentRegistryInterface {
    */
   isFrozen(): boolean {
     return this.frozen
+  }
+
+  /**
+   * Seal the registry to prevent further mutations (alternative to freeze)
+   * This provides more explicit semantics for configuration finalization
+   */
+  seal(): void {
+    if (this.sealed) {
+      throw new Error('Registry is already sealed and cannot be sealed again.')
+    }
+    
+    // Deep freeze all stored objects to prevent mutations
+    this.agents.forEach((agent, key) => {
+      if (!Object.isFrozen(agent)) {
+        this.agents.set(key, createFrozenCopy(agent))
+      }
+    })
+    
+    this.transports.forEach((transport, key) => {
+      if (!Object.isFrozen(transport)) {
+        const frozenTransport = {
+          ...transport,
+          config: transport.config ? createFrozenCopy(transport.config) : undefined
+        }
+        this.transports.set(key, Object.freeze(frozenTransport) as Transport)
+      }
+    })
+    
+    // Freeze the maps themselves
+    Object.freeze(this.agents)
+    Object.freeze(this.transports)
+    
+    this.sealed = true
+    this.frozen = true // Sealing also implies freezing
+    Object.freeze(this) // Freeze the registry instance itself
+  }
+
+  /**
+   * Check if the registry is sealed
+   */
+  isSealed(): boolean {
+    return this.sealed
+  }
+
+  /**
+   * Override registration methods to prevent mutations after sealing
+   */
+  private checkNotSealed(operation: string): void {
+    if (this.sealed) {
+      throw new Error(`Cannot ${operation} on sealed registry. Registry has been sealed to prevent runtime mutations.`)
+    }
   }
 
   /**
