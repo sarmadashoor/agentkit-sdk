@@ -8,12 +8,16 @@ import {
   TransportMetadataValidationError
 } from '@agentkit/errors'
 import { z } from 'zod'
+import { createFrozenCopy } from './utils/deepFreeze'
 
 export class AgentRegistry implements AgentRegistryInterface {
-  private agents = new Map<string, AgentMetadata>()
-  private transports = new Map<string, Transport>()
+  private agents = new Map<string, Readonly<AgentMetadata>>()
+  private transports = new Map<string, Readonly<Transport>>()
+  private frozen = false // Track if registry has been frozen
 
   register(metadata: AgentMetadata): void {
+    this.checkNotFrozen('register agent')
+    
     // Validate structure but store original to preserve all fields
     try {
       AgentMetadataSchema.parse(metadata)
@@ -29,10 +33,14 @@ export class AgentRegistry implements AgentRegistryInterface {
       throw new DuplicateAgentIdError(metadata.id)
     }
     
-    this.agents.set(metadata.id, metadata)
+    // Create a deeply frozen copy to prevent mutations while preserving original
+    const frozenMetadata = createFrozenCopy(metadata)
+    this.agents.set(metadata.id, frozenMetadata)
   }
 
   registerTransport(transport: Transport): void {
+    this.checkNotFrozen('register transport')
+    
     // Validate structure but store original to preserve context
     try {
       TransportSchema.parse(transport)
@@ -48,7 +56,13 @@ export class AgentRegistry implements AgentRegistryInterface {
       throw new DuplicateTransportIdError(transport.id)
     }
     
-    this.transports.set(transport.id, transport)
+    // Create a frozen copy to prevent mutations while preserving original behavior
+    // Note: We create a shallow copy and freeze only the config deeply
+    const frozenTransport = {
+      ...transport,
+      config: createFrozenCopy(transport.config)
+    }
+    this.transports.set(transport.id, Object.freeze(frozenTransport) as Transport)
   }
 
   lookup(agentId: string): AgentMetadata {
@@ -78,15 +92,18 @@ export class AgentRegistry implements AgentRegistryInterface {
 
   // Cleanup and disposal methods
   clear(): void {
+    this.checkNotFrozen('clear registry')
     this.agents.clear()
     this.transports.clear()
   }
 
   removeAgent(agentId: string): boolean {
+    this.checkNotFrozen('remove agent')
     return this.agents.delete(agentId)
   }
 
   removeTransport(transportId: string): boolean {
+    this.checkNotFrozen('remove transport')
     return this.transports.delete(transportId)
   }
 
@@ -114,6 +131,41 @@ export class AgentRegistry implements AgentRegistryInterface {
 
   get transportCount(): number {
     return this.transports.size
+  }
+
+  // Registry immutability methods
+  
+  /**
+   * Freeze the entire registry to prevent further mutations
+   * This makes the registry immutable after initial setup
+   */
+  freeze(): void {
+    if (this.frozen) {
+      return // Already frozen
+    }
+    
+    // Freeze the maps themselves
+    Object.freeze(this.agents)
+    Object.freeze(this.transports)
+    
+    this.frozen = true
+    Object.freeze(this) // Freeze the registry instance itself
+  }
+
+  /**
+   * Check if the registry is frozen
+   */
+  isFrozen(): boolean {
+    return this.frozen
+  }
+
+  /**
+   * Override registration methods to prevent mutations after freezing
+   */
+  private checkNotFrozen(operation: string): void {
+    if (this.frozen) {
+      throw new Error(`Cannot ${operation} on frozen registry. Registry has been frozen to prevent runtime mutations.`)
+    }
   }
 }
 
