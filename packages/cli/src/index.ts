@@ -2,6 +2,8 @@
 import { Command } from 'commander'
 import chalk from 'chalk'
 import { createPluginCommand } from './commands/create-plugin'
+import { signPluginCommand } from './commands/sign-plugin'
+import { signPluginHmacCommand } from './commands/sign-plugin-hmac'
 
 // Read version from package.json
 const packageJson = require('../package.json')
@@ -16,6 +18,12 @@ program
 
 // Add create-plugin command
 program.addCommand(createPluginCommand)
+
+// Add sign-plugin command (Ed25519 - existing)
+program.addCommand(signPluginCommand)
+
+// Add sign-plugin HMAC command (new HMAC-based)
+program.addCommand(signPluginHmacCommand)
 
 // Add future commands placeholder
 program

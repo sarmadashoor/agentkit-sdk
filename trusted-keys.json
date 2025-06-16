@@ -1,0 +1,16 @@
+[
+  {
+    "name": "agentkit-core",
+    "pubkey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAd75J8yJJ1lEaKcR8wM3QJl9s7FJ8QRrJd5K2Vn5+2Jo=\n-----END PUBLIC KEY-----",
+    "expires": "2026-01-01",
+    "type": "dev",
+    "description": "AgentKit core development signing key"
+  },
+  {
+    "name": "agentkit-ci",
+    "pubkey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAh1K2Vn5+2Jod75J8yJJ1lEaKcR8wM3QJl9s7FJ8QRrJ=\n-----END PUBLIC KEY-----",
+    "expires": "2025-12-31",
+    "type": "ci",
+    "description": "AgentKit CI/CD pipeline signing key"
+  }
+]

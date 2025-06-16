@@ -50,17 +50,16 @@ export {
   createPluginDevelopmentWrapper,
   measurePluginPerformance,
   validatePluginContract,
-  comparePluginPerformance,
   type PluginPerformanceReport,
   type PluginValidationResult
 } from './pluginDevelopment'
 
 // Plugin execution tracer
 export class PluginExecutionTracer {
-  constructor(private debugManager: DebugManager) {}
+  constructor(private debugManager: import('./DebugManager').DebugManager) {}
   
   getPluginTraces(pluginName: string) {
-    return this.debugManager.getTimeline()?.entries.filter(e => e.pluginName === pluginName) || []
+    return this.debugManager.getTimeline()?.entries.filter((e: any) => e.pluginName === pluginName) || []
   }
   
   getCompletedTraces() {

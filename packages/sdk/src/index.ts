@@ -291,6 +291,10 @@ export const AgentRegistryLegacy = {
 export { AgentManager, AgentState } from './AgentManager'
 export { BoundedExecutor } from './boundedExecutor'
 export { CircuitBreaker, CircuitState } from './circuitBreaker'
+
+// Performance utilities
+export { EnhancedBoundedExecutor, type EnhancedObservabilityHooks } from './performance/EnhancedBoundedExecutor'
+export { RetryableExecutor, type RetryObservabilityHooks } from './performance/RetryableExecutor'
 export {
   PluginManager,
   LoggingPlugin,
@@ -349,3 +353,13 @@ export {
   sanitizeForPlugin,
   deepFreeze
 } from './utils/deepClone'
+
+// Plugin security and signing utilities
+export {
+  signPlugin,
+  serializePluginForSigning,
+  createSignedPlugin,
+  validatePluginSignatureFields,
+  type PluginSignatureMetadata,
+  type SigningOptions
+} from './security/plugin-signer'

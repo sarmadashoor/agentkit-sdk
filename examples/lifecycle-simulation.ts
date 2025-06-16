@@ -6,7 +6,7 @@
  */
 
 import { connectAgent } from '@agentkit/sdk'
-import { createGreetPlugin, GreetPlugin } from '../packages/sdk/src/__tests__/fixtures/greet-plugin'
+import { createLoggingPlugin } from '@agentkit/sdk'
 import type { AgentKitPlugin, AgentContext, SendPayload } from '@agentkit/types'
 
 // Mock agent for demonstration

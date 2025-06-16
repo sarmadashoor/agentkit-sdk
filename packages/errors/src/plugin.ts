@@ -99,3 +99,51 @@ export class PluginSandboxError extends AgentKitError {
     super(`Plugin "${pluginName}" hook "${hookName}" sandbox violation: ${reason}`, options)
   }
 }
+
+/**
+ * Error thrown when plugin verification fails
+ */
+export class PluginVerificationError extends AgentKitError {
+  readonly code = 'PLUGIN_VERIFICATION_FAILED' as const
+  readonly category = 'security' as const
+
+  constructor(message: string, options?: AgentKitErrorOptions) {
+    super(message, options)
+  }
+}
+
+/**
+ * Error thrown when plugin is signed with untrusted key
+ */
+export class UntrustedPluginError extends AgentKitError {
+  readonly code = 'PLUGIN_UNTRUSTED_KEY' as const
+  readonly category = 'security' as const
+
+  constructor(message: string, options?: AgentKitErrorOptions) {
+    super(message, options)
+  }
+}
+
+/**
+ * Error thrown when plugin signature has expired
+ */
+export class ExpiredSignatureError extends AgentKitError {
+  readonly code = 'PLUGIN_SIGNATURE_EXPIRED' as const
+  readonly category = 'security' as const
+
+  constructor(message: string, options?: AgentKitErrorOptions) {
+    super(message, options)
+  }
+}
+
+/**
+ * Error thrown when plugin signature is missing
+ */
+export class MissingSignatureError extends AgentKitError {
+  readonly code = 'PLUGIN_SIGNATURE_MISSING' as const
+  readonly category = 'security' as const
+
+  constructor(message: string, options?: AgentKitErrorOptions) {
+    super(message, options)
+  }
+}

@@ -12,8 +12,7 @@
 
 import { performance } from 'perf_hooks'
 import { EventEmitter } from 'events'
-import { EnhancedBoundedExecutor, type EnhancedObservabilityHooks } from '../packages/sdk/src/performance/EnhancedBoundedExecutor'
-import { RetryableExecutor, type RetryObservabilityHooks } from '../packages/sdk/src/performance/RetryableExecutor'
+import { EnhancedBoundedExecutor, type EnhancedObservabilityHooks, RetryableExecutor, type RetryObservabilityHooks } from '@agentkit/sdk'
 
 interface BenchmarkOptions {
   concurrent?: number

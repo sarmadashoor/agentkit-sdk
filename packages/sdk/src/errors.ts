@@ -74,6 +74,10 @@ export {
   PluginSignatureError,
   RecursivePluginCallError,
   PluginSandboxError,
+  PluginVerificationError,
+  UntrustedPluginError,
+  ExpiredSignatureError,
+  MissingSignatureError,
 
   // Circuit breaker errors
   CircuitBreakerError,

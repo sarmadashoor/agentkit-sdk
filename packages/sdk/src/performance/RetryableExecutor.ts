@@ -117,13 +117,14 @@ export class RetryableExecutor {
         lastError = error as Error
         
         // Record failure
-        this.recordFailure(task.pluginName, error as Error)
+        const err = error instanceof Error ? error : new Error(String(error))
+        this.recordFailure(task.pluginName, err)
         
         // Check if error is retryable
-        if (!this.isRetryableError(error as Error, config)) {
+        if (!this.isRetryableError(err, config)) {
           debugLog.warn('non-retryable error', {
             taskId: task.id,
-            error: error.message,
+            error: err.message,
             pluginName: task.pluginName
           }, this.debug)
           break
@@ -146,11 +147,11 @@ export class RetryableExecutor {
           taskId: task.id,
           attempt: attempt + 1,
           delay,
-          error: error.message,
+          error: err.message,
           pluginName: task.pluginName
         }, this.debug)
         
-        this.observabilityHooks?.onRetryAttempt?.(task.id, attempt + 1, delay, error as Error)
+        this.observabilityHooks?.onRetryAttempt?.(task.id, attempt + 1, delay, err)
         
         // Wait before retry
         await new Promise(resolve => setTimeout(resolve, delay))

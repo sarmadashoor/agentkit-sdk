@@ -92,7 +92,25 @@ export class EnhancedBoundedExecutor {
   private isShutdown = false
   
   // Performance tracking
-  private metrics: PerformanceMetrics
+  private metrics: PerformanceMetrics = {
+    queueSizeHistogram: [],
+    maxQueueSizeReached: 0,
+    totalEnqueued: 0,
+    totalDequeued: 0,
+    totalDropped: 0,
+    executionLatencyHistogram: [],
+    queueWaitTimeHistogram: [],
+    totalExecutions: 0,
+    totalTimeouts: 0,
+    totalFailures: 0,
+    pluginTimeouts: new Map(),
+    pluginFailures: new Map(),
+    disabledPlugins: new Set(),
+    guardrailViolations: 0,
+    consecutiveTimeouts: 0,
+    peakQueueSize: 0,
+    memoryPressureEvents: 0
+  }
   private startTime = Date.now()
   
   // Memory leak prevention

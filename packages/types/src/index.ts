@@ -221,6 +221,8 @@ export interface ConnectAgentOptions {
   features?: FeatureFlags
   // Plugin system
   plugins?: AgentKitPlugin[]
+  // Plugin verification mode: 'strict' (reject unsigned), 'warn' (log warning), 'off' (disable)
+  verify?: 'strict' | 'warn' | 'off'
 }
 
 export interface AgentRuntimeHandle {
@@ -437,13 +439,55 @@ export const ConnectAgentOptionsSchema = z.object({
   // Feature flags
   features: FeatureFlagsSchema,
   // Plugin system
-  plugins: z.array(AgentKitPluginSchema).optional()
+  plugins: z.array(AgentKitPluginSchema).optional(),
+  // Plugin verification options
+  allowUnverifiedPlugins: z.boolean().optional(),
+  trustedKeysPath: z.string().optional()
 })
 
 export type ValidatedAgent = z.infer<typeof AgentSchema>
 export type ValidatedTransport = z.infer<typeof TransportSchema>
 export type ValidatedConnectAgentOptions = z.infer<typeof ConnectAgentOptionsSchema>
 export type ValidatedAgentMetadata = z.infer<typeof AgentMetadataSchema>
+
+/**
+ * Options for connecting to an agent with plugin verification support
+ */
+export interface ConnectAgentOptions {
+  /** Agent instance or agent ID to connect to */
+  agent: string | Agent
+  /** Transport instance or transport ID to use */
+  transport: string | Transport
+  /** Optional scope restrictions */
+  scope?: string[]
+  /** Tech stack information */
+  techStack?: string
+  /** Callback for agent output */
+  onOutput?: (output: AgentOutput) => void
+  /** Enable debug logging */
+  debug?: boolean
+  /** Registry instance for agent/transport lookup */
+  registry?: AgentRegistryInterface
+  /** Lifecycle event hooks */
+  onInit?: (agentId: string) => void
+  onShutdown?: (agentId: string) => void
+  onError?: (error: Error) => void
+  onCleanup?: (agentId: string) => void
+  /** Observability hooks */
+  observability?: ObservabilityHooks
+  /** Resource limits */
+  resourceLimits?: ResourceLimits
+  /** Circuit breaker configuration */
+  circuitBreaker?: CircuitBreakerConfig
+  /** Feature flags */
+  features?: FeatureFlags
+  /** Plugin system */
+  plugins?: AgentKitPlugin[]
+  /** Allow unsigned plugins in development mode */
+  allowUnverifiedPlugins?: boolean
+  /** Path to trusted keys registry file */
+  trustedKeysPath?: string
+}
 
 // Plugin-related types (moved from SDK to avoid circular dependencies)
 
@@ -529,6 +573,13 @@ export interface AgentKitPlugin {
   compatibility?: PluginCompatibility
   /** Required permissions */
   permissions?: PluginPermissions
+  
+  /** HMAC signature for plugin verification */
+  signature?: string
+  /** Public key for signature verification (optional, can use environment secret) */
+  publicKey?: string
+  /** Trust policy for this plugin: 'strict' | 'warn' | 'off' */
+  trustPolicy?: 'strict' | 'warn' | 'off'
   
   /**
    * Called when the agent is initialized

@@ -286,6 +286,10 @@ npm run typecheck
 | [🗂️ Registry Documentation](./docs/registry.md) | Agent registration and metadata patterns |
 | [🚀 Migration Guide](./docs/migration.md) | Version scope and stability guarantees |
 | [📋 Changelog](./docs/CHANGELOG.md) | Complete version history and features |
+| [⚡ Performance Guide](./PERFORMANCE.md) | Profiling, optimization, and monitoring |
+| [🔧 CLI Reference](./CLI.md) | Command-line tools and plugin scaffolding |
+| [🧩 Plugin Development](./PLUGIN_DEVELOPMENT.md) | Complete plugin development lifecycle |
+| [📚 API Reference](./API.md) | Comprehensive API documentation |
 
 ## Examples
 
