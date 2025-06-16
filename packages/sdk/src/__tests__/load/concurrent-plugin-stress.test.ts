@@ -1,4 +1,8 @@
 /**
+ * @testmeta type:load
+ * @testmeta category:performance
+ * @testmeta priority:high
+ * 
  * Load Test Suite - 100 Concurrent Plugin Calls
  * Tests performance under extreme load conditions
  */

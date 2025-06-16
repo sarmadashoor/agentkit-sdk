@@ -1,3 +1,12 @@
+/**
+ * @testmeta type:chaos
+ * @testmeta category:reliability
+ * @testmeta priority:critical
+ * 
+ * Plugin Chaos Tests
+ * Tests plugin resilience, crash recovery, and system stability
+ */
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { AgentManager } from '../../AgentManager'
 import { DummyAgent } from '@agentkit/test-agent'
@@ -21,6 +30,9 @@ describe('Plugin Chaos Tests', () => {
   })
 
   describe('Plugin Crashes During Operations', () => {
+    /**
+     * @testmeta technique:crash-recovery
+     */
     it('should survive plugin crashes during onSend', async () => {
       const crashPlugin: AgentKitPlugin = {
         name: 'crash-plugin',
@@ -63,6 +75,9 @@ describe('Plugin Chaos Tests', () => {
       expect(manager.getState().shutdown).toBe(false)
     })
 
+    /**
+     * @testmeta technique:init-crash-recovery
+     */
     it('should survive plugin crashes during onInit', async () => {
       const crashPlugin: AgentKitPlugin = {
         name: 'init-crash-plugin',
@@ -93,6 +108,9 @@ describe('Plugin Chaos Tests', () => {
       await manager.send({ test: 'message' })
     })
 
+    /**
+     * @testmeta technique:shutdown-crash-recovery
+     */
     it('should survive plugin crashes during onShutdown', async () => {
       const crashPlugin: AgentKitPlugin = {
         name: 'shutdown-crash-plugin',
@@ -126,6 +144,9 @@ describe('Plugin Chaos Tests', () => {
   })
 
   describe('Plugin Timeouts', () => {
+    /**
+     * @testmeta technique:timeout-handling
+     */
     it('should timeout infinite loop plugins', async () => {
       const infiniteLoopPlugin: AgentKitPlugin = {
         name: 'infinite-loop-plugin',
@@ -175,6 +196,9 @@ describe('Plugin Chaos Tests', () => {
       expect(manager.getState().initialized).toBe(true)
     })
 
+    /**
+     * @testmeta technique:sync-timeout-handling
+     */
     it('should handle synchronous infinite loops', async () => {
       const syncInfinitePlugin: AgentKitPlugin = {
         name: 'sync-infinite-plugin',
@@ -213,6 +237,9 @@ describe('Plugin Chaos Tests', () => {
   })
 
   describe('Plugin Memory Issues', () => {
+    /**
+     * @testmeta technique:memory-leak-isolation
+     */
     it('should survive plugins that leak memory', async () => {
       const memoryLeakPlugin: AgentKitPlugin = {
         name: 'memory-leak-plugin',
@@ -251,6 +278,9 @@ describe('Plugin Chaos Tests', () => {
       expect(manager.getState().initialized).toBe(true)
     })
 
+    /**
+     * @testmeta technique:payload-limit-enforcement
+     */
     it('should handle plugins that exceed payload limits', async () => {
       const largePayloadPlugin: AgentKitPlugin = {
         name: 'large-payload-plugin',
@@ -292,6 +322,9 @@ describe('Plugin Chaos Tests', () => {
   })
 
   describe('Plugin Exception Types', () => {
+    /**
+     * @testmeta technique:non-error-exception-handling
+     */
     it('should handle plugins throwing non-Error objects', async () => {
       const weirdThrowPlugin: AgentKitPlugin = {
         name: 'weird-throw-plugin',
@@ -320,6 +353,9 @@ describe('Plugin Chaos Tests', () => {
       await expect(manager.send({ test: 'message' })).resolves.not.toThrow()
     })
 
+    /**
+     * @testmeta technique:null-exception-handling
+     */
     it('should handle plugins throwing null/undefined', async () => {
       const nullThrowPlugin: AgentKitPlugin = {
         name: 'null-throw-plugin',
@@ -360,6 +396,9 @@ describe('Plugin Chaos Tests', () => {
   })
 
   describe('Recursive Plugin Calls', () => {
+    /**
+     * @testmeta technique:recursion-prevention
+     */
     it('should prevent infinite recursion in plugin hooks', async () => {
       let recursionCount = 0
       const maxRecursion = 10
@@ -400,6 +439,9 @@ describe('Plugin Chaos Tests', () => {
   })
 
   describe('Plugin State Corruption Attempts', () => {
+    /**
+     * @testmeta technique:state-corruption-prevention
+     */
     it('should prevent plugins from corrupting manager state', async () => {
       const corruptionPlugin: AgentKitPlugin = {
         name: 'corruption-plugin',
@@ -447,6 +489,9 @@ describe('Plugin Chaos Tests', () => {
   })
 
   describe('Multi-Plugin Chaos Scenarios', () => {
+    /**
+     * @testmeta technique:multi-plugin-failure-handling
+     */
     it('should handle multiple failing plugins in sequence', async () => {
       const plugins: AgentKitPlugin[] = Array.from({ length: 10 }, (_, i) => ({
         name: `chaos-plugin-${i}`,
@@ -492,6 +537,9 @@ describe('Plugin Chaos Tests', () => {
       expect(manager.getState().shutdown).toBe(false)
     })
 
+    /**
+     * @testmeta technique:shutdown-under-load
+     */
     it('should handle plugin failures during shutdown under load', async () => {
       const chaosPlugins: AgentKitPlugin[] = Array.from({ length: 5 }, (_, i) => ({
         name: `shutdown-chaos-${i}`,
@@ -536,6 +584,9 @@ describe('Plugin Chaos Tests', () => {
   })
 
   describe('Resource Exhaustion', () => {
+    /**
+     * @testmeta technique:resource-exhaustion-handling
+     */
     it('should handle plugin resource exhaustion gracefully', async () => {
       const resourceExhaustionPlugin: AgentKitPlugin = {
         name: 'resource-exhaustion-plugin',

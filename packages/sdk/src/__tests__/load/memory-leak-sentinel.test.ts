@@ -1,4 +1,8 @@
 /**
+ * @testmeta type:load
+ * @testmeta category:memory
+ * @testmeta priority:high
+ * 
  * Memory Leak Sentinel Tests
  * Tests for memory leaks and GC effectiveness under high load
  */

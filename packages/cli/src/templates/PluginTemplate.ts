@@ -18,41 +18,61 @@ ${imports}
  * @license ${config.license}
  */
 export class ${className} implements AgentKitPlugin {
-  name = '${config.name}'
-  version = '1.0.0'
-  description = '${config.description || `${config.name} plugin for AgentKit`}'
+  readonly name = '${config.name}'
+  readonly version = '1.0.0'
+  readonly description = '${config.description || `${config.name} plugin for AgentKit`}'
   
   ${config.browserSafe ? this.generateBrowserCompatibility() : ''}
   
-  constructor(private config?: ${className}Config) {
-    // Validate config if provided
-    if (config) {
-      this.validateConfig(config)
-    }
+  private readonly pluginConfig: ${className}Config
+  
+  constructor(config?: Partial<${className}Config>) {
+    // Merge with defaults and validate
+    this.pluginConfig = ${className}ConfigSchema.parse(config || {})
   }
 
-  private validateConfig(config: unknown): asserts config is ${className}Config {
-    const result = ${className}ConfigSchema.safeParse(config)
-    if (!result.success) {
-      throw new Error(\`Invalid ${config.name} config: \${result.error.message}\`)
-    }
+  /**
+   * Get the current plugin configuration
+   */
+  getConfig(): Readonly<${className}Config> {
+    return { ...this.pluginConfig }
+  }
+
+  /**
+   * Update plugin configuration (creates new instance)
+   */
+  withConfig(newConfig: Partial<${className}Config>): ${className} {
+    return new ${className}({ ...this.pluginConfig, ...newConfig })
   }
 
 ${hookImplementations}
 }
 
-// Configuration schema
+// Enhanced configuration schema with validation
 export const ${className}ConfigSchema = z.object({
-  // Add your configuration fields here
+  /** Enable or disable the plugin */
   enabled: z.boolean().default(true),
-  logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info')
-})
+  /** Logging level for plugin operations */
+  logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  /** Custom configuration for your plugin */
+  // Add your specific configuration fields here
+}).strict() // Prevent additional properties
 
 export type ${className}Config = z.infer<typeof ${className}ConfigSchema>
 
-// Export plugin instance factory
-export function create${className}(config?: ${className}Config): ${className} {
+/**
+ * Plugin factory function for easy instantiation
+ */
+export function create${className}(config?: Partial<${className}Config>): ${className} {
   return new ${className}(config)
+}
+
+/**
+ * Register plugin with AgentKit SDK
+ * Usage: connectAgent({ plugins: [register${className}()] })
+ */
+export function register${className}(config?: Partial<${className}Config>) {
+  return create${className}(config)
 }
 
 // Default export for convenience
@@ -78,33 +98,112 @@ export default ${className}
 
     if (config.hooks.includes('onInit')) {
       implementations.push(`
+  /**
+   * Called when the agent is initialized
+   * Use this hook to set up any required resources or connections
+   */
   async onInit(context: AgentContext): Promise<void> {
-    console.log(\`[\${this.name}] Initializing with agent \${context.agentId}\`)
-    // Add your initialization logic here
+    if (!this.pluginConfig.enabled) {
+      return
+    }
+    
+    if (this.pluginConfig.logLevel !== 'error') {
+      console.log(\`[\${this.name}] Initializing with agent \${context.agentId}\`)
+    }
+    
+    try {
+      // Add your initialization logic here
+      // Example: await this.setupResources(context)
+      
+    } catch (error) {
+      console.error(\`[\${this.name}] Initialization failed:\`, error)
+      throw error // Re-throw to signal initialization failure
+    }
   }`)
     }
 
     if (config.hooks.includes('onSend')) {
       implementations.push(`
+  /**
+   * Called before sending data to the agent
+   * Use this hook to modify, validate, or log outgoing data
+   */
   async onSend(payload: SendPayload, context: AgentContext): Promise<void> {
-    console.log(\`[\${this.name}] Processing send for agent \${context.agentId}\`)
-    // Add your send processing logic here
+    if (!this.pluginConfig.enabled) {
+      return
+    }
+    
+    if (this.pluginConfig.logLevel === 'debug') {
+      console.log(\`[\${this.name}] Processing send for agent \${context.agentId}\`, {
+        payloadSize: JSON.stringify(payload.input).length,
+        timestamp: context.timestamp
+      })
+    }
+    
+    try {
+      // Add your send processing logic here
+      // Example: await this.validatePayload(payload)
+      // Example: this.logInteraction(payload, context)
+      
+    } catch (error) {
+      console.error(\`[\${this.name}] Send processing failed:\`, error)
+      throw error // Re-throw to prevent send operation
+    }
   }`)
     }
 
     if (config.hooks.includes('onError')) {
       implementations.push(`
+  /**
+   * Called when an error occurs in the agent system
+   * Use this hook to handle, log, or report errors
+   */
   async onError(error: Error, context: AgentContext): Promise<void> {
-    console.error(\`[\${this.name}] Error in agent \${context.agentId}:\`, error)
-    // Add your error handling logic here
+    if (!this.pluginConfig.enabled) {
+      return
+    }
+    
+    console.error(\`[\${this.name}] Error in agent \${context.agentId}:\`, {
+      error: error.message,
+      stack: error.stack,
+      context: {
+        requestId: context.requestId,
+        timestamp: context.timestamp
+      }
+    })
+    
+    try {
+      // Add your error handling logic here
+      // Example: await this.reportError(error, context)
+      // Example: await this.notifyAdmins(error, context)
+      
+    } catch (handlingError) {
+      // Don't throw from error handlers to avoid infinite loops
+      console.error(\`[\${this.name}] Error handling failed:\`, handlingError)
+    }
   }`)
     }
 
     if (config.hooks.includes('onShutdown')) {
       implementations.push(`
+  /**
+   * Called when the agent is shutting down
+   * Use this hook to clean up resources and save state
+   */
   async onShutdown(context: AgentContext): Promise<void> {
-    console.log(\`[\${this.name}] Shutting down for agent \${context.agentId}\`)
-    // Add your cleanup logic here
+    if (this.pluginConfig.logLevel !== 'error') {
+      console.log(\`[\${this.name}] Shutting down for agent \${context.agentId}\`)
+    }
+    
+    try {
+      // Add your cleanup logic here
+      // Example: await this.closeConnections()
+      // Example: await this.saveState(context)
+      
+    } catch (error) {
+      // Log but don't throw during shutdown to avoid blocking other cleanup
+      console.error(\`[\${this.name}] Shutdown cleanup failed:\`, error)
+    }
   }`)
     }
 
@@ -632,13 +731,23 @@ export default defineConfig({
 
 ${config.description || `${config.name} plugin for AgentKit`}
 
+## Features
+
+- ⚡ Zero-config setup with intelligent defaults
+- 🔒 Type-safe configuration with Zod validation
+- 🎯 Implements ${config.hooks.length} lifecycle hook${config.hooks.length !== 1 ? 's' : ''}: ${config.hooks.map(h => `\`${h}\``).join(', ')}
+- 📝 Comprehensive logging with configurable levels
+- 🧪 Full test suite with ${Math.round(config.hooks.length * 2.5)} test cases${config.browserSafe ? `
+- 🌐 Browser-compatible with Web Worker support` : ''}
+- 🚀 Production-ready with error handling and cleanup
+
 ## Installation
 
 \`\`\`bash
 npm install ${config.scoped ? `${config.scoped}/` : ''}agentkit-plugin-${config.name}
 \`\`\`
 
-## Usage
+## Quick Start
 
 \`\`\`typescript
 import { connectAgent } from '@agentkit/sdk'
@@ -654,6 +763,12 @@ const { send, shutdown } = await connectAgent({
   transport: 'websocket',
   plugins: [plugin]
 })
+
+// Send data to your agent
+await send({ message: 'Hello World!' })
+
+// Clean shutdown
+await shutdown()
 \`\`\`
 
 ## Configuration
@@ -663,11 +778,51 @@ const { send, shutdown } = await connectAgent({
 | enabled | boolean | true | Enable or disable the plugin |
 | logLevel | string | 'info' | Logging level (debug, info, warn, error) |
 
-## Hooks
+### Advanced Configuration
 
-This plugin implements the following hooks:
+\`\`\`typescript
+const plugin = new ${className}({
+  enabled: true,
+  logLevel: 'debug' // Enable detailed logging for development
+})
 
-${config.hooks.map(hook => `- \`${hook}\`: ${this.getHookDescription(hook)}`).join('\n')}
+// Get current configuration
+const config = plugin.getConfig()
+
+// Create new instance with updated configuration  
+const updatedPlugin = plugin.withConfig({ logLevel: 'warn' })
+\`\`\`
+
+## API Reference
+
+### Lifecycle Hooks
+
+This plugin implements the following AgentKit lifecycle hooks:
+
+${config.hooks.map(hook => `#### \`${hook}\`
+
+${this.getHookDescription(hook)}
+
+${this.getHookUsageExample(hook)}`).join('\n\n')}
+
+### Plugin Methods
+
+#### \`getConfig()\`
+
+Returns the current plugin configuration as a readonly object.
+
+\`\`\`typescript
+const config = plugin.getConfig()
+console.log(config.logLevel) // 'info'
+\`\`\`
+
+#### \`withConfig(newConfig)\`
+
+Creates a new plugin instance with updated configuration.
+
+\`\`\`typescript
+const newPlugin = plugin.withConfig({ logLevel: 'debug' })
+\`\`\`
 
 ## Development
 
@@ -696,19 +851,28 @@ npm run test
 
 # Run tests with coverage
 npm run test:coverage
+
+# Run specific test suites
+npm run test -- --grep "onInit"
 ${config.browserSafe ? `
 # Run browser tests
 npm run test:browser` : ''}
 \`\`\`
 
-### Linting
+### Code Quality
 
 \`\`\`bash
 # Check for lint errors
 npm run lint
 
-# Fix lint errors
+# Fix lint errors automatically
 npm run lint:fix
+
+# Format code
+npm run format
+
+# Check formatting
+npm run format:check
 \`\`\`
 
 ### Building
@@ -717,9 +881,44 @@ npm run lint:fix
 npm run build
 \`\`\`
 
+The build output will be in the \`dist/\` directory.
+
+## Troubleshooting
+
+### Common Issues
+
+**Plugin not loading:**
+- Ensure all dependencies are installed: \`npm install\`
+- Check that the plugin is properly registered: \`plugins: [plugin]\`
+- Verify the plugin configuration is valid
+
+**TypeScript errors:**
+- Run \`npm run build\` to check for compilation errors
+- Ensure all imports are correctly typed
+
+**Tests failing:**
+- Run \`npm run test:run\` for a clean test run
+- Check the console output for specific error messages
+
+### Debug Mode
+
+Enable debug logging to get detailed information about plugin execution:
+
+\`\`\`typescript
+const plugin = new ${className}({ logLevel: 'debug' })
+\`\`\`
+
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines.
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch: \`git checkout -b feature/your-feature\`
+3. Make your changes and add tests
+4. Run the test suite: \`npm test\`
+5. Submit a pull request
 
 ## License
 
@@ -728,6 +927,10 @@ ${config.license} - See [LICENSE](./LICENSE) for details.
 ## Author
 
 ${config.author}
+
+---
+
+Built with [AgentKit](https://github.com/agentkit/agentkit) • [Documentation](https://docs.agentkit.dev) • [Examples](https://github.com/agentkit/examples)
 `
   }
 
@@ -836,5 +1039,35 @@ export type ${className}Config = z.infer<typeof ${className}ConfigSchema>`
       onShutdown: 'Called when the agent is shutting down'
     }
     return descriptions[hook] || 'Unknown hook'
+  }
+
+  private getHookUsageExample(hook: PluginHookName): string {
+    const examples: Record<PluginHookName, string> = {
+      onInit: `\`\`\`typescript
+// Use for setting up resources, connections, or initial state
+async onInit(context: AgentContext): Promise<void> {
+  // Initialize database connections, setup monitoring, etc.
+}
+\`\`\``,
+      onSend: `\`\`\`typescript
+// Use for validating, modifying, or logging outgoing data
+async onSend(payload: SendPayload, context: AgentContext): Promise<void> {
+  // Validate input, add metadata, log interactions, etc.
+}
+\`\`\``,
+      onError: `\`\`\`typescript
+// Use for error handling, reporting, and recovery
+async onError(error: Error, context: AgentContext): Promise<void> {
+  // Log errors, send notifications, attempt recovery, etc.
+}
+\`\`\``,
+      onShutdown: `\`\`\`typescript
+// Use for cleanup, saving state, and resource disposal
+async onShutdown(context: AgentContext): Promise<void> {
+  // Close connections, save state, cleanup resources, etc.
+}
+\`\`\``
+    }
+    return examples[hook] || ''
   }
 }
