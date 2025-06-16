@@ -6,7 +6,7 @@
 - heading "Browser Environment" [level=3]
 - paragraph:
   - strong: "User Agent:"
-  - text: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.15 Safari/537.36
+  - text: Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.15 Mobile Safari/537.36
 - paragraph:
   - strong: "Platform:"
   - text: Linux x86_64
@@ -33,5 +33,5 @@
 - button "Test Hooks"
 - heading "Test Logs" [level=3]
 - button "Clear Logs"
-- text: "[2025-06-15T07:57:19.764Z] AgentKit browser bundle loaded successfully [2025-06-15T07:57:19.773Z] Page initialized - ready for testing"
+- text: "[2025-06-16T06:13:48.282Z] AgentKit browser bundle loaded successfully [2025-06-16T06:13:48.285Z] Page initialized - ready for testing"
 ```

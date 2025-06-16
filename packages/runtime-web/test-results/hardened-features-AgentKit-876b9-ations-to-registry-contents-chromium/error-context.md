@@ -33,5 +33,5 @@
 - button "Test Hooks"
 - heading "Test Logs" [level=3]
 - button "Clear Logs"
-- text: "[2025-06-15T07:57:19.742Z] AgentKit browser bundle loaded successfully [2025-06-15T07:57:19.752Z] Page initialized - ready for testing"
+- text: "[2025-06-16T06:13:01.640Z] AgentKit browser bundle loaded successfully [2025-06-16T06:13:01.657Z] Page initialized - ready for testing"
 ```

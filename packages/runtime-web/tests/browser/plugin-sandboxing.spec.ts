@@ -60,16 +60,16 @@ test.describe('Plugin WebWorker Sandboxing - Browser Tests', () => {
                 const blockedPatterns = []
                 
                 if (!securityOptions.allowEval) {
-                  blockedPatterns.push(/eval\\s*\\(/)
+                  blockedPatterns.push(/eval\s*\(/)
                 }
                 if (!securityOptions.allowFunction) {
-                  blockedPatterns.push(/Function\\s*\\(/)
+                  blockedPatterns.push(/Function\s*\(/)
                 }
                 if (!securityOptions.allowTimers) {
                   blockedPatterns.push(/setTimeout/, /setInterval/)
                 }
                 if (!securityOptions.allowNetwork) {
-                  blockedPatterns.push(/XMLHttpRequest/, /fetch\\s*\\(/)
+                  blockedPatterns.push(/XMLHttpRequest/, /fetch\s*\(/)
                 }
                 
                 // Check for security violations
@@ -741,7 +741,7 @@ test.describe('Plugin WebWorker Sandboxing - Browser Tests', () => {
             )
 
             // Basic security check
-            const blockedPatterns = [/eval\\s*\\(/, /Function\\s*\\(/]
+            const blockedPatterns = [/eval\s*\(/, /Function\s*\(/]
             const hasDangerousCode = blockedPatterns.some(pattern => pattern.test(pluginCode))
             
             if (hasDangerousCode) {
