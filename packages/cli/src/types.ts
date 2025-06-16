@@ -10,6 +10,12 @@ export interface PluginConfig {
   browserSafe?: boolean
   scoped?: string
   browserTargets?: string[]
+  // Enhanced DX features
+  withDebug?: boolean
+  withHotReload?: boolean
+  withPerformance?: boolean
+  withDocs?: boolean
+  template?: 'basic' | 'advanced' | 'performance' | 'debug'
 }
 
 export interface ConfigField {

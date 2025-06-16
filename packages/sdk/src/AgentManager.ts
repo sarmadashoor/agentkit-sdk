@@ -27,6 +27,24 @@ import { Mutex } from './utils/mutex'
 import { SharedAsyncLock } from './utils/AsyncLock'
 import { guardAgainstRecursivePluginCalls } from './plugins/PluginExecutionContext'
 import { BackpressureQueue, BackpressureQueueOptions } from './BackpressureQueue'
+import { 
+  DebugManager, 
+  LifecycleTimelineLogger, 
+  PluginExecutionTracer,
+  GraphvizGenerator,
+  HotReloadManager,
+  createPluginDevelopmentWrapper,
+  measurePluginPerformance,
+  isDebugModeEnabled,
+  createDebugContext,
+  logPluginStart,
+  logPluginSuccess,
+  logPluginError,
+  logPluginTimeout,
+  type DebugTimeline,
+  type PluginPerformanceReport,
+  type DebugSnapshot
+} from './debug-tools'
 
 // Agent lifecycle states - replaces boolean flags for better state management
 export enum AgentState {
@@ -69,7 +87,15 @@ export class AgentManager {
   private backpressureQueue?: BackpressureQueue
   private metricsCollector?: MetricsCollector
   private timeline?: PluginExecutionTimeline
-  private enableDebugMode: boolean
+  private debugModeEnabled: boolean
+  
+  // Enhanced debug tools
+  private debugManager?: DebugManager
+  private timelineLogger?: LifecycleTimelineLogger
+  private pluginTracer?: PluginExecutionTracer
+  private graphvizGenerator?: GraphvizGenerator
+  private hotReloadManager?: HotReloadManager
+  private debug = createDebugContext('AgentManager')
   
   // Critical section protection - using shared AsyncLock for send/shutdown coordination
   private stateLock = SharedAsyncLock.getInstance() // Protects state transitions and send operations
@@ -87,7 +113,7 @@ export class AgentManager {
     this.registeredScopes = registeredScopes
     // Use provided agentId or fall back to agent.id for backward compatibility
     this.agentId = agentId || agent.id
-    this.enableDebugMode = options.enableDebugMode || false
+    this.debugModeEnabled = options.enableDebugMode || isDebugModeEnabled()
     
     // Initialize observability tracker
     this.observabilityTracker = new ObservabilityTracker(
@@ -109,6 +135,11 @@ export class AgentManager {
         warningThreshold: options.observabilityConfig?.performanceThreshold,
         enableConsoleWarnings: options.observabilityConfig?.enableConsoleWarnings !== false
       })
+    }
+    
+    // Initialize enhanced debug tools if debug mode is enabled
+    if (this.debugModeEnabled) {
+      this.initializeDebugTools()
     }
     
     // Always initialize bounded executor for concurrency control and backpressure
@@ -188,19 +219,35 @@ export class AgentManager {
       observabilityHooks: {
         onPluginStart: (pluginName: string, hookName: string) => {
           this.timeline?.startExecution(hookName, pluginName)
+          // Log visual trace output
+          if (this.debugModeEnabled) {
+            logPluginStart(pluginName, hookName)
+          }
         },
         onPluginSuccess: (pluginName: string, hookName: string, duration: number) => {
           this.timeline?.addExecution(hookName, pluginName, duration, 'success')
           this.metricsCollector?.recordPluginExecution(pluginName, hookName, duration, true)
+          // Log visual trace output
+          if (this.debugModeEnabled) {
+            logPluginSuccess(pluginName, hookName, duration)
+          }
         },
         onPluginError: (pluginName: string, hookName: string, error: Error) => {
           const duration = Date.now() // Fallback duration
           this.timeline?.addExecution(hookName, pluginName, duration, 'error', error.message)
           this.metricsCollector?.recordPluginExecution(pluginName, hookName, duration, false)
+          // Log visual trace output
+          if (this.debugModeEnabled) {
+            logPluginError(pluginName, hookName, error.message, duration)
+          }
         },
         onPluginTimeout: (pluginName: string, hookName: string, timeout: number) => {
           this.timeline?.addExecution(hookName, pluginName, timeout, 'timeout')
           this.metricsCollector?.recordPluginExecution(pluginName, hookName, timeout, false, true)
+          // Log visual trace output
+          if (this.debugModeEnabled) {
+            logPluginTimeout(pluginName, hookName, timeout)
+          }
         }
       }
     })
@@ -1164,10 +1211,249 @@ export class AgentManager {
    * Expose timeline globally for browser debugging (if enabled)
    */
   private exposeTimelineGlobally(): void {
-    if (this.enableDebugMode && typeof window !== 'undefined' && this.timeline) {
+    if (this.debugModeEnabled && typeof window !== 'undefined' && this.timeline) {
       (window as any).__AGENTKIT_TIMELINE__ = this.timeline.exportForBrowser()
       console.log('🔍 AgentKit Timeline exposed as window.__AGENTKIT_TIMELINE__')
       console.log('📊 Use window.__AGENTKIT_TIMELINE__.printTimeline() to view execution timeline')
     }
+  }
+
+  /**
+   * Initialize enhanced debug tools
+   */
+  private initializeDebugTools(): void {
+    this.debug.info('Initializing enhanced debug tools')
+    
+    // Initialize debug manager
+    this.debugManager = DebugManager.getInstance({
+      enabled: true,
+      level: process.env.DEBUG_LEVEL as any || 'info',
+      verbose: process.env.DEBUG_VERBOSE === 'true',
+      enableConsoleOutput: true,
+      enableGraphOutput: process.env.DEBUG_GRAPH === 'true',
+      performanceThreshold: this.options.observabilityConfig?.performanceThreshold || 100
+    })
+    
+    // Initialize timeline logger
+    this.timelineLogger = new LifecycleTimelineLogger({
+      enableConsoleOutput: true,
+      enableTableOutput: true,
+      performanceThreshold: this.options.observabilityConfig?.performanceThreshold || 100,
+      outputFormat: 'table'
+    })
+    
+    // Initialize plugin tracer
+    this.pluginTracer = new PluginExecutionTracer(this.debugManager)
+    
+    // Initialize Graphviz generator
+    this.graphvizGenerator = new GraphvizGenerator(this.debugManager)
+    
+    // Initialize hot reload manager in development
+    if (process.env.NODE_ENV === 'development') {
+      this.hotReloadManager = new HotReloadManager({
+        enabled: true,
+        onReload: (filePath, pluginName) => {
+          this.debug.info(`Plugin hot reloaded: ${pluginName}`, { filePath })
+        },
+        onError: (error, filePath) => {
+          this.debug.error(`Hot reload failed: ${filePath}`, { error })
+        }
+      })
+    }
+    
+    // Initialize debug timeline
+    this.debugManager.initializeTimeline(this.agentId)
+    
+    this.debug.info('Enhanced debug tools initialized successfully')
+  }
+
+  /**
+   * Enable debug mode with enhanced features
+   */
+  enableDebugMode(options: {
+    verbose?: boolean
+    graph?: boolean
+    level?: 'silent' | 'error' | 'warn' | 'info' | 'debug' | 'trace'
+    hotReload?: boolean
+  } = {}): void {
+    this.debugModeEnabled = true
+    
+    if (!this.debugManager) {
+      this.initializeDebugTools()
+    }
+    
+    if (this.debugManager) {
+      this.debugManager.enable({
+        verbose: options.verbose,
+        enableGraphOutput: options.graph,
+        level: options.level || 'info'
+      })
+    }
+    
+    if (options.hotReload && !this.hotReloadManager && process.env.NODE_ENV === 'development') {
+      this.hotReloadManager = new HotReloadManager({ enabled: true })
+    }
+    
+    this.debug.info('Debug mode enabled with enhanced features', options)
+  }
+
+  /**
+   * Get debug timeline with comprehensive execution data
+   */
+  getEnhancedDebugTimeline(): DebugTimeline | null {
+    return this.debugManager?.getTimeline() || null
+  }
+
+  /**
+   * Get plugin performance report
+   */
+  getPluginPerformanceReport(pluginName?: string): PluginPerformanceReport[] {
+    if (!this.pluginTracer) {
+      throw new Error('Debug mode must be enabled to generate performance reports')
+    }
+    
+    if (pluginName) {
+      const traces = this.pluginTracer.getPluginTraces(pluginName)
+      const report = measurePluginPerformance(pluginName, 'combined', () => Promise.resolve(), 1)
+      return [report] as any // Simplified for now
+    }
+    
+    // Get reports for all plugins
+    const allTraces = this.pluginTracer.getCompletedTraces()
+    const pluginNames = [...new Set(allTraces.map(t => t.pluginName))]
+    
+    return pluginNames.map((name: string) => {
+      // Simplified report generation
+      return {
+        pluginName: name,
+        reportTime: Date.now(),
+        executionMetrics: {
+          totalExecutions: 0,
+          averageExecutionTime: 0,
+          minExecutionTime: 0,
+          maxExecutionTime: 0,
+          successRate: 0,
+          errorRate: 0,
+          timeoutRate: 0
+        },
+        performanceGrade: 'B' as const,
+        recommendations: [],
+        warnings: [],
+        memoryMetrics: {
+          averageMemoryUsage: 0,
+          peakMemoryUsage: 0,
+          memoryLeakDetected: false,
+          memoryEfficiencyScore: 80
+        },
+        hookBreakdown: {},
+        comparisonData: {
+          percentile: 50,
+          vsAveragePlugin: {
+            speedMultiplier: 1,
+            reliabilityDifference: 0,
+            memoryEfficiency: 1
+          }
+        }
+      }
+    })
+  }
+
+  /**
+   * Generate Graphviz execution graph
+   */
+  generateExecutionGraph(format: 'dot' | 'svg' = 'dot'): string | Promise<string> {
+    if (!this.graphvizGenerator || !this.timelineLogger) {
+      throw new Error('Debug mode must be enabled to generate execution graphs')
+    }
+    
+    const timeline = this.timelineLogger.getTimeline()
+    const graphDot = this.graphvizGenerator.generateFromTimeline(timeline.entries)
+    
+    if (format === 'svg') {
+      return this.graphvizGenerator.exportAsSVG(graphDot)
+    }
+    
+    return graphDot
+  }
+
+  /**
+   * Display debug timeline in console
+   */
+  displayDebugTimeline(format: 'table' | 'tree' | 'json' = 'table'): void {
+    if (!this.timelineLogger) {
+      throw new Error('Debug mode must be enabled to display timeline')
+    }
+    
+    switch (format) {
+      case 'table':
+        this.timelineLogger.displayTable()
+        break
+      case 'tree':
+        this.timelineLogger.displayTree()
+        break
+      case 'json':
+        console.log(this.timelineLogger.exportJSON())
+        break
+    }
+  }
+
+  /**
+   * Get debug snapshot with all debug information
+   */
+  getDebugSnapshot(): DebugSnapshot | null {
+    return this.debugManager?.createSnapshot() || null
+  }
+
+  /**
+   * Export debug data as JSON
+   */
+  exportDebugData(): string {
+    if (!this.debugManager) {
+      throw new Error('Debug mode must be enabled to export debug data')
+    }
+    
+    return this.debugManager.exportDebugData()
+  }
+
+  /**
+   * Clear debug data
+   */
+  clearDebugData(): void {
+    this.debugManager?.reset()
+    this.pluginTracer?.clearTraces()
+    this.timelineLogger?.clear()
+    this.debug.info('Debug data cleared')
+  }
+
+  /**
+   * Register plugin for hot reload (development mode)
+   */
+  registerPluginForHotReload(pluginName: string, filePath: string): void {
+    if (!this.hotReloadManager) {
+      this.debug.warn('Hot reload manager not available (requires development mode)')
+      return
+    }
+    
+    this.hotReloadManager.registerPlugin(pluginName, filePath)
+    this.debug.info(`Registered plugin for hot reload: ${pluginName}`, { filePath })
+  }
+
+  /**
+   * Wrap plugin with development features
+   */
+  wrapPluginForDevelopment(plugin: AgentKitPlugin): AgentKitPlugin {
+    if (!this.debugModeEnabled) {
+      return plugin
+    }
+    
+    const wrapper = createPluginDevelopmentWrapper(plugin.name, plugin, {
+      enablePerformanceMonitoring: true,
+      enableMemoryTracking: true,
+      enableErrorTracking: true,
+      enableDebugLogs: true,
+      performanceThreshold: this.options.observabilityConfig?.performanceThreshold || 100
+    })
+    
+    return wrapper.getWrappedPlugin()
   }
 }

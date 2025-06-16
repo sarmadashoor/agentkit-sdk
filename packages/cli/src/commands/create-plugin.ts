@@ -20,6 +20,11 @@ export const createPluginCommand = new Command('create-plugin')
   .option('-a, --author <author>', 'Plugin author')
   .option('-l, --license <license>', 'Plugin license', 'MIT')
   .option('--skip-prompts', 'Skip interactive prompts and use defaults', false)
+  .option('--with-debug', 'Include debug and development tools', true)
+  .option('--with-hot-reload', 'Enable hot reload for development', true)
+  .option('--with-performance', 'Include performance monitoring', true)
+  .option('--with-docs', 'Generate comprehensive documentation', true)
+  .option('--template <template>', 'Use specific template (basic|advanced|performance|debug)', 'advanced')
   .action(async (options) => {
     console.log(chalk.cyan.bold('\n🚀 AgentKit Plugin Generator\n'))
 
@@ -104,6 +109,13 @@ async function collectInputs(options: any) {
   config.withTests = options.withTests
   config.browserSafe = options.browserSafe
   config.scoped = options.scoped
+  
+  // Enhanced DX features
+  config.withDebug = options.withDebug
+  config.withHotReload = options.withHotReload
+  config.withPerformance = options.withPerformance
+  config.withDocs = options.withDocs
+  config.template = options.template
 
   // Description
   if (!options.skipPrompts) {

@@ -1,13 +1,16 @@
 import fs from 'fs-extra'
 import path from 'path'
 import { PluginTemplate } from '../templates/PluginTemplate'
+import { EnhancedPluginTemplate } from '../templates/EnhancedPluginTemplate'
 import { PluginConfig } from '../types'
 
 export class CreatePluginCommand {
   private template: PluginTemplate
+  private enhancedTemplate: EnhancedPluginTemplate
 
   constructor() {
     this.template = new PluginTemplate()
+    this.enhancedTemplate = new EnhancedPluginTemplate()
   }
 
   async execute(config: PluginConfig): Promise<void> {
@@ -30,8 +33,12 @@ export class CreatePluginCommand {
   }
 
   private async generatePluginFiles(pluginDir: string, config: PluginConfig): Promise<void> {
+    // Choose template based on debug/DX features
+    const useEnhanced = config.withDebug || config.withHotReload || config.withPerformance || config.template === 'enhanced' || config.template === 'advanced' || config.template === 'debug' || config.template === 'performance'
+    const activeTemplate = useEnhanced ? this.enhancedTemplate : this.template
+    
     // Main plugin file
-    const pluginCode = this.template.generate(config)
+    const pluginCode = activeTemplate.generate(config)
     await fs.writeFile(path.join(pluginDir, 'index.ts'), pluginCode)
 
     // Plugin metadata
