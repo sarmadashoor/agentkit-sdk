@@ -30,6 +30,7 @@ import {
 import { debugLog } from '../log'
 import { PluginSandboxV2, SandboxExecutionResult, PluginErrorEvent } from './PluginSandboxV2'
 import { pluginExecutionContext, withPluginExecutionContext } from './PluginExecutionContext'
+import { VMRunner, VMExecutionResult, secureClone } from '../security/vmRunner'
 
 /**
  * Plugin registration metadata with order tracking
@@ -60,6 +61,8 @@ export interface SecurePluginManagerOptions extends PluginManagerOptions {
   vmTimeout?: number
   maxMemoryUsage?: number
   strictExecutionOrder?: boolean
+  enableVMSandbox?: boolean
+  enableStaticAnalysis?: boolean
 }
 
 /**
@@ -71,6 +74,7 @@ export class SecurePluginManagerV2 extends EventEmitter {
     observabilityHooks?: SecurePluginManagerOptions['observabilityHooks']
   }
   private sandbox: PluginSandboxV2
+  private vmRunner: VMRunner
   private registrationCounter = 0
   private isShutdown = false
   private executionStats = {
@@ -79,7 +83,9 @@ export class SecurePluginManagerV2 extends EventEmitter {
     failedHookExecutions: 0,
     pluginErrors: 0,
     timeouts: 0,
-    isolatedExecutions: 0
+    isolatedExecutions: 0,
+    vmExecutions: 0,
+    securityViolations: 0
   }
 
   constructor(options: SecurePluginManagerOptions = {}) {
@@ -95,6 +101,8 @@ export class SecurePluginManagerV2 extends EventEmitter {
       vmTimeout: options.vmTimeout ?? 3000,
       maxMemoryUsage: options.maxMemoryUsage ?? 50 * 1024 * 1024,
       strictExecutionOrder: options.strictExecutionOrder ?? true,
+      enableVMSandbox: options.enableVMSandbox ?? true,
+      enableStaticAnalysis: options.enableStaticAnalysis ?? true,
       observabilityHooks: options.observabilityHooks
     }
 
@@ -108,6 +116,13 @@ export class SecurePluginManagerV2 extends EventEmitter {
       enableFreezing: this.options.enableFreezing
     })
 
+    // Initialize VM runner for enhanced security
+    this.vmRunner = new VMRunner({
+      timeoutMs: this.options.vmTimeout,
+      memoryLimitBytes: this.options.maxMemoryUsage,
+      enableStaticAnalysis: this.options.enableStaticAnalysis
+    })
+
     // Forward sandbox error events
     this.sandbox.on('pluginError', (errorEvent: PluginErrorEvent) => {
       this.executionStats.pluginErrors++
@@ -118,7 +133,8 @@ export class SecurePluginManagerV2 extends EventEmitter {
 
     debugLog.lifecycle('secure plugin manager v2 created', 'SecurePluginManagerV2', {
       options: this.options,
-      sandboxingEnabled: this.options.enableSandboxing
+      sandboxingEnabled: this.options.enableSandboxing,
+      vmSandboxEnabled: this.options.enableVMSandbox
     }, this.options.debug)
   }
 
@@ -224,7 +240,13 @@ export class SecurePluginManagerV2 extends EventEmitter {
       try {
         let sandboxResult: SandboxExecutionResult
 
-        if (this.options.enableSandboxing) {
+        if (this.options.enableVMSandbox) {
+          // Use VM runner for maximum security isolation
+          sandboxResult = await this.executeWithExecutionContext(plugin, hookName, () =>
+            this.executeWithVMSandbox(plugin, hookName, args)
+          )
+          this.executionStats.vmExecutions++
+        } else if (this.options.enableSandboxing) {
           // Use sandbox for complete isolation with execution context tracking
           sandboxResult = await this.executeWithExecutionContext(plugin, hookName, () =>
             this.sandbox.executeHook(plugin, hookName, ...args)
@@ -234,6 +256,11 @@ export class SecurePluginManagerV2 extends EventEmitter {
           sandboxResult = await this.executeWithExecutionContext(plugin, hookName, () =>
             this.executeWithBasicIsolation(plugin, hookName, args)
           )
+        }
+
+        // Track security violations
+        if (sandboxResult.securityViolations) {
+          this.executionStats.securityViolations += sandboxResult.securityViolations.length
         }
 
         const enhancedResult: SecurePluginExecutionResult = {
@@ -349,6 +376,123 @@ export class SecurePluginManagerV2 extends EventEmitter {
     } finally {
       pluginExecutionContext.endExecution(executionId)
     }
+  }
+
+  /**
+   * Execute plugin using VM sandbox for maximum security isolation
+   */
+  private async executeWithVMSandbox(
+    plugin: AgentKitPlugin,
+    hookName: PluginHookName,
+    args: [AgentContext] | [SendPayload, AgentContext] | [Error, AgentContext]
+  ): Promise<SandboxExecutionResult & { securityViolations?: string[] }> {
+    const startTime = Date.now()
+    
+    try {
+      // Convert plugin to string for VM execution
+      const pluginCode = this.serializePluginForVM(plugin)
+      
+      // Prepare secure context for VM execution
+      const secureContext = this.prepareSecureContext(plugin, hookName, args)
+      
+      // Execute in VM with security monitoring
+      const vmResult = await this.vmRunner.executePluginHook(
+        plugin.name,
+        hookName,
+        pluginCode,
+        secureContext
+      )
+
+      if (!vmResult.withinLimits) {
+        throw new Error(`VM execution exceeded limits: ${vmResult.securityViolations.join(', ')}`)
+      }
+
+      return {
+        success: true,
+        duration: vmResult.executionTimeMs,
+        pluginName: plugin.name,
+        hookName: hookName as PluginHookName,
+        isolated: true,
+        dataCloned: true,
+        platformMethod: 'vm',
+        securityViolations: vmResult.securityViolations
+      }
+
+    } catch (error) {
+      return {
+        success: false,
+        duration: Date.now() - startTime,
+        pluginName: plugin.name,
+        hookName: hookName as PluginHookName,
+        error: error as Error,
+        timeout: (error as Error).message.includes('timeout'),
+        isolated: true,
+        dataCloned: true,
+        platformMethod: 'vm',
+        securityViolations: [(error as Error).message]
+      }
+    }
+  }
+
+  /**
+   * Serialize plugin for VM execution
+   */
+  private serializePluginForVM(plugin: AgentKitPlugin): string {
+    // Create a safe representation of the plugin for VM execution
+    const safePlugin = {
+      name: plugin.name,
+      version: plugin.version,
+      description: plugin.description,
+      onInit: plugin.onInit?.toString(),
+      onSend: plugin.onSend?.toString(),
+      onError: plugin.onError?.toString(),
+      onShutdown: plugin.onShutdown?.toString()
+    }
+
+    return `
+      const plugin = {
+        name: ${JSON.stringify(safePlugin.name)},
+        version: ${JSON.stringify(safePlugin.version)},
+        description: ${JSON.stringify(safePlugin.description)},
+        ${safePlugin.onInit ? `onInit: ${safePlugin.onInit},` : ''}
+        ${safePlugin.onSend ? `onSend: ${safePlugin.onSend},` : ''}
+        ${safePlugin.onError ? `onError: ${safePlugin.onError},` : ''}
+        ${safePlugin.onShutdown ? `onShutdown: ${safePlugin.onShutdown},` : ''}
+      };
+    `
+  }
+
+  /**
+   * Prepare secure execution context for VM
+   */
+  private prepareSecureContext(
+    plugin: AgentKitPlugin,
+    hookName: PluginHookName,
+    args: [AgentContext] | [SendPayload, AgentContext] | [Error, AgentContext]
+  ): any {
+    const context = {
+      plugin: {
+        name: plugin.name,
+        version: plugin.version
+      },
+      agentContext: secureClone(args[0] as AgentContext)
+    }
+
+    // Add hook-specific data
+    if (hookName === 'onSend' && args.length === 2) {
+      (context as any).sendPayload = secureClone(args[0] as SendPayload)
+      context.agentContext = secureClone(args[1] as AgentContext)
+    } else if (hookName === 'onError' && args.length === 2) {
+      const error = args[0] as Error
+      ;(context as any).error = {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      }
+      context.agentContext = secureClone(args[1] as AgentContext)
+    }
+
+    return context
   }
 
   /**
@@ -552,6 +696,9 @@ export class SecurePluginManagerV2 extends EventEmitter {
 
     // Shutdown sandbox
     this.sandbox.shutdown()
+
+    // Cleanup VM runner
+    this.vmRunner.dispose()
 
     // Clear all plugins
     this.registrations = []

@@ -17,6 +17,7 @@ export interface PluginExecutionResult {
   duration: number
   error?: Error
   timeout?: boolean
+  securityViolations?: string[]
 }
 
 /**
