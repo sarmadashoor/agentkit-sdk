@@ -19,19 +19,30 @@ import {
 } from '../errors'
 import { debugLog } from '../log'
 import { deepClone, isCloneable } from '../utils/deepClone'
+import { WorkerPool, isWebWorkerSupported, isBrowserEnvironment, type WorkerExecutionOptions } from './worker-utils'
 
-// Platform detection for vm module
+// Platform detection for execution environment
 let vm: any = null
 let isNodeJS = false
+let isBrowser = false
+let supportsWebWorkers = false
 
 try {
+  // Check for Node.js environment
   if (typeof process !== 'undefined' && process.versions && process.versions.node) {
     vm = require('vm')
     isNodeJS = true
   }
 } catch (error) {
-  // vm module not available (browser environment)
-  isNodeJS = false
+  // vm module not available
+}
+
+try {
+  // Check for browser environment
+  isBrowser = isBrowserEnvironment()
+  supportsWebWorkers = isWebWorkerSupported()
+} catch (error) {
+  // Browser APIs not available
 }
 
 /**
@@ -48,6 +59,9 @@ export class PluginManager {
   
   // Memory leak prevention - track active timeouts
   private activeTimeouts = new Set<NodeJS.Timeout>()
+  
+  // Web Worker pool for browser environments
+  private workerPool?: WorkerPool
 
   constructor(options: PluginManagerOptions = {}) {
     this.options = {
@@ -61,12 +75,44 @@ export class PluginManager {
       enableDebugMode: options.enableDebugMode ?? false
     }
     
-    // Validate sandbox support
-    if (this.options.sandbox && !isNodeJS) {
-      debugLog.lifecycle('sandbox disabled - not running in Node.js', 'PluginManager', {
-        platform: typeof process !== 'undefined' ? 'node' : 'browser'
-      }, this.options.debug)
-      this.options.sandbox = false
+    // Initialize sandbox support based on platform
+    if (this.options.sandbox) {
+      if (isNodeJS && vm) {
+        // Node.js VM sandboxing available
+        debugLog.lifecycle('sandbox enabled - Node.js vm.runInContext', 'PluginManager', {
+          platform: 'node'
+        }, this.options.debug)
+      } else if (isBrowser && supportsWebWorkers) {
+        // Browser Web Worker sandboxing available
+        this.workerPool = new WorkerPool({
+          maxWorkers: 3,
+          maxIdleTime: 30000,
+          debug: this.options.debug,
+          preWarm: false
+        })
+        debugLog.lifecycle('sandbox enabled - Browser Web Workers', 'PluginManager', {
+          platform: 'browser',
+          webWorkerSupport: true
+        }, this.options.debug)
+      } else {
+        // No sandboxing available - warn and disable
+        this.options.sandbox = false
+        const platform = isNodeJS ? 'node-no-vm' : isBrowser ? 'browser-no-workers' : 'unknown'
+        debugLog.lifecycle('sandbox disabled - platform not supported', 'PluginManager', {
+          platform,
+          isNodeJS,
+          isBrowser,
+          supportsWebWorkers
+        }, this.options.debug)
+        
+        // Warn in dev mode about disabled sandboxing
+        if (this.options.enableDebugMode && typeof console !== 'undefined') {
+          console.warn(
+            'AgentKit: Plugin sandboxing disabled due to unsupported environment. ' +
+            'This may pose security risks with untrusted plugins.'
+          )
+        }
+      }
     }
     
     debugLog.lifecycle('plugin manager created', 'PluginManager', {
@@ -76,7 +122,8 @@ export class PluginManager {
       sandbox: this.options.sandbox,
       sandboxTimeout: this.options.sandboxTimeout,
       allowedGlobals: this.options.allowedGlobals?.length,
-      platform: isNodeJS ? 'node' : 'browser'
+      platform: isNodeJS ? 'node' : isBrowser ? 'browser' : 'unknown',
+      hasWorkerPool: !!this.workerPool
     }, this.options.debug)
   }
 
@@ -248,6 +295,13 @@ export class PluginManager {
         warn: (...args: any[]) => debugLog.operation('sandbox-console-warn', { args }, this.options.debug)
       } : undefined,
       
+      // Block constructor access
+      constructor: undefined,
+      __proto__: null,
+      
+      // Block Function constructor
+      Function: undefined,
+      
       // Allowed safe globals
       ...allowedGlobals.reduce((acc, globalName) => {
         try {
@@ -386,6 +440,8 @@ export class PluginManager {
       // Create script that completely isolates execution in the VM context
       const executionScript = `
         (function() {
+          'use strict';
+          
           try {
             // Define the plugin function in the isolated context
             const pluginFn = ${functionBody};
@@ -437,13 +493,21 @@ export class PluginManager {
       }
       
       if (error instanceof Error) {
+        // Check for VM timeout specifically
+        if (error.message.includes('Script execution timed out')) {
+          throw new PluginTimeoutError(`${plugin.name}.${hookName}`, timeoutMs, {
+            context: { operation: `${plugin.name}.${hookName}`, timeoutMs, type: 'sandbox' }
+          })
+        }
+        
         // Check for common sandbox escape attempts
-        const escapePatter = /(\bglobal\b|\bprocess\b|\brequire\b|\bmodule\b|\bexports\b|constructor|prototype|__proto__)/i
-        const isSandboxViolation = escapePatter.test(error.message) || 
+        const escapePattern = /(\bglobal\b|\bprocess\b|\brequire\b|\bmodule\b|\bexports\b|constructor|prototype|__proto__|Function)/i
+        const isSandboxViolation = escapePattern.test(error.message) || 
                                    error.message.includes('is not defined') ||
                                    error.message.includes('is not a function') ||
                                    error.message.includes('Cannot read properties of undefined') ||
-                                   error.message.includes('Cannot set properties of undefined')
+                                   error.message.includes('Cannot set properties of undefined') ||
+                                   error.message.includes('Cannot access before initialization')
         
         if (isSandboxViolation) {
           this.options.observabilityHooks?.onPluginSandboxEscape?.(plugin.name, hookName, error.message)
@@ -527,6 +591,102 @@ export class PluginManager {
   }
 
   /**
+   * Execute plugin hook in Web Worker (browser environments)
+   */
+  private async executePluginInWorker(
+    plugin: AgentKitPlugin,
+    hookName: PluginHookName,
+    hook: Function,
+    args: unknown[]
+  ): Promise<any> {
+    if (!this.workerPool) {
+      throw new Error('Worker pool not initialized')
+    }
+
+    this.options.observabilityHooks?.onPluginSandboxStart?.(plugin.name, hookName)
+    const workerStart = Date.now()
+
+    try {
+      // Strip functions from arguments for security  
+      const sanitizedArgs = args.map(arg => this.stripFunctions(this.secureClone(arg)))
+
+      debugLog.operation('worker executing plugin', {
+        plugin: plugin.name,
+        hook: hookName,
+        argsCount: sanitizedArgs.length,
+        workerPoolStats: this.workerPool.getStats()
+      }, this.options.debug)
+
+      // Track memory usage if available
+      let memoryBefore: number | undefined
+      if (typeof performance !== 'undefined' && (performance as any).memory) {
+        memoryBefore = (performance as any).memory.usedJSHeapSize
+      }
+
+      // Execute in worker with proper function serialization
+      const hookSource = hook.toString()
+      
+      const options: WorkerExecutionOptions = {
+        pluginName: plugin.name,
+        hookName,
+        functionSource: hookSource,
+        args: sanitizedArgs,
+        timeout: this.options.sandboxTimeout!,
+        allowedGlobals: this.options.allowedGlobals!,
+        debug: this.options.debug
+      }
+
+      const result = await this.workerPool.execute(options)
+
+      const duration = Date.now() - workerStart
+      this.options.observabilityHooks?.onPluginSandboxEnd?.(plugin.name, hookName, duration)
+
+      // Log memory usage if available
+      if (memoryBefore !== undefined && typeof performance !== 'undefined' && (performance as any).memory) {
+        const memoryAfter = (performance as any).memory.usedJSHeapSize
+        const memoryDelta = memoryAfter - memoryBefore
+        
+        debugLog.operation('worker execution memory', {
+          plugin: plugin.name,
+          hook: hookName,
+          memoryBefore,
+          memoryAfter,
+          memoryDelta
+        }, this.options.debug)
+      }
+
+      debugLog.operation('worker execution completed', {
+        plugin: plugin.name,
+        hook: hookName,
+        duration,
+        hasResult: result !== undefined,
+        workerPoolStats: this.workerPool.getStats()
+      }, this.options.debug)
+
+      return result
+
+    } catch (error) {
+      const duration = Date.now() - workerStart
+      this.options.observabilityHooks?.onPluginSandboxEnd?.(plugin.name, hookName, duration)
+
+      // Re-throw timeout errors as-is
+      if (error instanceof PluginTimeoutError) {
+        throw error
+      }
+
+      // Check for sandbox violations and escape attempts
+      if (error instanceof Error) {
+        const escapePattern = /(\bdocument\b|\bwindow\b|\blocation\b|\bnavigator\b|\bhistory\b|is not defined|is not a function)/i
+        if (escapePattern.test(error.message)) {
+          this.options.observabilityHooks?.onPluginSandboxEscape?.(plugin.name, hookName, error.message)
+        }
+      }
+
+      throw error
+    }
+  }
+
+  /**
    * Execute a plugin hook with proper async/sync handling
    */
   private async executePluginHook(
@@ -538,14 +698,22 @@ export class PluginManager {
     debugLog.operation('plugin hook executing', {
       plugin: plugin.name,
       hook: hookName,
-      sandbox: this.options.sandbox
+      sandbox: this.options.sandbox,
+      platform: isNodeJS ? 'node' : isBrowser ? 'browser' : 'unknown'
     }, this.options.debug)
 
-    if (this.options.sandbox && isNodeJS && vm) {
-      return this.executePluginInSandbox(plugin, hookName, hook, args)
-    } else {
-      return this.executePluginHookDirect(plugin, hookName, hook, args)
+    if (this.options.sandbox) {
+      if (isNodeJS && vm) {
+        // Use Node.js VM sandbox
+        return this.executePluginInSandbox(plugin, hookName, hook, args)
+      } else if (isBrowser && this.workerPool) {
+        // Use Web Worker sandbox
+        return this.executePluginInWorker(plugin, hookName, hook, args)
+      }
     }
+    
+    // Fallback to direct execution
+    return this.executePluginHookDirect(plugin, hookName, hook, args)
   }
 
   /**
@@ -761,12 +929,19 @@ export class PluginManager {
     }
     this.activeTimeouts.clear()
 
+    // Shutdown worker pool if it exists
+    if (this.workerPool) {
+      this.workerPool.shutdown()
+      this.workerPool = undefined
+    }
+
     // Clear plugins array to release references
     this.plugins.length = 0
 
     debugLog.operation('plugin manager shutdown', {
       clearedTimeouts: this.activeTimeouts.size,
-      clearedPlugins: this.plugins.length
+      clearedPlugins: this.plugins.length,
+      shutdownWorkerPool: !!this.workerPool
     }, this.options.debug)
   }
 
