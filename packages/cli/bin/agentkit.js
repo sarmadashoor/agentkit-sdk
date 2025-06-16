@@ -43,15 +43,22 @@ if (!command || command === "--help" || command === "-h") {
 ${styles.bold("Usage:")} agentkit <command> [options]
 
 ${styles.bold("Commands:")}
-  create-plugin [name]  Create a new AgentKit plugin
-  sign-plugin <file>    Sign a plugin file (coming soon)
-  doctor               Validate dependencies (coming soon)
-  --help, -h           Show this help message
-  --version, -v        Show version information
+  create-plugin [name]     Create a new AgentKit plugin
+  sign-plugin <file>       Sign a plugin file with HMAC or Ed25519
+  doctor                   Validate dependencies (coming soon)
+  --help, -h              Show this help message
+  --version, -v           Show version information
 
 ${styles.bold("Examples:")}
   agentkit create-plugin my-plugin
   agentkit create-plugin hello-world
+  agentkit sign-plugin index.ts --hmac
+  agentkit sign-plugin plugin.js --ed25519 --output
+
+${styles.bold("Sign Plugin Options:")}
+  --hmac                  Use HMAC-SHA256 signing (requires secret)
+  --ed25519               Use Ed25519 signing (default)
+  --output, -o            Write signature to plugin.signed.json file
 `);
   process.exit(0);
 }
@@ -65,8 +72,7 @@ async function main() {
     process.exit(0);
   }
   if (command === "sign-plugin") {
-    console.log(styles.yellow("\u{1F510} sign-plugin command coming soon!"));
-    console.log("This will cryptographically sign plugin files for secure distribution.");
+    await signPlugin();
     process.exit(0);
   }
   if (command === "doctor") {
@@ -375,4 +381,145 @@ async function createPackageJson(pluginDir, pluginName) {
 }
 function toPascalCase(str) {
   return str.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join("");
+}
+async function signPlugin() {
+  console.log(styles.cyan("\\n\u{1F510} Signing AgentKit plugin...\\n"));
+  const pluginFile = args[1];
+  if (!pluginFile) {
+    console.log(styles.red("\u274C Plugin file path is required"));
+    console.log(styles.dim("Usage: agentkit sign-plugin <plugin-file> [--hmac|--ed25519]"));
+    process.exit(1);
+  }
+  if (!fs.existsSync(pluginFile)) {
+    console.log(styles.red(`\u274C Plugin file not found: ${pluginFile}`));
+    process.exit(1);
+  }
+  const useHmac = args.includes("--hmac");
+  const useEd25519 = args.includes("--ed25519") || !useHmac;
+  try {
+    console.log(styles.dim(`\u{1F4C4} Loading plugin from: ${pluginFile}`));
+    const pluginContent = fs.readFileSync(pluginFile, "utf8");
+    const metadata = extractPluginMetadata(pluginContent);
+    console.log(styles.dim(`\u{1F4E6} Plugin: ${metadata.name} v${metadata.version}`));
+    if (useHmac) {
+      await signPluginHMAC(pluginFile, pluginContent, metadata);
+    } else {
+      await signPluginEd25519(pluginFile, pluginContent, metadata);
+    }
+  } catch (error) {
+    console.log(styles.red("\u274C Error signing plugin:"), error.message);
+    process.exit(1);
+  }
+}
+function extractPluginMetadata(content) {
+  const metadata = {
+    name: "unknown-plugin",
+    version: "1.0.0"
+  };
+  const nameMatch = content.match(/name\s*[:=]\s*['"]([^'"]+)['"]/);
+  const versionMatch = content.match(/version\s*[:=]\s*['"]([^'"]+)['"]/);
+  const descriptionMatch = content.match(/description\s*[:=]\s*['"]([^'"]+)['"]/);
+  if (nameMatch) metadata.name = nameMatch[1];
+  if (versionMatch) metadata.version = versionMatch[1];
+  if (descriptionMatch) metadata.description = descriptionMatch[1];
+  const classMatch = content.match(/export\s+(?:default\s+)?class\s+(\w+)/);
+  if (classMatch && metadata.name === "unknown-plugin") {
+    metadata.name = classMatch[1].toLowerCase().replace(/plugin$/i, "");
+  }
+  return metadata;
+}
+async function signPluginHMAC(filePath, content, metadata) {
+  const crypto = require("crypto");
+  const secret = process.env.AGENTKIT_SIGNING_SECRET;
+  if (!secret) {
+    console.log(styles.yellow("\\n\u26A0\uFE0F  No AGENTKIT_SIGNING_SECRET environment variable found"));
+    const userSecret = await askQuestion("Enter signing secret: ");
+    if (!userSecret || userSecret.length < 16) {
+      console.log(styles.red("\u274C Signing secret must be at least 16 characters"));
+      process.exit(1);
+    }
+    process.env.AGENTKIT_SIGNING_SECRET = userSecret;
+  }
+  console.log(styles.dim("\u{1F511} Using HMAC-SHA256 signing..."));
+  const signableContent = JSON.stringify({
+    name: metadata.name,
+    version: metadata.version,
+    description: metadata.description,
+    contentHash: crypto.createHash("sha256").update(content).digest("hex"),
+    timestamp: Math.floor(Date.now() / 1e3)
+  }, null, 2);
+  const hmac = crypto.createHmac("sha256", process.env.AGENTKIT_SIGNING_SECRET);
+  hmac.update(signableContent);
+  const signature = hmac.digest("hex");
+  const signatureData = {
+    algorithm: "HMAC-SHA256",
+    signature,
+    hash: crypto.createHash("sha256").update(content).digest("hex"),
+    metadata,
+    timestamp: Math.floor(Date.now() / 1e3),
+    signed: signableContent
+  };
+  const outputPath = path.join(path.dirname(filePath), "plugin.signed.json");
+  fs.writeFileSync(outputPath, JSON.stringify(signatureData, null, 2));
+  console.log(styles.green("\\n\u2705 Plugin signed successfully with HMAC!"));
+  console.log(styles.dim(`\u{1F4DD} Signature written to: ${outputPath}`));
+  console.log(styles.dim(`\u{1F510} Signature: ${signature.substring(0, 32)}...`));
+}
+async function signPluginEd25519(filePath, content, metadata) {
+  const crypto = require("crypto");
+  console.log(styles.dim("\u{1F511} Using Ed25519 signing..."));
+  const keyPath = path.join(require("os").homedir(), ".agentkit", "keys", "dev.key");
+  let keyPair;
+  if (fs.existsSync(keyPath)) {
+    console.log(styles.dim("\u{1F4C2} Loading existing key..."));
+    keyPair = JSON.parse(fs.readFileSync(keyPath, "utf8"));
+  } else {
+    console.log(styles.dim("\u{1F528} Generating new Ed25519 key pair..."));
+    const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519", {
+      publicKeyEncoding: { type: "spki", format: "pem" },
+      privateKeyEncoding: { type: "pkcs8", format: "pem" }
+    });
+    keyPair = {
+      publicKey,
+      privateKey,
+      keyId: crypto.createHash("sha256").update(publicKey).digest("hex").substring(0, 16)
+    };
+    const keyDir = path.dirname(keyPath);
+    fs.mkdirSync(keyDir, { recursive: true });
+    fs.writeFileSync(keyPath, JSON.stringify(keyPair, null, 2), { mode: 384 });
+    console.log(styles.dim(`\u{1F4BE} Key saved to: ${keyPath}`));
+  }
+  const message = JSON.stringify({
+    name: metadata.name,
+    version: metadata.version,
+    description: metadata.description,
+    contentHash: crypto.createHash("sha256").update(content).digest("hex"),
+    timestamp: Math.floor(Date.now() / 1e3),
+    expires: Math.floor(Date.now() / 1e3) + 365 * 24 * 60 * 60
+    // 1 year
+  });
+  const signature = crypto.sign(null, Buffer.from(message), keyPair.privateKey).toString("base64");
+  const signatureData = {
+    algorithm: "Ed25519",
+    signature,
+    keyId: keyPair.keyId,
+    hash: crypto.createHash("sha256").update(content).digest("hex"),
+    metadata,
+    timestamp: Math.floor(Date.now() / 1e3),
+    expires: Math.floor(Date.now() / 1e3) + 365 * 24 * 60 * 60,
+    message
+  };
+  const outputToFile = args.includes("--output") || args.includes("-o");
+  if (outputToFile) {
+    const outputPath = path.join(path.dirname(filePath), "plugin.signed.json");
+    fs.writeFileSync(outputPath, JSON.stringify(signatureData, null, 2));
+    console.log(styles.green("\\n\u2705 Plugin signed successfully with Ed25519!"));
+    console.log(styles.dim(`\u{1F4DD} Signature written to: ${outputPath}`));
+  } else {
+    console.log(styles.green("\\n\u2705 Plugin signed successfully with Ed25519!"));
+    console.log(styles.cyan("\\n\u{1F4CB} Signature Data:\\n"));
+    console.log(JSON.stringify(signatureData, null, 2));
+  }
+  console.log(styles.dim(`\\n\u{1F510} Key ID: ${keyPair.keyId}`));
+  console.log(styles.dim(`\u{1F510} Signature: ${signature.substring(0, 32)}...`));
 }
