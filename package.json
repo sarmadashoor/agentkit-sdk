@@ -32,7 +32,9 @@
     "release:check": "node scripts/release-check.js",
     "release": "node scripts/release.js",
     "install:hooks": "./scripts/install-hooks.sh",
-    "postinstall": "./scripts/install-hooks.sh"
+    "postinstall": "./scripts/install-hooks.sh",
+    "cli": "node packages/cli/bin/agentkit.js",
+    "agentkit": "node packages/cli/bin/agentkit.js"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
