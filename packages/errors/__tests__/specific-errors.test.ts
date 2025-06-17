@@ -55,7 +55,7 @@ import {
   AgentKitError,
   ErrorFactory,
   ErrorTypeGuards
-} from './index'
+} from '../src/index'
 
 describe('Specific Error Classes', () => {
   describe('SDK Errors', () => {

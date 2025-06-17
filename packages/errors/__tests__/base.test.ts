@@ -7,7 +7,7 @@ import {
   wrapError,
   type ErrorCode,
   type ErrorCategory 
-} from './base'
+} from '../src/base'
 
 // Test error class for testing
 class TestError extends AgentKitError {
