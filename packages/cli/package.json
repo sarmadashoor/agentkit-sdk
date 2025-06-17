@@ -17,11 +17,14 @@
     "@types/node": "^20.10.4",
     "@types/readline-sync": "^1.4.4",
     "tsup": "^8.0.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.6.1"
   },
   "scripts": {
     "build": "tsup && cp dist/index-standalone.js bin/agentkit.js && chmod +x bin/agentkit.js",
     "dev": "npm run build",
+    "pretest": "npm run build",
+    "test": "vitest",
     "prepublishOnly": "npm run build"
   },
   "files": [
