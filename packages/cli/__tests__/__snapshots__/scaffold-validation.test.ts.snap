@@ -1,0 +1,33 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CLI Scaffolding Validation > File Tree Snapshot > should generate valid plugin implementation > plugin-implementation 1`] = `
+"import type { AgentKitPlugin, AgentContext, SendPayload } from '../src/types/agentkit-types'
+
+const helloWorldPlugin: AgentKitPlugin = {
+  name: 'hello-world',
+  version: '1.0.0',
+  description: 'Generated plugin: hello-world',
+  
+  async onInit(context: AgentContext): Promise<void> {
+    console.log(\`\${this.name} plugin initialized for agent: \${context.agentId}\`)
+  },
+  
+  async onSend(payload: SendPayload, context: AgentContext): Promise<SendPayload> {
+    // Plugin logic here
+    return {
+      ...payload,
+      metadata: {
+        ...payload.metadata,
+        processedBy: this.name,
+        timestamp: Date.now()
+      }
+    }
+  },
+  
+  async onShutdown(context: AgentContext): Promise<void> {
+    console.log(\`\${this.name} plugin shutting down\`)
+  }
+}
+
+export default helloWorldPlugin"
+`;

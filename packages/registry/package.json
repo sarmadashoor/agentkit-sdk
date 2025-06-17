@@ -16,7 +16,7 @@
     "build": "tsup",
     "clean": "rm -rf dist",
     "test": "vitest",
-    "lint": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

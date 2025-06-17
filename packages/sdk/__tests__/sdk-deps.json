@@ -1,0 +1,667 @@
+{
+  "../../errors/dist/base.d.ts": [],
+  "../../errors/dist/circuit-breaker.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../errors/dist/index.d.ts": [
+    "../../errors/dist/base.d.ts",
+    "../../errors/dist/circuit-breaker.d.ts",
+    "../../errors/dist/plugin.d.ts",
+    "../../errors/dist/registry.d.ts",
+    "../../errors/dist/sdk.d.ts",
+    "../../errors/dist/transport.d.ts",
+    "../../errors/dist/validation.d.ts"
+  ],
+  "../../errors/dist/plugin.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../errors/dist/registry.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../errors/dist/sdk.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../errors/dist/transport.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../errors/dist/validation.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../registry/dist/index.d.ts": [
+    "../../types/dist/index.d.ts"
+  ],
+  "../../test-agent/dist/index.d.ts": [
+    "../../types/dist/index.d.ts"
+  ],
+  "../../transports-dummy/dist/index.d.ts": [
+    "../../types/dist/index.d.ts"
+  ],
+  "../../types/dist/index.d.ts": [],
+  "AgentManager.ts": [
+    "../../errors/dist/index.d.ts",
+    "../../types/dist/index.d.ts",
+    "BackpressureQueue.ts",
+    "boundedExecutor.ts",
+    "circuitBreaker.ts",
+    "errors.ts",
+    "lifecycle/AgentLifecycle.ts",
+    "lifecycle/AgentObservability.ts",
+    "lifecycle/PluginRunner.ts",
+    "lifecycle/SandboxedExecutor.ts",
+    "log.ts",
+    "observability.ts",
+    "observability/MetricsCollector.ts",
+    "observability/PluginExecutionTimeline.ts",
+    "utils/AsyncLock.ts",
+    "utils/mutex.ts"
+  ],
+  "BackpressureQueue.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "log.ts"
+  ],
+  "__tests__/agent-concurrency.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/agent-manager-concurrency.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "AgentManager.ts",
+    "errors.ts"
+  ],
+  "__tests__/agent-manager-memory-leaks.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/agent-manager-plugins.test.ts": [
+    "../../registry/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "index.ts",
+    "plugins/index.ts"
+  ],
+  "__tests__/agent-manager-race-conditions.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "errors.ts",
+    "index.ts"
+  ],
+  "__tests__/bounded-queue.test.ts": [
+    "../../errors/dist/index.d.ts",
+    "../../registry/dist/index.d.ts",
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/bug-fixes.test.ts": [
+    "../../registry/dist/index.d.ts",
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/chaos/ChaosPlugins.ts": [
+    "../../types/dist/index.d.ts"
+  ],
+  "__tests__/chaos/plugin-chaos.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "../../types/dist/index.d.ts",
+    "AgentManager.ts"
+  ],
+  "__tests__/chaos/reentrant-hooks.test.ts": [
+    "../../types/dist/index.d.ts",
+    "AgentManager.ts"
+  ],
+  "__tests__/chaos/vm-sandbox-breakout.test.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "plugins/PluginManager.ts"
+  ],
+  "__tests__/circuit-breaker-integration.test.ts": [
+    "circuitBreaker.ts"
+  ],
+  "__tests__/circuit-breaker-metrics.test.ts": [
+    "circuitBreaker.ts"
+  ],
+  "__tests__/circuit-breaker-observability.test.ts": [
+    "circuitBreaker.ts",
+    "errors.ts"
+  ],
+  "__tests__/circuit-breaker-transport-integration.test.ts": [
+    "../../registry/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "circuitBreaker.ts",
+    "index.ts"
+  ],
+  "__tests__/circuit-breaker.test.ts": [
+    "circuitBreaker.ts"
+  ],
+  "__tests__/connect-agent-refactor.test.ts": [
+    "../../registry/dist/index.d.ts",
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/connectAgent.integration.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "errors.ts",
+    "index.ts"
+  ],
+  "__tests__/connectAgent.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "errors.ts",
+    "index.ts"
+  ],
+  "__tests__/demo-runner.test.ts": [
+    "__tests__/lifecycle-simulation-demo.ts"
+  ],
+  "__tests__/end-to-end.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/fixtures/greet-plugin/index.ts": [
+    "../../types/dist/index.d.ts"
+  ],
+  "__tests__/init.test.ts": [],
+  "__tests__/lifecycle-simulation-demo.ts": [
+    "../../types/dist/index.d.ts",
+    "__tests__/fixtures/greet-plugin/index.ts"
+  ],
+  "__tests__/load/concurrent-plugin-stress.test.ts": [
+    "../../types/dist/index.d.ts",
+    "AgentManager.ts",
+    "performance/EnhancedBoundedExecutor.ts"
+  ],
+  "__tests__/load/memory-leak-sentinel.test.ts": [
+    "../../types/dist/index.d.ts",
+    "AgentManager.ts",
+    "performance/EnhancedBoundedExecutor.ts"
+  ],
+  "__tests__/observability-integration.test.ts": [
+    "../../registry/dist/index.d.ts",
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/observability.test.ts": [
+    "../../registry/dist/index.d.ts",
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "../../types/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/plugin-hmac-verification.test.ts": [
+    "../../types/dist/index.d.ts",
+    "index.ts",
+    "security/browser-verifier.ts",
+    "security/crypto-polyfill.ts",
+    "security/plugin-signer.ts"
+  ],
+  "__tests__/plugin-interface-compatibility.test.ts": [
+    "../../types/dist/index.d.ts",
+    "plugins/PluginManager.ts"
+  ],
+  "__tests__/plugin-isolation.test.ts": [
+    "../../types/dist/index.d.ts",
+    "__tests__/fixtures/greet-plugin/index.ts"
+  ],
+  "__tests__/plugin-lifecycle.test.ts": [
+    "../../types/dist/index.d.ts",
+    "__tests__/fixtures/greet-plugin/index.ts",
+    "index.ts",
+    "observability/MetricsCollector.ts",
+    "observability/PluginExecutionTimeline.ts"
+  ],
+  "__tests__/plugin-performance.test.ts": [
+    "../../types/dist/index.d.ts",
+    "__tests__/fixtures/greet-plugin/index.ts",
+    "observability/MetricsCollector.ts",
+    "observability/PluginExecutionTimeline.ts"
+  ],
+  "__tests__/plugin-sandboxing.test.ts": [
+    "plugins/PluginManager.ts",
+    "plugins/index.ts"
+  ],
+  "__tests__/plugin-security.test.ts": [
+    "../../types/dist/index.d.ts",
+    "index.ts",
+    "security/plugin-hmac-verifier.ts"
+  ],
+  "__tests__/plugin-signature-integration.test.ts": [
+    "../../types/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/plugin-type-import.test.ts": [
+    "../../types/dist/index.d.ts",
+    "plugins/PluginManager.ts"
+  ],
+  "__tests__/plugin-verification.test.ts": [
+    "errors.ts",
+    "security/crypto-utils.ts",
+    "security/plugin-verification.ts"
+  ],
+  "__tests__/security/plugin-security-circuit-breaker.test.ts": [
+    "security/PluginSecurityCircuitBreaker.ts"
+  ],
+  "__tests__/security/security-integration.test.ts": [
+    "../../types/dist/index.d.ts",
+    "plugins/SecurePluginManagerV2.ts",
+    "security/PluginSecurityCircuitBreaker.ts",
+    "security/vmRunner.ts"
+  ],
+  "__tests__/security/vm-sandbox-security.test.ts": [
+    "../../types/dist/index.d.ts",
+    "security/vmRunner.ts"
+  ],
+  "__tests__/transport-backpressure.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "AgentManager.ts",
+    "errors.ts"
+  ],
+  "__tests__/transport-simulation.test.ts": [
+    "../../registry/dist/index.d.ts",
+    "../../test-agent/dist/index.d.ts",
+    "../../types/dist/index.d.ts",
+    "index.ts"
+  ],
+  "boundedExecutor.ts": [
+    "../../errors/dist/index.d.ts",
+    "../../types/dist/index.d.ts",
+    "log.ts"
+  ],
+  "circuitBreaker.ts": [
+    "errors.ts",
+    "log.ts",
+    "utils/AsyncLock.ts"
+  ],
+  "debug-tools/DebugManager.ts": [
+    "debug-tools/types.ts"
+  ],
+  "debug-tools/GraphvizGenerator.ts": [
+    "debug-tools/DebugManager.ts",
+    "debug-tools/types.ts"
+  ],
+  "debug-tools/HotReloadManager.ts": [
+    "debug-tools/DebugManager.ts",
+    "debug-tools/debugMode.ts"
+  ],
+  "debug-tools/TraceOutputFormatter.ts": [
+    "debug-tools/buildGuards.ts",
+    "debug-tools/types.ts"
+  ],
+  "debug-tools/buildGuards.ts": [],
+  "debug-tools/debugMode.ts": [
+    "debug-tools/DebugManager.ts",
+    "debug-tools/types.ts"
+  ],
+  "debug-tools/index.ts": [
+    "debug-tools/DebugManager.ts",
+    "debug-tools/GraphvizGenerator.ts",
+    "debug-tools/HotReloadManager.ts",
+    "debug-tools/TraceOutputFormatter.ts",
+    "debug-tools/buildGuards.ts",
+    "debug-tools/debugMode.ts",
+    "debug-tools/logLifecycleTimeline.ts",
+    "debug-tools/pluginDevelopment.ts",
+    "debug-tools/snapshotPluginPerf.ts",
+    "debug-tools/tracePluginExecution.ts",
+    "debug-tools/types.ts"
+  ],
+  "debug-tools/logLifecycleTimeline.ts": [
+    "debug-tools/DebugManager.ts",
+    "debug-tools/types.ts"
+  ],
+  "debug-tools/pluginDevelopment.ts": [
+    "debug-tools/DebugManager.ts",
+    "debug-tools/debugMode.ts",
+    "debug-tools/snapshotPluginPerf.ts",
+    "debug-tools/tracePluginExecution.ts",
+    "debug-tools/types.ts"
+  ],
+  "debug-tools/snapshotPluginPerf.ts": [
+    "debug-tools/DebugManager.ts",
+    "debug-tools/types.ts"
+  ],
+  "debug-tools/tracePluginExecution.ts": [
+    "debug-tools/DebugManager.ts",
+    "debug-tools/types.ts"
+  ],
+  "debug-tools/types.ts": [],
+  "errors.ts": [
+    "../../errors/dist/index.d.ts"
+  ],
+  "index.ts": [
+    "../../registry/dist/index.d.ts",
+    "../../types/dist/index.d.ts",
+    "AgentManager.ts",
+    "boundedExecutor.ts",
+    "circuitBreaker.ts",
+    "errors.ts",
+    "log.ts",
+    "metrics/index.ts",
+    "observability.ts",
+    "observability/MetricsCollector.ts",
+    "observability/PluginExecutionTimeline.ts",
+    "performance/EnhancedBoundedExecutor.ts",
+    "performance/RetryableExecutor.ts",
+    "plugins/PluginExecutionContext.ts",
+    "plugins/index.ts",
+    "security/plugin-signer.ts",
+    "utils/deepClone.ts",
+    "validation.ts"
+  ],
+  "lifecycle/AgentLifecycle.ts": [
+    "../../types/dist/index.d.ts",
+    "BackpressureQueue.ts",
+    "boundedExecutor.ts",
+    "circuitBreaker.ts",
+    "errors.ts",
+    "lifecycle/ScopeValidator.ts",
+    "log.ts",
+    "observability.ts",
+    "observability/MetricsCollector.ts",
+    "plugins/PluginExecutionContext.ts",
+    "utils/AsyncLock.ts",
+    "validation.ts"
+  ],
+  "lifecycle/AgentObservability.ts": [
+    "../../types/dist/index.d.ts",
+    "debug-tools/index.ts",
+    "observability/MetricsCollector.ts",
+    "observability/PluginExecutionTimeline.ts"
+  ],
+  "lifecycle/PluginRunner.ts": [
+    "../../errors/dist/index.d.ts",
+    "../../types/dist/index.d.ts",
+    "debug-tools/index.ts",
+    "log.ts",
+    "plugins/index.ts",
+    "security/plugin-hmac-verifier.ts"
+  ],
+  "lifecycle/SandboxedExecutor.ts": [
+    "../../types/dist/index.d.ts",
+    "BackpressureQueue.ts",
+    "boundedExecutor.ts",
+    "circuitBreaker.ts",
+    "errors.ts",
+    "log.ts",
+    "observability.ts",
+    "observability/MetricsCollector.ts",
+    "plugins/PluginExecutionContext.ts",
+    "utils/AsyncLock.ts"
+  ],
+  "lifecycle/ScopeValidator.ts": [
+    "log.ts"
+  ],
+  "log.ts": [],
+  "metrics/Instrumentation.ts": [
+    "metrics/MetricsInterface.ts",
+    "metrics/PrometheusCollector.ts"
+  ],
+  "metrics/MetricsInterface.ts": [],
+  "metrics/PrometheusCollector.ts": [
+    "metrics/MetricsInterface.ts"
+  ],
+  "metrics/__tests__/Instrumentation.test.ts": [
+    "metrics/Instrumentation.ts",
+    "metrics/MetricsInterface.ts",
+    "metrics/PrometheusCollector.ts"
+  ],
+  "metrics/__tests__/PrometheusCollector.test.ts": [
+    "metrics/PrometheusCollector.ts"
+  ],
+  "metrics/index.ts": [
+    "metrics/Instrumentation.ts",
+    "metrics/MetricsInterface.ts",
+    "metrics/PrometheusCollector.ts",
+    "metrics/utils.ts"
+  ],
+  "metrics/utils.ts": [
+    "metrics/Instrumentation.ts",
+    "metrics/MetricsInterface.ts",
+    "metrics/PrometheusCollector.ts"
+  ],
+  "observability.ts": [
+    "../../types/dist/index.d.ts",
+    "log.ts"
+  ],
+  "observability/MetricsCollector.ts": [],
+  "observability/PluginExecutionTimeline.ts": [],
+  "observability/__tests__/MetricsCollector.test.ts": [
+    "observability/MetricsCollector.ts"
+  ],
+  "observability/__tests__/PluginExecutionTimeline.test.ts": [
+    "observability/PluginExecutionTimeline.ts"
+  ],
+  "observability/__tests__/observability-integration.test.ts": [
+    "../../types/dist/index.d.ts",
+    "AgentManager.ts",
+    "observability/MetricsCollector.ts",
+    "observability/PluginExecutionTimeline.ts"
+  ],
+  "observability/__tests__/plugin-reliability.test.ts": [
+    "../../types/dist/index.d.ts",
+    "AgentManager.ts"
+  ],
+  "observability/index.ts": [
+    "observability.ts",
+    "observability/MetricsCollector.ts",
+    "observability/PluginExecutionTimeline.ts"
+  ],
+  "performance/EnhancedBoundedExecutor.ts": [
+    "../../errors/dist/index.d.ts",
+    "../../types/dist/index.d.ts",
+    "log.ts"
+  ],
+  "performance/PerformanceObservability.ts": [
+    "observability/MetricsCollector.ts",
+    "observability/PluginExecutionTimeline.ts",
+    "performance/EnhancedBoundedExecutor.ts",
+    "performance/RetryableExecutor.ts"
+  ],
+  "performance/RetryableExecutor.ts": [
+    "log.ts"
+  ],
+  "plugins/LoggingPlugin.ts": [
+    "errors.ts",
+    "plugins/types.ts"
+  ],
+  "plugins/PluginCompatibilityValidator.ts": [
+    "../../types/dist/index.d.ts",
+    "log.ts"
+  ],
+  "plugins/PluginExecutionContext.ts": [
+    "errors.ts",
+    "log.ts"
+  ],
+  "plugins/PluginManager.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "log.ts",
+    "plugins/core/PluginRegistry.ts",
+    "plugins/environment/PlatformEnvironment.ts",
+    "plugins/execution/PluginExecutor.ts",
+    "plugins/observability/PluginObservability.ts",
+    "plugins/security/PluginSecurity.ts",
+    "plugins/types.ts",
+    "plugins/worker-utils.ts"
+  ],
+  "plugins/PluginManagerOriginal.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "log.ts",
+    "plugins/types.ts",
+    "plugins/worker-utils.ts",
+    "utils/deepClone.ts"
+  ],
+  "plugins/PluginSandbox.ts": [
+    "../../types/dist/index.d.ts",
+    "log.ts",
+    "utils/deepClone.ts"
+  ],
+  "plugins/PluginSandboxV2.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "log.ts",
+    "utils/deepClone.ts"
+  ],
+  "plugins/SecurePluginManager.ts": [
+    "../../errors/dist/index.d.ts",
+    "../../types/dist/index.d.ts",
+    "log.ts",
+    "plugins/PluginCompatibilityValidator.ts",
+    "plugins/PluginSandbox.ts",
+    "plugins/types.ts",
+    "utils/deepClone.ts"
+  ],
+  "plugins/SecurePluginManagerV2.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "log.ts",
+    "plugins/PluginExecutionContext.ts",
+    "plugins/PluginSandboxV2.ts",
+    "plugins/types.ts",
+    "security/vmRunner.ts"
+  ],
+  "plugins/__tests__/PluginSandbox.security.test.ts": [
+    "../../types/dist/index.d.ts",
+    "plugins/PluginSandbox.ts"
+  ],
+  "plugins/__tests__/SecurePluginManager.test.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "plugins/SecurePluginManager.ts"
+  ],
+  "plugins/__tests__/async-plugin-manager.test.ts": [
+    "errors.ts",
+    "plugins/PluginManager.ts",
+    "plugins/types.ts"
+  ],
+  "plugins/__tests__/plugin-manager.test.ts": [
+    "errors.ts",
+    "plugins/PluginManager.ts",
+    "plugins/types.ts"
+  ],
+  "plugins/__tests__/plugin-worker.test.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "plugins/PluginManager.ts"
+  ],
+  "plugins/__tests__/sandbox-debug.test.ts": [
+    "../../types/dist/index.d.ts",
+    "plugins/PluginManager.ts"
+  ],
+  "plugins/__tests__/sandboxed-plugin.test.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "plugins/PluginManager.ts"
+  ],
+  "plugins/__tests__/worker-integration.test.ts": [
+    "plugins/worker-utils.ts"
+  ],
+  "plugins/core/PluginRegistry.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "log.ts",
+    "plugins/types.ts"
+  ],
+  "plugins/core/SecurityUtils.ts": [
+    "log.ts",
+    "utils/deepClone.ts"
+  ],
+  "plugins/environment/PlatformEnvironment.ts": [
+    "log.ts"
+  ],
+  "plugins/environment/SandboxEnvironment.ts": [
+    "log.ts",
+    "plugins/worker-utils.ts"
+  ],
+  "plugins/execution/PluginExecutor.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "log.ts",
+    "plugins/environment/PlatformEnvironment.ts",
+    "plugins/security/PluginSecurity.ts",
+    "plugins/types.ts",
+    "plugins/worker-utils.ts"
+  ],
+  "plugins/index.ts": [
+    "plugins/LoggingPlugin.ts",
+    "plugins/PluginCompatibilityValidator.ts",
+    "plugins/PluginExecutionContext.ts",
+    "plugins/PluginManager.ts",
+    "plugins/PluginSandbox.ts",
+    "plugins/PluginSandboxV2.ts",
+    "plugins/SecurePluginManager.ts",
+    "plugins/SecurePluginManagerV2.ts",
+    "plugins/types.ts"
+  ],
+  "plugins/observability/PluginObservability.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "log.ts",
+    "plugins/core/PluginRegistry.ts",
+    "plugins/execution/PluginExecutor.ts",
+    "plugins/security/PluginSecurity.ts",
+    "plugins/types.ts"
+  ],
+  "plugins/security/PluginSecurity.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "log.ts",
+    "utils/deepClone.ts"
+  ],
+  "plugins/types.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts"
+  ],
+  "plugins/worker-utils.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "log.ts"
+  ],
+  "security/PluginSecurityCircuitBreaker.ts": [],
+  "security/browser-verifier.ts": [
+    "../../types/dist/index.d.ts",
+    "security/plugin-signer.ts"
+  ],
+  "security/crypto-polyfill.ts": [
+    "../../types/dist/index.d.ts",
+    "security/plugin-signer.ts"
+  ],
+  "security/crypto-utils.ts": [],
+  "security/index.ts": [
+    "security/PluginSecurityCircuitBreaker.ts",
+    "security/vmRunner.ts"
+  ],
+  "security/plugin-hmac-verifier.ts": [
+    "../../types/dist/index.d.ts",
+    "security/browser-verifier.ts",
+    "security/crypto-polyfill.ts",
+    "security/plugin-signer.ts"
+  ],
+  "security/plugin-signer.ts": [
+    "../../types/dist/index.d.ts"
+  ],
+  "security/plugin-verification.ts": [
+    "errors.ts",
+    "security/crypto-utils.ts"
+  ],
+  "security/vmRunner.ts": [
+    "../../types/dist/index.d.ts"
+  ],
+  "utils/AsyncLock.ts": [],
+  "utils/deepClone.ts": [],
+  "utils/mutex.ts": [],
+  "validation.ts": [
+    "../../types/dist/index.d.ts",
+    "errors.ts",
+    "log.ts"
+  ]
+}

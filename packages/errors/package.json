@@ -18,10 +18,10 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "vitest",
-    "test:run": "vitest --run",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [

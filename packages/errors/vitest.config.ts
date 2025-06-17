@@ -4,6 +4,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['__tests__/**/*.test.ts', 'src/__tests__/**/*.test.ts'],
+    include: ['__tests__/**/*.test.ts', '__tests__/**/*.spec.ts'],
+    exclude: ['node_modules', 'dist'],
   },
+  resolve: {
+    alias: {
+      '@': './src'
+    }
+  }
 });

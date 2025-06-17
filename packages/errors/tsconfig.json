@@ -6,8 +6,9 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["vitest/globals"]
+    "moduleResolution": "Node",
+    "types": ["vitest/globals", "node"]
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/__tests__/**"]
+  "exclude": ["node_modules", "dist", "__tests__"]
 }

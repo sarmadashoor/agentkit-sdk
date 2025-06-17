@@ -1,0 +1,78 @@
+{
+  "__tests__/cli-dry-run.test.ts": [
+    "security/crypto.ts",
+    "security/plugin-hmac-signer.ts",
+    "security/safe-plugin-parser.ts"
+  ],
+  "__tests__/cli-dx-validation.test.ts": [],
+  "__tests__/plugin-signing.test.ts": [
+    "security/crypto.ts"
+  ],
+  "__tests__/scaffold-validation.test.ts": [],
+  "commands/create-plugin.ts": [
+    "core/CreatePluginCommand.ts",
+    "types/agentkit-types.ts"
+  ],
+  "commands/sign-plugin-hmac.ts": [
+    "security/plugin-hmac-signer.ts",
+    "security/safe-plugin-parser.ts",
+    "types/agentkit-types.ts"
+  ],
+  "commands/sign-plugin.ts": [
+    "security/crypto.ts"
+  ],
+  "core/CreatePluginCommand.ts": [
+    "templates/EnhancedPluginTemplate.ts",
+    "templates/PluginTemplate.ts",
+    "types.ts"
+  ],
+  "index-simple.ts": [],
+  "index-standalone.ts": [],
+  "index.ts": [],
+  "security/crypto.ts": [],
+  "security/plugin-hmac-signer.ts": [],
+  "security/safe-plugin-parser.ts": [
+    "types/agentkit-types.ts"
+  ],
+  "templates/EnhancedPluginTemplate.ts": [
+    "types.ts",
+    "types/agentkit-types.ts"
+  ],
+  "templates/PluginTemplate.ts": [
+    "templates/generators/PluginCodeGenerator.ts",
+    "templates/generators/PluginConfigGenerator.ts",
+    "templates/generators/PluginDocumentationGenerator.ts",
+    "templates/generators/PluginTestGenerator.ts",
+    "templates/generators/PluginToolingGenerator.ts",
+    "types.ts"
+  ],
+  "templates/PluginTemplateOriginal.ts": [
+    "types.ts",
+    "types/agentkit-types.ts"
+  ],
+  "templates/generators/PluginCodeGenerator.ts": [
+    "templates/utils/PluginTemplateUtils.ts",
+    "types.ts"
+  ],
+  "templates/generators/PluginConfigGenerator.ts": [
+    "types.ts"
+  ],
+  "templates/generators/PluginDocumentationGenerator.ts": [
+    "templates/utils/PluginTemplateUtils.ts",
+    "types.ts"
+  ],
+  "templates/generators/PluginTestGenerator.ts": [
+    "templates/utils/PluginTemplateUtils.ts",
+    "types.ts"
+  ],
+  "templates/generators/PluginToolingGenerator.ts": [
+    "types.ts"
+  ],
+  "templates/utils/PluginTemplateUtils.ts": [
+    "types/agentkit-types.ts"
+  ],
+  "types.ts": [
+    "types/agentkit-types.ts"
+  ],
+  "types/agentkit-types.ts": []
+}

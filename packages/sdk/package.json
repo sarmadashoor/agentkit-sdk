@@ -17,7 +17,7 @@
     "clean": "rm -rf dist",
     "test": "node scripts/validate-tests.mjs && vitest",
     "test:manual": "vitest test/manual/",
-    "lint": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

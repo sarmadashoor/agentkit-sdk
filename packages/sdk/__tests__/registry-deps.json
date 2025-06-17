@@ -1,0 +1,66 @@
+{
+  "../../errors/dist/base.d.ts": [],
+  "../../errors/dist/circuit-breaker.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../errors/dist/index.d.ts": [
+    "../../errors/dist/base.d.ts",
+    "../../errors/dist/circuit-breaker.d.ts",
+    "../../errors/dist/plugin.d.ts",
+    "../../errors/dist/registry.d.ts",
+    "../../errors/dist/sdk.d.ts",
+    "../../errors/dist/transport.d.ts",
+    "../../errors/dist/validation.d.ts"
+  ],
+  "../../errors/dist/plugin.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../errors/dist/registry.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../errors/dist/sdk.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../errors/dist/transport.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../errors/dist/validation.d.ts": [
+    "../../errors/dist/base.d.ts"
+  ],
+  "../../test-agent/dist/index.d.ts": [
+    "../../types/dist/index.d.ts"
+  ],
+  "../../transports-dummy/dist/index.d.ts": [
+    "../../types/dist/index.d.ts"
+  ],
+  "../../types/dist/index.d.ts": [],
+  "__tests__/init.test.ts": [],
+  "__tests__/registry-edge-cases.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/registry-immutability.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/registry-refactor.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "../../transports-dummy/dist/index.d.ts",
+    "index.ts"
+  ],
+  "__tests__/registry-scopes.test.ts": [
+    "../../test-agent/dist/index.d.ts",
+    "index.ts"
+  ],
+  "index.ts": [
+    "../../errors/dist/index.d.ts",
+    "../../types/dist/index.d.ts",
+    "utils/deepFreeze.ts"
+  ],
+  "plugin-loader.ts": [
+    "../../types/dist/index.d.ts"
+  ],
+  "utils/deepFreeze.ts": []
+}

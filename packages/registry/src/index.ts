@@ -18,6 +18,7 @@ export class AgentRegistry implements AgentRegistryInterface {
 
   register(metadata: AgentMetadata): void {
     this.checkNotSealed('register agent')
+    this.checkNotFrozen('register agent')
     
     // Validate structure but store original to preserve all fields
     try {
@@ -41,6 +42,7 @@ export class AgentRegistry implements AgentRegistryInterface {
 
   registerTransport(transport: Transport): void {
     this.checkNotSealed('register transport')
+    this.checkNotFrozen('register transport')
     
     // Validate structure but store original to preserve context
     try {
@@ -94,17 +96,20 @@ export class AgentRegistry implements AgentRegistryInterface {
   // Cleanup and disposal methods
   clear(): void {
     this.checkNotSealed('clear registry')
+    this.checkNotFrozen('clear registry')
     this.agents.clear()
     this.transports.clear()
   }
 
   removeAgent(agentId: string): boolean {
     this.checkNotSealed('remove agent')
+    this.checkNotFrozen('remove agent')
     return this.agents.delete(agentId)
   }
 
   removeTransport(transportId: string): boolean {
     this.checkNotSealed('remove transport')
+    this.checkNotFrozen('remove transport')
     return this.transports.delete(transportId)
   }
 

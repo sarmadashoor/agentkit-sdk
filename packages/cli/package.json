@@ -25,6 +25,8 @@
     "dev": "npm run build",
     "pretest": "npm run build",
     "test": "vitest",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
   },
   "files": [
