@@ -26,7 +26,7 @@ ${styles.bold('Usage:')} agentkit <command> [options]
 ${styles.bold('Commands:')}
   create-plugin [name]     Create a new AgentKit plugin
   sign-plugin <file>       Sign a plugin file with HMAC or Ed25519
-  doctor                   Validate dependencies (coming soon)
+  doctor                   Validate development environment
   --help, -h              Show this help message
   --version, -v           Show version information
 
@@ -35,6 +35,7 @@ ${styles.bold('Examples:')}
   agentkit create-plugin hello-world
   agentkit sign-plugin index.ts --hmac
   agentkit sign-plugin plugin.js --ed25519 --output
+  agentkit doctor
 
 ${styles.bold('Sign Plugin Options:')}
   --hmac                  Use HMAC-SHA256 signing (requires secret)
@@ -61,9 +62,8 @@ async function main() {
   }
 
   if (command === 'doctor') {
-    console.log(styles.yellow('🔧 doctor command coming soon!'))
-    console.log('This will validate all plugin contracts and dependencies.')
-    process.exit(0)
+    const isValid = await runDoctor()
+    process.exit(isValid ? 0 : 1)
   }
 
   console.log(styles.red(`Unknown command: ${command}`))
@@ -616,4 +616,189 @@ async function signPluginEd25519(
   
   console.log(styles.dim(`\\n🔐 Key ID: ${keyPair.keyId}`))
   console.log(styles.dim(`🔐 Signature: ${signature.substring(0, 32)}...`))
+}
+
+async function runDoctor() {
+  console.log(styles.cyan('\\n🔧 AgentKit Doctor - Environment Validation\\n'))
+  
+  let allChecksPass = true
+  const results: { name: string; status: boolean; message: string }[] = []
+  
+  // Check Node.js version
+  const nodeCheck = checkNodeVersion()
+  results.push(nodeCheck)
+  if (!nodeCheck.status) allChecksPass = false
+  
+  // Check OS and platform
+  const osCheck = checkOSPlatform()
+  results.push(osCheck)
+  
+  // Check workspace tools
+  const pnpmCheck = await checkPnpm()
+  results.push(pnpmCheck)
+  if (!pnpmCheck.status) allChecksPass = false
+  
+  const tsCheck = await checkTypeScript()
+  results.push(tsCheck)
+  if (!tsCheck.status) allChecksPass = false
+  
+  // Check CLI version
+  const cliCheck = checkCLIVersion()
+  results.push(cliCheck)
+  
+  // Check plugin directory structure
+  const dirCheck = checkPluginDirectory()
+  results.push(dirCheck)
+  
+  // Output results
+  console.log(styles.bold('📋 Environment Checks:\\n'))
+  for (const result of results) {
+    const icon = result.status ? styles.green('✅') : styles.red('❌')
+    console.log(`${icon} ${result.name}: ${result.message}`)
+  }
+  
+  console.log()
+  if (allChecksPass) {
+    console.log(styles.green('🎉 All critical checks passed! Your environment is ready for AgentKit plugin development.'))
+  } else {
+    console.log(styles.red('⚠️  Some critical checks failed. Please fix the issues above before developing plugins.'))
+  }
+  
+  return allChecksPass
+}
+
+function checkNodeVersion(): { name: string; status: boolean; message: string } {
+  const nodeVersion = process.version
+  const majorVersion = parseInt(nodeVersion.slice(1).split('.')[0])
+  const minVersion = 18
+  
+  if (majorVersion >= minVersion) {
+    return {
+      name: 'Node.js Version',
+      status: true,
+      message: `${nodeVersion} (>= ${minVersion}.0.0 required)`
+    }
+  } else {
+    return {
+      name: 'Node.js Version',
+      status: false,
+      message: `${nodeVersion} - Please upgrade to Node.js ${minVersion}.0.0 or higher`
+    }
+  }
+}
+
+function checkOSPlatform(): { name: string; status: boolean; message: string } {
+  const os = require('os')
+  const platform = os.platform()
+  const arch = os.arch()
+  const release = os.release()
+  
+  const supportedPlatforms = ['darwin', 'linux', 'win32']
+  const supportedArchs = ['x64', 'arm64']
+  
+  const platformSupported = supportedPlatforms.includes(platform)
+  const archSupported = supportedArchs.includes(arch)
+  
+  if (platformSupported && archSupported) {
+    return {
+      name: 'Operating System',
+      status: true,
+      message: `${platform} ${arch} ${release} - Supported platform`
+    }
+  } else {
+    return {
+      name: 'Operating System',
+      status: true, // Warning, not critical
+      message: `${platform} ${arch} ${release} - Untested platform, may work`
+    }
+  }
+}
+
+async function checkPnpm(): Promise<{ name: string; status: boolean; message: string }> {
+  try {
+    const { execSync } = require('child_process')
+    const version = execSync('pnpm --version', { encoding: 'utf8', timeout: 5000 }).trim()
+    
+    return {
+      name: 'PNPM Package Manager',
+      status: true,
+      message: `v${version} - Available for workspace development`
+    }
+  } catch (error) {
+    return {
+      name: 'PNPM Package Manager',
+      status: false,
+      message: 'Not installed - Required for AgentKit workspace development. Install with: npm install -g pnpm'
+    }
+  }
+}
+
+async function checkTypeScript(): Promise<{ name: string; status: boolean; message: string }> {
+  try {
+    const { execSync } = require('child_process')
+    const version = execSync('tsc --version', { encoding: 'utf8', timeout: 5000 }).trim()
+    
+    return {
+      name: 'TypeScript Compiler',
+      status: true,
+      message: `${version} - Available for plugin development`
+    }
+  } catch (error) {
+    return {
+      name: 'TypeScript Compiler',
+      status: false,
+      message: 'Not installed - Required for plugin development. Install with: npm install -g typescript'
+    }
+  }
+}
+
+function checkCLIVersion(): { name: string; status: boolean; message: string } {
+  const packageJson = {
+    version: '0.1.0-alpha' // Hardcoded for standalone CLI
+  }
+  
+  return {
+    name: 'AgentKit CLI',
+    status: true,
+    message: `v${packageJson.version} - Current version`
+  }
+}
+
+function checkPluginDirectory(): { name: string; status: boolean; message: string } {
+  const cwd = process.cwd()
+  
+  // Check if we're in a plugin directory
+  const hasIndexTs = fs.existsSync(path.join(cwd, 'index.ts'))
+  const hasPluginJson = fs.existsSync(path.join(cwd, 'plugin.json'))
+  const hasPackageJson = fs.existsSync(path.join(cwd, 'package.json'))
+  const hasTestDir = fs.existsSync(path.join(cwd, 'test'))
+  
+  // Check if we're in a workspace with plugins directory
+  const hasPluginsDir = fs.existsSync(path.join(cwd, 'plugins'))
+  
+  if (hasIndexTs && hasPackageJson) {
+    const score = [hasPluginJson, hasTestDir].filter(Boolean).length
+    return {
+      name: 'Plugin Directory Structure',
+      status: true,
+      message: `Plugin detected with ${score + 2}/4 expected files (index.ts, package.json${hasPluginJson ? ', plugin.json' : ''}${hasTestDir ? ', test/' : ''})`
+    }
+  } else if (hasPluginsDir) {
+    const pluginDirs = fs.readdirSync(path.join(cwd, 'plugins')).filter(name => {
+      const pluginPath = path.join(cwd, 'plugins', name)
+      return fs.statSync(pluginPath).isDirectory()
+    })
+    
+    return {
+      name: 'Plugin Directory Structure',
+      status: true,
+      message: `Workspace detected with ${pluginDirs.length} plugin directories`
+    }
+  } else {
+    return {
+      name: 'Plugin Directory Structure',
+      status: true, // Info, not critical
+      message: 'Not in a plugin directory - Use "agentkit create-plugin" to create one'
+    }
+  }
 }
