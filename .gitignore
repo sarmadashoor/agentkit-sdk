@@ -56,3 +56,7 @@ temp
 # Package manager
 .npm
 .yarn-integrity
+# Madge dependency analysis
+.madge/
+*.madge.svg
+*.madge.png

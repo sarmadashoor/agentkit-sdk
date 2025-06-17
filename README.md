@@ -7,6 +7,9 @@
 
 A modular, secure, agent-agnostic TypeScript SDK for managing AI agents inside host applications.
 
+> **📦 Package Manager**: This project requires **pnpm** (>=8.x)  
+> Install via: `npm install -g pnpm`
+
 ## Overview
 
 AgentKit SDK provides a foundational framework for integrating and managing AI agents within applications. The SDK abstracts away the complexity of agent lifecycle management, transport protocols, and type safety while maintaining full flexibility for different agent implementations.
@@ -34,7 +37,11 @@ AgentKit is designed around three core principles:
 ### Installation
 
 ```bash
-npm install @agentkit/sdk
+# Install dependencies
+pnpm install
+
+# Install specific package
+pnpm add @agentkit/sdk
 ```
 
 ### Basic Usage
@@ -244,27 +251,37 @@ agentkit-sdk/
 ### Prerequisites
 
 - **Node.js** >= 18.0.0
-- **pnpm** >= 8.0.0 (recommended) or npm
+- **pnpm** >= 8.0.0
+
+### Environment Check
+
+```bash
+# Check your development environment
+./scripts/check-environment.sh
+```
 
 ### Installation
 
 ```bash
-# With pnpm (recommended)
-pnpm install
+# Install pnpm globally (if not already installed)
+npm install -g pnpm
 
-# Or with npm (fallback)
-npm install
+# Install project dependencies
+pnpm install
 ```
 
 ### Available Scripts
 
+All commands use pnpm by default:
+
 | Command | Description |
 |---------|-------------|
-| `pnpm build` / `npm run build:npm` | Build all packages in dependency order |
-| `pnpm test` / `npm run test:npm` | Run comprehensive test suite (51+ tests) |
-| `pnpm typecheck` / `npm run typecheck:npm` | Validate TypeScript across all packages |
+| `pnpm build` | Build all packages in dependency order |
+| `pnpm test` | Run comprehensive test suite (51+ tests) |
+| `pnpm typecheck` | Validate TypeScript across all packages |
 | `pnpm clean` | Remove all build artifacts |
 | `pnpm lint` | Run ESLint across packages |
+| `pnpm analyze:deps` | Analyze package dependencies with madge |
 
 ### Package Development
 
@@ -273,9 +290,10 @@ Each package is independently buildable and testable:
 ```bash
 # Work on a specific package
 cd packages/sdk
-npm run build
-npm test
-npm run typecheck
+pnpm build
+pnpm test
+pnpm typecheck
+pnpm lint
 ```
 
 ## Documentation

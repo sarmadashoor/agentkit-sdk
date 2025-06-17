@@ -36,7 +36,7 @@ AgentKit plugins extend agent capabilities through a secure, type-safe lifecycle
 
 ```bash
 # Install AgentKit CLI
-npm install -g @agentkit/cli
+pnpm add -g @agentkit/cli
 
 # Create new plugin
 agentkit create-plugin --name my-analyzer --hooks onInit onSend onShutdown

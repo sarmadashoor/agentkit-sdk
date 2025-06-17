@@ -4,31 +4,13 @@ set -e
 echo "Building all packages..."
 
 # Check if pnpm is available
-if command -v pnpm >/dev/null 2>&1; then
-  echo "Using pnpm"
-  pnpm -r --parallel run build
-else
-  echo "pnpm not found, using npm workspaces"
-  # Build packages in dependency order
-  echo "Building @agentkit/types..."
-  cd packages/types && npm run build
-  cd ../..
-  
-  echo "Building @agentkit/registry..."
-  cd packages/registry && npm run build
-  cd ../..
-  
-  echo "Building @agentkit/test-agent..."
-  cd packages/test-agent && npm run build
-  cd ../..
-  
-  echo "Building @agentkit/transports-dummy..."
-  cd packages/transports-dummy && npm run build
-  cd ../..
-  
-  echo "Building @agentkit/sdk..."
-  cd packages/sdk && npm run build
-  cd ../..
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "❌ Error: pnpm is required but not installed."
+  echo "Please install pnpm with: npm install -g pnpm"
+  exit 1
 fi
+
+echo "Using pnpm to build all packages..."
+pnpm -r --parallel run build
 
 echo "✅ All packages built successfully!"

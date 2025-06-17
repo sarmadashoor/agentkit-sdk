@@ -5,6 +5,10 @@ The AgentKit CLI provides comprehensive tools for plugin development, security m
 ## Installation
 
 ```bash
+# Install with pnpm (recommended)
+pnpm add -g @agentkit/cli
+
+# Or with npm
 npm install -g @agentkit/cli
 ```
 
