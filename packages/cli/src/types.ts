@@ -1,4 +1,4 @@
-import type { PluginHookName } from '@agentkit/types'
+import type { PluginHookName } from './types/agentkit-types'
 
 export interface PluginConfig {
   name: string

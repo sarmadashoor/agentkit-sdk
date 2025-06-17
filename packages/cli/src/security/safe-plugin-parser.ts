@@ -5,7 +5,7 @@
  * Prevents code injection vulnerabilities during plugin signing
  */
 
-import type { AgentKitPlugin } from '@agentkit/types'
+import type { AgentKitPlugin } from '../types/agentkit-types'
 
 /**
  * Safely parse plugin without executing any code

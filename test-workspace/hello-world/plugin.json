@@ -1,0 +1,13 @@
+{
+  "name": "hello-world",
+  "version": "1.0.0",
+  "description": "hello-world plugin for AgentKit",
+  "main": "./index.ts",
+  "hooks": [
+    "onStart",
+    "onSend",
+    "onShutdown"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

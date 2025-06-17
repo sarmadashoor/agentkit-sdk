@@ -1,5 +1,5 @@
 import { PluginConfig, ConfigField } from '../types'
-import type { PluginHookName } from '@agentkit/types'
+import type { PluginHookName } from '../types/agentkit-types'
 
 export class PluginTemplate {
   generate(config: PluginConfig): string {
@@ -82,7 +82,7 @@ export default ${className}
 
   private generateImports(config: PluginConfig): string {
     const imports = [
-      `import type { AgentKitPlugin, AgentContext${config.hooks.includes('onSend') ? ', SendPayload' : ''} } from '@agentkit/types'`,
+      `import type { AgentKitPlugin, AgentContext${config.hooks.includes('onSend') ? ', SendPayload' : ''} } from '../types/agentkit-types'`,
       `import { z } from 'zod'`
     ]
 
@@ -227,7 +227,7 @@ export default ${className}
     
     return `import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ${className} } from './index'
-import type { AgentContext${config.hooks.includes('onSend') ? ', SendPayload' : ''} } from '@agentkit/types'
+import type { AgentContext${config.hooks.includes('onSend') ? ', SendPayload' : ''} } from '../types/agentkit-types'
 
 describe('${className}', () => {
   let plugin: ${className}
@@ -347,7 +347,7 @@ ${this.generateHookTests(config)}
     const className = this.toPascalCase(config.name)
     
     return `import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { connectAgent } from '@agentkit/sdk'
+// import { connectAgent } from '@agentkit/sdk'
 import { ${className} } from './index'
 
 describe('${className} Integration', () => {
@@ -750,7 +750,7 @@ npm install ${config.scoped ? `${config.scoped}/` : ''}agentkit-plugin-${config.
 ## Quick Start
 
 \`\`\`typescript
-import { connectAgent } from '@agentkit/sdk'
+// import { connectAgent } from '@agentkit/sdk'
 import { ${className} } from '${config.scoped ? `${config.scoped}/` : ''}agentkit-plugin-${config.name}'
 
 const plugin = new ${className}({

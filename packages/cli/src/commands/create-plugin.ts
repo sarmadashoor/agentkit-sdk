@@ -6,7 +6,7 @@ import fs from 'fs-extra'
 import path from 'path'
 import validateNpmPackageName from 'validate-npm-package-name'
 import { CreatePluginCommand } from '../core/CreatePluginCommand'
-import type { PluginHookName } from '@agentkit/types'
+import type { PluginHookName } from '../types/agentkit-types'
 
 const VALID_HOOKS: PluginHookName[] = ['onInit', 'onSend', 'onError', 'onShutdown']
 

@@ -1,5 +1,5 @@
 import { PluginConfig } from '../types'
-import type { PluginHookName } from '@agentkit/types'
+import type { PluginHookName } from '../types/agentkit-types'
 
 export class EnhancedPluginTemplate {
   generate(config: PluginConfig): string {
@@ -104,25 +104,25 @@ if (process.env.NODE_ENV === 'development') {
 
   private generateImports(config: PluginConfig): string {
     const imports = [
-      "import type { AgentKitPlugin, AgentContext, SendPayload } from '@agentkit/types'",
+      "import type { AgentKitPlugin, AgentContext, SendPayload } from '../types/agentkit-types'",
       "import { z } from 'zod'"
     ]
 
     if (config.withDebug) {
       imports.push(
-        "import { debugTrace, debugPerformance, createDebugContext } from '@agentkit/sdk/debug-tools'"
+        "// import { debugTrace, debugPerformance, createDebugContext } from '@agentkit/sdk/debug-tools'"
       )
     }
 
     if (config.withPerformance) {
       imports.push(
-        "import { measurePluginPerformance, createPluginDevelopmentWrapper } from '@agentkit/sdk/debug-tools'"
+        "// import { measurePluginPerformance, createPluginDevelopmentWrapper } from '@agentkit/sdk/debug-tools'"
       )
     }
 
     if (config.withHotReload) {
       imports.push(
-        "import { hotReload, globalHotReloadManager } from '@agentkit/sdk/debug-tools'"
+        "// import { hotReload, globalHotReloadManager } from '@agentkit/sdk/debug-tools'"
       )
     }
 

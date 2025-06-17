@@ -91,7 +91,7 @@ export default ${className}
    */
   generateImports(config: PluginConfig): string {
     const imports = [
-      `import type { AgentKitPlugin, AgentContext${config.hooks.includes('onSend') ? ', SendPayload' : ''} } from '@agentkit/types'`,
+      `import type { AgentKitPlugin, AgentContext${config.hooks.includes('onSend') ? ', SendPayload' : ''} } from '../types/agentkit-types'`,
       `import { z } from 'zod'`
     ]
 

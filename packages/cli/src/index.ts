@@ -1,57 +1,368 @@
 #!/usr/bin/env node
-import { Command } from 'commander'
-import chalk from 'chalk'
-import { createPluginCommand } from './commands/create-plugin'
-import { signPluginCommand } from './commands/sign-plugin'
-import { signPluginHmacCommand } from './commands/sign-plugin-hmac'
 
-// Read version from package.json
-const packageJson = require('../package.json')
-const version = packageJson.version
+import * as fs from 'fs-extra'
+import * as path from 'path'
+import * as readline from 'readline-sync'
 
-const program = new Command()
+// Simple console styling without external dependencies
+const styles = {
+  cyan: (text: string) => `\x1b[36m${text}\x1b[0m`,
+  green: (text: string) => `\x1b[32m${text}\x1b[0m`,
+  yellow: (text: string) => `\x1b[33m${text}\x1b[0m`,
+  red: (text: string) => `\x1b[31m${text}\x1b[0m`,
+  bold: (text: string) => `\x1b[1m${text}\x1b[0m`,
+  dim: (text: string) => `\x1b[2m${text}\x1b[0m`
+}
 
-program
-  .name('agentkit')
-  .description('AgentKit CLI - Build plugins with excellent developer experience')
-  .version(version)
+console.log(styles.cyan('🚀 AgentKit CLI v0.1.0-alpha'))
 
-// Add create-plugin command
-program.addCommand(createPluginCommand)
+const args = process.argv.slice(2)
+const command = args[0]
 
-// Add sign-plugin command (Ed25519 - existing)
-program.addCommand(signPluginCommand)
+if (!command || command === '--help' || command === '-h') {
+  console.log(`
+${styles.bold('Usage:')} agentkit <command> [options]
 
-// Add sign-plugin HMAC command (new HMAC-based)
-program.addCommand(signPluginHmacCommand)
+${styles.bold('Commands:')}
+  create-plugin [name]  Create a new AgentKit plugin
+  sign-plugin <file>    Sign a plugin file (coming soon)
+  doctor               Validate dependencies (coming soon)
+  --help, -h           Show this help message
+  --version, -v        Show version information
 
-// Add future commands placeholder
-program
-  .command('doctor')
-  .description('Validate all plugin contracts and dependencies')
-  .action(() => {
-    console.log(chalk.yellow('🔧 Doctor command coming soon!'))
-  })
+${styles.bold('Examples:')}
+  agentkit create-plugin my-plugin
+  agentkit create-plugin --help
+`)
+  process.exit(0)
+}
 
-program
-  .command('publish-plugin')
-  .description('Publish plugin to registry')
-  .argument('<plugin-name>', 'Name of the plugin to publish')
-  .action((pluginName) => {
-    console.log(chalk.yellow(`📦 Publishing ${pluginName} coming soon!`))
-  })
+if (command === '--version' || command === '-v') {
+  console.log('0.1.0-alpha')
+  process.exit(0)
+}
 
-// Error handling
-program.on('command:*', () => {
-  console.error(chalk.red('Invalid command: %s'), program.args.join(' '))
-  console.log('See --help for a list of available commands.')
+async function main() {
+  if (command === 'create-plugin') {
+    await createPlugin()
+    process.exit(0)
+  }
+
+  if (command === 'sign-plugin') {
+    console.log(styles.yellow('🔐 sign-plugin command coming soon!'))
+    console.log('This will cryptographically sign plugin files for secure distribution.')
+    process.exit(0)
+  }
+
+  if (command === 'doctor') {
+    console.log(styles.yellow('🔧 doctor command coming soon!'))
+    console.log('This will validate all plugin contracts and dependencies.')
+    process.exit(0)
+  }
+
+  console.log(styles.red(`Unknown command: ${command}`))
+  console.log('Run "agentkit --help" for available commands.')
+  process.exit(1)
+}
+
+main().catch(error => {
+  console.log(styles.red('❌ Error:'), error.message)
   process.exit(1)
 })
 
-// Parse arguments
-program.parse(process.argv)
+async function createPlugin() {
+  console.log(styles.cyan('\\n🛠️  Creating a new AgentKit plugin...\\n'))
+  
+  // Get plugin name
+  let pluginName = args[1]
+  if (!pluginName) {
+    pluginName = readline.question('Plugin name: ')
+  }
+  
+  if (!pluginName || pluginName.trim() === '') {
+    console.log(styles.red('❌ Plugin name is required'))
+    process.exit(1)
+  }
+  
+  // Validate plugin name
+  if (!/^[a-z][a-z0-9-]*$/.test(pluginName)) {
+    console.log(styles.red('❌ Plugin name must be lowercase, start with a letter, and contain only letters, numbers, and hyphens'))
+    process.exit(1)
+  }
+  
+  const pluginDir = path.join(process.cwd(), pluginName)
+  
+  // Check if directory already exists
+  if (await fs.pathExists(pluginDir)) {
+    console.log(styles.red(`❌ Directory "${pluginName}" already exists`))
+    process.exit(1)
+  }
+  
+  try {
+    console.log(styles.dim(`📁 Creating directory: ${pluginDir}`))
+    await fs.ensureDir(pluginDir)
+    
+    console.log(styles.dim('📝 Creating plugin files...'))
+    
+    // Create index.ts
+    await createIndexFile(pluginDir, pluginName)
+    
+    // Create plugin.json
+    await createPluginJson(pluginDir, pluginName)
+    
+    // Create README.md
+    await createReadme(pluginDir, pluginName)
+    
+    // Create test directory and test file
+    await createTestFile(pluginDir, pluginName)
+    
+    // Create package.json
+    await createPackageJson(pluginDir, pluginName)
+    
+    console.log(styles.green('\\n✅ Plugin created successfully!'))
+    console.log(styles.cyan('\\n📋 Next steps:\\n'))
+    console.log(`  ${styles.dim('$')} cd ${pluginName}`)
+    console.log(`  ${styles.dim('$')} npm install`)
+    console.log(`  ${styles.dim('$')} npm test`)
+    console.log('')
+    console.log(styles.green('📖 Check README.md for usage instructions\\n'))
+    
+  } catch (error) {
+    console.log(styles.red('❌ Error creating plugin:'), error.message)
+    process.exit(1)
+  }
+}
 
-// Show help if no command provided
-if (!process.argv.slice(2).length) {
-  program.outputHelp()
+async function createIndexFile(pluginDir: string, pluginName: string) {
+  const className = toPascalCase(pluginName)
+  const content = `// ${pluginName} plugin for AgentKit
+export class ${className} {
+  readonly name = '${pluginName}'
+  readonly version = '1.0.0'
+  
+  /**
+   * Called when the agent starts
+   */
+  async onStart(context: { agentId: string; timestamp: number }) {
+    console.log(\`[${pluginName}] Plugin started for agent \${context.agentId}\`)
+  }
+  
+  /**
+   * Called when a message is sent
+   */
+  async onSend(payload: { input: any }, context: { agentId: string }) {
+    console.log(\`[${pluginName}] Processing send for agent \${context.agentId}\`)
+    return payload
+  }
+  
+  /**
+   * Called when the agent shuts down
+   */
+  async onShutdown(context: { agentId: string }) {
+    console.log(\`[${pluginName}] Plugin shutting down for agent \${context.agentId}\`)
+  }
+}
+
+// Default export for convenience
+export default ${className}
+`
+  
+  await fs.writeFile(path.join(pluginDir, 'index.ts'), content)
+}
+
+async function createPluginJson(pluginDir: string, pluginName: string) {
+  const metadata = {
+    name: pluginName,
+    version: '1.0.0',
+    description: `${pluginName} plugin for AgentKit`,
+    main: './index.ts',
+    hooks: ['onStart', 'onSend', 'onShutdown'],
+    author: 'Your Name',
+    license: 'MIT'
+  }
+  
+  await fs.writeFile(
+    path.join(pluginDir, 'plugin.json'), 
+    JSON.stringify(metadata, null, 2)
+  )
+}
+
+async function createReadme(pluginDir: string, pluginName: string) {
+  const className = toPascalCase(pluginName)
+  const content = `# ${pluginName}
+
+A simple AgentKit plugin that demonstrates basic functionality.
+
+## Features
+
+- ⚡ Zero-config setup
+- 🎯 Implements onStart, onSend, and onShutdown hooks
+- 📝 TypeScript support
+- 🧪 Test suite included
+
+## Installation
+
+\`\`\`bash
+npm install
+\`\`\`
+
+## Usage
+
+\`\`\`typescript
+import { connectAgent } from '@agentkit/sdk'
+import { ${className} } from './'
+
+const plugin = new ${className}()
+
+const { send, shutdown } = await connectAgent({
+  agent: 'my-agent',
+  transport: 'websocket',
+  plugins: [plugin]
+})
+
+// Send a message
+await send({ message: 'Hello World!' })
+
+// Clean shutdown
+await shutdown()
+\`\`\`
+
+## Development
+
+\`\`\`bash
+# Run tests
+npm test
+
+# Watch mode
+npm run test:watch
+\`\`\`
+
+## API
+
+### onStart(context)
+
+Called when the agent is initialized.
+
+### onSend(payload, context)
+
+Called before sending data to the agent. You can modify the payload here.
+
+### onShutdown(context)
+
+Called when the agent is shutting down. Use for cleanup.
+
+## License
+
+MIT
+`
+  
+  await fs.writeFile(path.join(pluginDir, 'README.md'), content)
+}
+
+async function createTestFile(pluginDir: string, pluginName: string) {
+  const testDir = path.join(pluginDir, 'test')
+  await fs.ensureDir(testDir)
+  
+  const className = toPascalCase(pluginName)
+  const content = `import { ${className} } from '../index'
+
+describe('${className}', () => {
+  let plugin: ${className}
+  
+  beforeEach(() => {
+    plugin = new ${className}()
+  })
+  
+  test('should have correct metadata', () => {
+    expect(plugin.name).toBe('${pluginName}')
+    expect(plugin.version).toBe('1.0.0')
+  })
+  
+  test('should handle onStart', async () => {
+    const context = { agentId: 'test-agent', timestamp: Date.now() }
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+    
+    await plugin.onStart(context)
+    
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Plugin started for agent test-agent')
+    )
+    
+    consoleSpy.mockRestore()
+  })
+  
+  test('should handle onSend', async () => {
+    const payload = { input: { message: 'test' } }
+    const context = { agentId: 'test-agent' }
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+    
+    const result = await plugin.onSend(payload, context)
+    
+    expect(result).toEqual(payload)
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Processing send for agent test-agent')
+    )
+    
+    consoleSpy.mockRestore()
+  })
+  
+  test('should handle onShutdown', async () => {
+    const context = { agentId: 'test-agent' }
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+    
+    await plugin.onShutdown(context)
+    
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Plugin shutting down for agent test-agent')
+    )
+    
+    consoleSpy.mockRestore()
+  })
+})
+`
+  
+  await fs.writeFile(path.join(testDir, 'index.test.ts'), content)
+}
+
+async function createPackageJson(pluginDir: string, pluginName: string) {
+  const packageJson = {
+    name: pluginName,
+    version: '1.0.0',
+    description: `${pluginName} plugin for AgentKit`,
+    main: 'index.ts',
+    scripts: {
+      test: 'jest',
+      'test:watch': 'jest --watch'
+    },
+    devDependencies: {
+      '@types/jest': '^29.5.0',
+      '@types/node': '^20.0.0',
+      jest: '^29.5.0',
+      'ts-jest': '^29.1.0',
+      typescript: '^5.0.0'
+    },
+    jest: {
+      preset: 'ts-jest',
+      testEnvironment: 'node',
+      testMatch: ['**/test/**/*.test.ts']
+    },
+    engines: {
+      node: '>=18.0.0'
+    },
+    keywords: ['agentkit', 'plugin'],
+    author: 'Your Name',
+    license: 'MIT'
+  }
+  
+  await fs.writeFile(
+    path.join(pluginDir, 'package.json'), 
+    JSON.stringify(packageJson, null, 2)
+  )
+}
+
+function toPascalCase(str: string): string {
+  return str
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('')
 }

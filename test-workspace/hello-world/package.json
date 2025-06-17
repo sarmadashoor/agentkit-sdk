@@ -1,0 +1,38 @@
+{
+  "name": "hello-world",
+  "version": "1.0.0",
+  "description": "hello-world plugin for AgentKit",
+  "main": "index.ts",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/test/**/*.test.ts"
+    ],
+    "setupFilesAfterEnv": [],
+    "collectCoverageFrom": [
+      "*.ts",
+      "!*.test.ts"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "agentkit",
+    "plugin"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

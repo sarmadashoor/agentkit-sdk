@@ -1,0 +1,13 @@
+{
+  "name": "test-plugin",
+  "version": "1.0.0",
+  "description": "test-plugin plugin for AgentKit",
+  "main": "./index.ts",
+  "hooks": [
+    "onStart",
+    "onSend",
+    "onShutdown"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

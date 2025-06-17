@@ -13,7 +13,7 @@ export class PluginTestGenerator {
     
     return `import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ${className} } from './index'
-import type { AgentContext${config.hooks.includes('onSend') ? ', SendPayload' : ''} } from '@agentkit/types'
+import type { AgentContext${config.hooks.includes('onSend') ? ', SendPayload' : ''} } from '../types/agentkit-types'
 
 describe('${className}', () => {
   let plugin: ${className}
@@ -59,7 +59,7 @@ ${this.generateHookTests(config)}
     const className = PluginTemplateUtils.toPascalCase(config.name)
     
     return `import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { connectAgent } from '@agentkit/sdk'
+// import { connectAgent } from '@agentkit/sdk'
 import { ${className} } from './index'
 
 describe('${className} Integration', () => {

@@ -1,0 +1,11 @@
+{
+  "algorithm": "HMAC-SHA256",
+  "signature": "6729139dec17359417e1d5f471bc66de2ec69703dc3c7e2fa607da45b0042fb6",
+  "hash": "e4176fd73b79616648f8411b17b38ff16822f6a07ea4cee55f76e91307ea24c7",
+  "metadata": {
+    "name": "hello-world",
+    "version": "1.0.0"
+  },
+  "timestamp": 1750108131,
+  "signed": "{\n  \"name\": \"hello-world\",\n  \"version\": \"1.0.0\",\n  \"contentHash\": \"e4176fd73b79616648f8411b17b38ff16822f6a07ea4cee55f76e91307ea24c7\",\n  \"timestamp\": 1750108131\n}"
+}

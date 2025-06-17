@@ -11,7 +11,7 @@ import { writeFile, readFile, access } from 'fs/promises'
 import { resolve, dirname, basename, extname } from 'path'
 import { signPlugin, serializePluginForSigning, type PluginSignatureMetadata } from '../security/plugin-hmac-signer'
 import { parsePluginSafely, normalizePluginForSigning, detectMaliciousPatterns } from '../security/safe-plugin-parser'
-import type { AgentKitPlugin } from '@agentkit/types'
+import type { AgentKitPlugin } from '../types/agentkit-types'
 
 export interface SignPluginOptions {
   /** Output path for signature file */

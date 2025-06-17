@@ -34,7 +34,7 @@ npm install ${config.scoped ? `${config.scoped}/` : ''}agentkit-plugin-${config.
 ## Quick Start
 
 \`\`\`typescript
-import { connectAgent } from '@agentkit/sdk'
+// import { connectAgent } from '@agentkit/sdk'
 import { ${className} } from '${config.scoped ? `${config.scoped}/` : ''}agentkit-plugin-${config.name}'
 
 const plugin = new ${className}({
