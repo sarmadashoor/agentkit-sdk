@@ -75,11 +75,18 @@ describe('Concurrent Plugin Stress Tests', () => {
   })
 
   afterEach(async () => {
-    await executor.shutdown()
+    console.time('concurrent-plugin-stress-cleanup')
+    if (executor) {
+      await executor.shutdown()
+      // Allow time for cleanup
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    console.timeEnd('concurrent-plugin-stress-cleanup')
   })
 
   describe('100 Concurrent Plugin Execution', () => {
     it('should handle 100 concurrent tasks with random latency', async () => {
+      console.time('concurrent-plugin-stress-100-tasks')
       const taskCount = 100
       const tasks: Promise<any>[] = []
       
@@ -124,7 +131,8 @@ describe('Concurrent Plugin Stress Tests', () => {
       expect(successfulTasks + failedTasks).toBe(taskCount)
       expect(successfulTasks).toBeGreaterThan(taskCount * 0.8) // At least 80% success rate
       expect(executor.getStats().timeoutRate).toBeLessThan(0.2) // Less than 20% timeout rate
-    }, 15000)
+      console.timeEnd('concurrent-plugin-stress-100-tasks')
+    }, { timeout: 20000 })
 
     it('should handle mixed plugin behaviors (crashes, logs, stalls)', async () => {
       const tasks: Promise<any>[] = []

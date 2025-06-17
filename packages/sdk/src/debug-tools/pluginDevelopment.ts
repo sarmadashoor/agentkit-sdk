@@ -654,4 +654,4 @@ export function validatePluginContract(plugin: any): PluginValidationResult {
   return wrapper.validateContract()
 }
 
-export type { PluginPerformanceReport, PluginValidationResult, DevelopmentWrapperConfig }
+// Types are already exported with the interface definitions above

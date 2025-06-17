@@ -64,7 +64,7 @@ function deepCopy<T>(obj: T, visited = new WeakMap()): T {
     }
   }
   
-  return copy
+  return copy as T
 }
 
 /**

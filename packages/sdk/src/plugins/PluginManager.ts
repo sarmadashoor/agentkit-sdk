@@ -159,6 +159,13 @@ export class PluginManager {
   }
 
   /**
+   * Get all registered plugins
+   */
+  getRegisteredPlugins(): ReadonlyArray<AgentKitPlugin> {
+    return this.registry.getPlugins()
+  }
+
+  /**
    * Generate security report for a plugin
    */
   generateSecurityReport(plugin: AgentKitPlugin) {

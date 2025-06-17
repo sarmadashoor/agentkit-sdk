@@ -80,6 +80,7 @@ export class LifecycleTimelineLogger {
       isSlowExecution: false,
       executionOrder: ++this.executionOrder,
       concurrentExecutions: this.getActiveConcurrentExecutions(),
+      retryAttempt: 0,
       payload: payload ? this.capturePayload(payload) : undefined,
       context: {
         agentId: context.agentId || 'unknown',

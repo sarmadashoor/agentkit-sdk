@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { BrowserTransport } from './BrowserTransport'
+import { BrowserTransport } from '../src/BrowserTransport'
 
 // Mock fetch globally
 const mockFetch = vi.fn()

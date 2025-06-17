@@ -96,10 +96,10 @@ export class GraphvizGenerator {
     entries: LifecycleTimelineEntry[],
     options: Partial<GraphvizOptions> = {}
   ): string {
-    const mergedOptions = { 
+    const mergedOptions: GraphvizOptions = { 
       ...this.defaultOptions, 
       ...options, 
-      colorScheme: 'performance',
+      colorScheme: 'performance' as const,
       highlightSlowOperations: true
     }
     
@@ -113,11 +113,11 @@ export class GraphvizGenerator {
     entries: LifecycleTimelineEntry[],
     options: Partial<GraphvizOptions> = {}
   ): string {
-    const mergedOptions = { 
+    const mergedOptions: GraphvizOptions = { 
       ...this.defaultOptions, 
       ...options,
-      layout: 'neato',
-      rankdir: 'LR',
+      layout: 'neato' as const,
+      rankdir: 'LR' as const,
       compactMode: true
     }
     
@@ -539,4 +539,4 @@ export function generatePerformanceHeatmap(
 // Global Graphviz generator
 export const globalGraphvizGenerator = new GraphvizGenerator()
 
-export type { GraphvizOptions, ExecutionGraph }
+// GraphvizOptions is already exported with the interface definition above

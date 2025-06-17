@@ -173,7 +173,7 @@ export class SandboxEnvironment {
       Object.freeze(context)
 
     } catch (error) {
-      debugLog.warn('context freezing failed', error as Error, this.options.debug)
+      debugLog.warn('context freezing failed', { error: (error as Error).message }, this.options.debug)
       // Continue execution even if freezing fails
     }
   }
@@ -250,7 +250,7 @@ export class SandboxEnvironment {
         const cloned = this.deepClone(arg)
         return this.deepFreeze(cloned)
       } catch (error) {
-        debugLog.warn('argument immutability failed', error as Error, this.options.debug)
+        debugLog.warn('argument immutability failed', { error: (error as Error).message }, this.options.debug)
         return arg
       }
     })

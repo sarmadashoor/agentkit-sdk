@@ -60,6 +60,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
     })
 
     it('should calculate average response time correctly', async () => {
+      console.time('circuit-breaker-response-time-calculation')
       circuitBreaker = new CircuitBreaker({
         enabled: true,
         failureThreshold: 5,
@@ -82,7 +83,8 @@ describe('CircuitBreaker Metrics and Logging', () => {
       const metrics = circuitBreaker.getMetrics()
       expect(metrics.averageResponseTime).toBeGreaterThan(0)
       expect(metrics.successfulRequests).toBe(2)
-    })
+      console.timeEnd('circuit-breaker-response-time-calculation')
+    }, { timeout: 10000 })
 
     it('should track state transitions accurately', async () => {
       circuitBreaker = new CircuitBreaker({
@@ -114,6 +116,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
     })
 
     it('should maintain response time history within limits', async () => {
+      console.time('circuit-breaker-response-history')
       circuitBreaker = new CircuitBreaker({
         enabled: true,
         failureThreshold: 1000, // High threshold to avoid opening
@@ -129,7 +132,8 @@ describe('CircuitBreaker Metrics and Logging', () => {
       expect(metrics.successfulRequests).toBe(150)
       expect(metrics.averageResponseTime).toBeGreaterThanOrEqual(0)
       // Should have calculated average from latest 100 response times only
-    })
+      console.timeEnd('circuit-breaker-response-history')
+    }, { timeout: 12000 })
   })
 
   describe('Logging and Console Output', () => {

@@ -101,7 +101,7 @@ export class PerformanceObservabilityCollector {
     // Monitor GC events if available
     if (typeof global !== 'undefined' && global.gc) {
       const originalGC = global.gc
-      global.gc = () => {
+      global.gc = async () => {
         this.gcEventCount++
         return originalGC()
       }

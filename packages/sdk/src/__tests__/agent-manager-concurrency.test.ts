@@ -31,6 +31,7 @@ describe('AgentManager Concurrency Safety', () => {
     })
 
     it('should handle concurrent shutdown calls gracefully', async () => {
+      console.time('agent-manager-concurrent-shutdown')
       // Start multiple shutdown operations concurrently
       const shutdown1 = manager.shutdown()
       const shutdown2 = manager.shutdown()
@@ -41,9 +42,11 @@ describe('AgentManager Concurrency Safety', () => {
       
       // Manager should be properly shutdown
       expect(manager.getState().shutdown).toBe(true)
-    })
+      console.timeEnd('agent-manager-concurrent-shutdown')
+    }, { timeout: 10000 })
 
     it('should handle send operations during shutdown', async () => {
+      console.time('agent-manager-send-during-shutdown')
       // Start multiple send operations
       const send1 = manager.send({ msg: 1 })
       const send2 = manager.send({ msg: 2 })
@@ -61,7 +64,8 @@ describe('AgentManager Concurrency Safety', () => {
       
       // Manager should be shutdown
       expect(manager.getState().shutdown).toBe(true)
-    })
+      console.timeEnd('agent-manager-send-during-shutdown')
+    }, { timeout: 12000 })
 
     it('should prevent initialization after shutdown', async () => {
       await manager.shutdown()

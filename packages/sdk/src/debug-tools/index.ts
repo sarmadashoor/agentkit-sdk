@@ -31,7 +31,8 @@ export {
 } from './buildGuards'
 export { DebugManager, type DebugConfig, type DebugSnapshot } from './DebugManager'
 export { HotReloadManager, createHotReloadManager, type HotReloadConfig } from './HotReloadManager'
-export { GraphvizGenerator, type ExecutionGraph } from './GraphvizGenerator'
+export { GraphvizGenerator } from './GraphvizGenerator'
+export { type ExecutionGraph } from './types'
 
 // Debug mode utilities
 export { 

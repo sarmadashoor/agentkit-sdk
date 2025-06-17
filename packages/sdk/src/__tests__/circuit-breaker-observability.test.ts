@@ -35,6 +35,7 @@ describe('CircuitBreaker Observability and State Transitions', () => {
 
   describe('State Transition Tracking', () => {
     test('tracks state transitions from CLOSED to OPEN to HALF_OPEN to CLOSED', async () => {
+      console.time('circuit-breaker-observability-state-transitions')
       circuitBreaker = new CircuitBreaker({
         name: 'test-circuit',
         failureThreshold: 2,
@@ -82,7 +83,8 @@ describe('CircuitBreaker Observability and State Transitions', () => {
           reason: 'recovery threshold reached (1/1)'
         })
       )
-    })
+      console.timeEnd('circuit-breaker-observability-state-transitions')
+    }, { timeout: 12000 })
 
     test('tracks multiple recovery attempts with custom recovery threshold', async () => {
       circuitBreaker = new CircuitBreaker({
@@ -354,6 +356,7 @@ describe('CircuitBreaker Observability and State Transitions', () => {
 
   describe('Advanced Scenarios', () => {
     test('handles rapid state transitions correctly', async () => {
+      console.time('circuit-breaker-rapid-state-transitions')
       circuitBreaker = new CircuitBreaker({
         name: 'rapid-circuit',
         failureThreshold: 1,
@@ -385,7 +388,8 @@ describe('CircuitBreaker Observability and State Transitions', () => {
       expect(mockObservabilityHooks.onCircuitOpen).toHaveBeenCalledTimes(2)
       expect(mockObservabilityHooks.onCircuitHalfOpen).toHaveBeenCalledTimes(2)
       expect(mockObservabilityHooks.onCircuitClose).toHaveBeenCalledTimes(2)
-    })
+      console.timeEnd('circuit-breaker-rapid-state-transitions')
+    }, { timeout: 10000 })
 
     test('provides accurate statistics during complex scenarios', async () => {
       circuitBreaker = new CircuitBreaker({

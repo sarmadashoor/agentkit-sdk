@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { VMRunner, createVMRunner, secureClone } from '../security/vmRunner'
+import { VMRunner, createVMRunner, secureClone } from '../../src/security/vmRunner'
 import type { AgentContext, SendPayload } from '@agentkit/types'
 
 /**

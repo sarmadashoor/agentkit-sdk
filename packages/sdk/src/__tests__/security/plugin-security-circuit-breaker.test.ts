@@ -27,10 +27,15 @@ describe('Plugin Security Circuit Breaker', () => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
-  afterEach(() => {
-    circuitBreaker.dispose()
+  afterEach(async () => {
+    console.time('plugin-security-circuit-breaker-cleanup')
+    await circuitBreaker.dispose()
     consoleWarnSpy.mockRestore()
     consoleErrorSpy.mockRestore()
+    
+    // Allow any pending security violations to be processed
+    await new Promise(resolve => setTimeout(resolve, 25))
+    console.timeEnd('plugin-security-circuit-breaker-cleanup')
   })
 
   describe('Violation Recording', () => {

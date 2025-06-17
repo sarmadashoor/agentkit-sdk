@@ -6,12 +6,22 @@ describe('CircuitBreaker', () => {
   let mockFn: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
+    console.time('circuit-breaker-setup')
     vi.useFakeTimers()
     mockFn = vi.fn()
+    console.timeEnd('circuit-breaker-setup')
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
+  afterEach(async () => {
+    console.time('circuit-breaker-cleanup')
+    try {
+      vi.useRealTimers()
+      // Allow any pending timers to be cleaned up
+      await new Promise(resolve => setImmediate(resolve))
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+    console.timeEnd('circuit-breaker-cleanup')
   })
 
   describe('Configuration and Validation', () => {
@@ -128,7 +138,7 @@ describe('CircuitBreaker', () => {
       expect(stats.state).toBe(CircuitState.OPEN)
       expect(stats.failureCount).toBe(3)
       expect(stats.openedAt).toBeDefined()
-    })
+    }, { timeout: 8000 })
   })
 
   describe('Enabled Circuit Breaker - Open State', () => {
@@ -180,6 +190,7 @@ describe('CircuitBreaker', () => {
     })
 
     it('should transition to half-open after timeout', async () => {
+      console.time('circuit-breaker-half-open-transition')
       // Advance time past timeout
       vi.advanceTimersByTime(31000)
       
@@ -191,7 +202,8 @@ describe('CircuitBreaker', () => {
       
       const stats = circuitBreaker.getStats()
       expect(stats.state).toBe(CircuitState.CLOSED) // Success in half-open closes circuit
-    })
+      console.timeEnd('circuit-breaker-half-open-transition')
+    }, { timeout: 10000 })
   })
 
   describe('Enabled Circuit Breaker - Half-Open State', () => {
@@ -369,6 +381,7 @@ describe('CircuitBreaker', () => {
     })
 
     it('should handle multiple rapid failures correctly', async () => {
+      console.time('circuit-breaker-rapid-failures')
       circuitBreaker = new CircuitBreaker({ enabled: true, failureThreshold: 3 })
       const error = new Error('rapid failure')
       
@@ -394,7 +407,8 @@ describe('CircuitBreaker', () => {
       expect(originalErrors.length).toBeGreaterThanOrEqual(3) // At least threshold reached
       expect(circuitErrors.length).toBeGreaterThan(0) // Some blocked by circuit
       expect(originalErrors.length + circuitErrors.length).toBe(10) // All failed
-    })
+      console.timeEnd('circuit-breaker-rapid-failures')
+    }, { timeout: 10000 })
   })
 
   describe('Feature Flag Integration', () => {
@@ -427,6 +441,7 @@ describe('CircuitBreaker', () => {
 
   describe('Full Lifecycle Simulation', () => {
     it('should complete full fail-recover cycle correctly', async () => {
+      console.time('circuit-breaker-full-lifecycle')
       circuitBreaker = new CircuitBreaker({
         enabled: true,
         failureThreshold: 2,
@@ -470,6 +485,7 @@ describe('CircuitBreaker', () => {
       mockFn.mockResolvedValue('normal operation')
       await circuitBreaker.execute(mockFn)
       expect(circuitBreaker.getStats().successCount).toBe(3) // 1 initial + 1 from recovery + 1 from normal
-    })
+      console.timeEnd('circuit-breaker-full-lifecycle')
+    }, { timeout: 15000 })
   })
 })

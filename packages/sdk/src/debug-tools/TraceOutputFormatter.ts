@@ -76,14 +76,14 @@ export class TraceOutputFormatter {
    */
   formatTimelineEntry(entry: LifecycleTimelineEntry): string {
     switch (entry.status) {
-      case 'pending':
-        return this.formatStart(entry.pluginName, entry.hookName, entry.startTime)
-      case 'success':
-        return this.formatSuccess(entry.pluginName, entry.hookName, entry.duration || 0, entry.endTime)
-      case 'error':
-        return this.formatError(entry.pluginName, entry.hookName, entry.errorMessage || 'Unknown error', entry.duration || 0, entry.endTime)
+      case 'started':
+        return this.formatStart(entry.pluginName, entry.hookName, entry.timestamp)
+      case 'completed':
+        return this.formatSuccess(entry.pluginName, entry.hookName, entry.duration || 0, entry.timestamp + (entry.duration || 0))
+      case 'failed':
+        return this.formatError(entry.pluginName, entry.hookName, entry.error || 'Unknown error', entry.duration || 0, entry.timestamp + (entry.duration || 0))
       case 'timeout':
-        return this.formatTimeout(entry.pluginName, entry.hookName, entry.duration || 0, entry.endTime)
+        return this.formatTimeout(entry.pluginName, entry.hookName, entry.duration || 0, entry.timestamp + (entry.duration || 0))
       default:
         return `${entry.hookName}(${entry.pluginName}) ${entry.status}`
     }
@@ -94,7 +94,7 @@ export class TraceOutputFormatter {
    */
   formatTimeline(entries: LifecycleTimelineEntry[]): string[] {
     return entries
-      .sort((a, b) => a.startTime - b.startTime)
+      .sort((a, b) => a.timestamp - b.timestamp)
       .map(entry => this.formatTimelineEntry(entry))
   }
 

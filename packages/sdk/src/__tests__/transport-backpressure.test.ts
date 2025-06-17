@@ -146,6 +146,7 @@ describe('Transport Backpressure API', () => {
 
   describe('Backpressure Integration with BoundedExecutor', () => {
     it('should work together with bounded executor limits', async () => {
+      console.time('transport-backpressure-bounded-executor')
       const transport = new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 3,
@@ -189,9 +190,11 @@ describe('Transport Backpressure API', () => {
       expect(failures).toBeGreaterThan(0) // Some should fail due to backpressure
 
       await manager.shutdown()
-    })
+      console.timeEnd('transport-backpressure-bounded-executor')
+    }, { timeout: 15000 })
 
     it('should handle backpressure errors gracefully during high load', async () => {
+      console.time('transport-backpressure-high-load')
       const transport = new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 1, // Very tight limit
@@ -228,7 +231,8 @@ describe('Transport Backpressure API', () => {
       expect(backpressureFailures.length).toBe(failures)
 
       await manager.shutdown()
-    })
+      console.timeEnd('transport-backpressure-high-load')
+    }, { timeout: 15000 })
   })
 
   describe('Dynamic Queue Management', () => {

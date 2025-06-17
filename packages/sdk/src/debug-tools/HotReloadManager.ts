@@ -485,4 +485,4 @@ export function hotReload(pluginName?: string) {
   }
 }
 
-export type { HotReloadConfig, PluginReloadInfo }
+export type { PluginReloadInfo }

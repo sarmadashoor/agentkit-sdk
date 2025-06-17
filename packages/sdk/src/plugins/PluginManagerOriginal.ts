@@ -495,6 +495,7 @@ export class PluginManager {
       if (error instanceof Error) {
         // Check for VM timeout specifically
         if (error.message.includes('Script execution timed out')) {
+          const timeoutMs = this.options.sandboxTimeout!
           throw new PluginTimeoutError(`${plugin.name}.${hookName}`, timeoutMs, {
             context: { operation: `${plugin.name}.${hookName}`, timeoutMs, type: 'sandbox' }
           })

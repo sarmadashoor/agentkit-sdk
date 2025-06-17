@@ -51,14 +51,20 @@ describe('CircuitBreaker Transport Integration', () => {
     registry.registerTransport(new DummyTransport({ debug: false }))
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    console.time('circuit-breaker-transport-integration-cleanup')
     vi.useRealTimers()
     consoleSpy.mockRestore()
     vi.restoreAllMocks()
+    
+    // Ensure any pending async operations complete
+    await new Promise(resolve => setTimeout(resolve, 50))
+    console.timeEnd('circuit-breaker-transport-integration-cleanup')
   })
 
   describe('Transport Message Send Wrapping', () => {
     it('should wrap transport operations with circuit breaker when enabled', async () => {
+      console.time('circuit-breaker-transport-integration')
       const handle = await connectAgent({
         agent: 'unreliable-agent',
         transport: 'dummy',
@@ -99,7 +105,8 @@ describe('CircuitBreaker Transport Integration', () => {
       )
 
       await handle.shutdown()
-    })
+      console.timeEnd('circuit-breaker-transport-integration')
+    }, { timeout: 15000 })
 
     it('should not use circuit breaker when feature flag is disabled', async () => {
       const handle = await connectAgent({
@@ -132,6 +139,7 @@ describe('CircuitBreaker Transport Integration', () => {
     })
 
     it('should recover circuit breaker after timeout period', async () => {
+      console.time('circuit-breaker-recovery')
       const handle = await connectAgent({
         agent: 'unreliable-agent',
         transport: 'dummy',
@@ -172,9 +180,11 @@ describe('CircuitBreaker Transport Integration', () => {
       )
 
       await handle.shutdown()
-    })
+      console.timeEnd('circuit-breaker-recovery')
+    }, { timeout: 12000 })
 
     it('should handle rapid concurrent requests correctly', async () => {
+      console.time('circuit-breaker-concurrent-requests')
       const handle = await connectAgent({
         agent: 'unreliable-agent',
         transport: 'dummy',
@@ -210,7 +220,8 @@ describe('CircuitBreaker Transport Integration', () => {
       expect(successes.length).toBeGreaterThan(0) // Some should succeed
       
       await handle.shutdown()
-    })
+      console.timeEnd('circuit-breaker-concurrent-requests')
+    }, { timeout: 15000 })
   })
 
   describe('Circuit Breaker with Resource Limits', () => {

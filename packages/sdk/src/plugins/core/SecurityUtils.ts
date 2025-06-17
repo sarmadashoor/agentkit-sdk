@@ -213,7 +213,7 @@ export class SecurityUtils {
         } catch (error) {
           // Continue with other properties if one fails
           if (this.options.debug) {
-            debugLog.warn('property freeze failed', error as Error, this.options.debug)
+            debugLog.warn('property freeze failed', { error: (error as Error).message }, this.options.debug)
           }
         }
       })
@@ -221,7 +221,7 @@ export class SecurityUtils {
       return obj
     } catch (error) {
       if (this.options.debug) {
-        debugLog.warn('object freeze failed', error as Error, this.options.debug)
+        debugLog.warn('object freeze failed', { error: (error as Error).message }, this.options.debug)
       }
       return obj
     }

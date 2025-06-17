@@ -60,7 +60,7 @@ class PooledWorker {
   private activeExecution: {
     resolve: (value: unknown) => void
     reject: (error: Error) => void
-    timeoutId?: number
+    timeoutId?: number | NodeJS.Timeout
   } | null = null
 
   constructor(private debug = false) {

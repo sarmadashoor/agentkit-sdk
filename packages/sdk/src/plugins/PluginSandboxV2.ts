@@ -29,6 +29,7 @@ export interface SandboxExecutionResult {
   isolated: boolean
   dataCloned: boolean
   platformMethod: 'vm' | 'structured-clone' | 'webworker' | 'fallback'
+  securityViolations?: string[]
 }
 
 /**
