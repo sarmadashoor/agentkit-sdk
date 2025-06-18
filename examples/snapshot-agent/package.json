@@ -9,7 +9,9 @@
     "test": "vitest",
     "test:run": "vitest run",
     "dev": "tsx src/index.ts",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@agentkit/sdk": "workspace:*",

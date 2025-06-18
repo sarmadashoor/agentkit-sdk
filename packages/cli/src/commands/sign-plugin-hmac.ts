@@ -69,7 +69,7 @@ export const signPluginHmacCommand = new Command('sign-plugin')
       const outputPath = options.output || getDefaultSignaturePath(pluginPath)
       
       // Check if signature file already exists
-      await checkExistingSignature(outputPath, options.force, spinner)
+      await checkExistingSignature(outputPath, options.force || false, spinner)
 
       // Write signature file
       spinner.text = 'Writing signature file...'
@@ -93,7 +93,8 @@ export const signPluginHmacCommand = new Command('sign-plugin')
         
         console.log()
         console.log(chalk.bold('📦 Serialized Plugin for Signing:'))
-        console.log(serializePluginForSigning(plugin).substring(0, 200) + '...')
+        const serialized = serializePluginForSigning(plugin);
+        console.log(serialized.substring(0, 200) + '...')
       }
 
       console.log()
@@ -110,7 +111,7 @@ export const signPluginHmacCommand = new Command('sign-plugin')
 /**
  * Validate that plugin file exists and is readable
  */
-async function validatePluginFile(pluginPath: string, spinner: ora.Ora): Promise<void> {
+async function validatePluginFile(pluginPath: string, spinner: ReturnType<typeof ora>): Promise<void> {
   try {
     await access(pluginPath)
     
@@ -167,7 +168,7 @@ function getDefaultSignaturePath(pluginPath: string): string {
 async function checkExistingSignature(
   outputPath: string, 
   force: boolean, 
-  spinner: ora.Ora
+  spinner: ReturnType<typeof ora>
 ): Promise<void> {
   try {
     await access(outputPath)

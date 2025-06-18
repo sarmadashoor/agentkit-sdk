@@ -128,9 +128,9 @@ async function main() {
     console.log('Run "agentkit --help" for available commands.')
     process.exit(1)
   } catch (error) {
-    console.log(styles.red('❌ Error:'), error.message)
+    console.log(styles.red('❌ Error:'), error instanceof Error ? error.message : String(error))
     if (hasVerbose) {
-      console.log(styles.dim(error.stack))
+      console.log(styles.dim(error instanceof Error ? (error.stack || String(error)) : String(error)))
     }
     process.exit(1)
   }
@@ -194,7 +194,7 @@ async function createPlugin() {
     console.log(styles.green('📖 Check README.md for usage instructions\n'))
     
   } catch (error) {
-    console.log(styles.red('❌ Error creating plugin:'), error.message)
+    console.log(styles.red('❌ Error creating plugin:'), error instanceof Error ? error.message : String(error))
     process.exit(1)
   }
 }
@@ -253,7 +253,7 @@ async function runDoctor() {
     message: majorVersion >= 18 ? `${nodeVersion} (>= 18.0.0 required)` : `${nodeVersion} - Please upgrade to Node.js 18.0.0 or higher`
   }
   results.push(nodeCheck)
-  if (!nodeCheck.status) allChecksPass = false
+  if (!nodeCheck.status) {allChecksPass = false}
   
   // Check TypeScript
   try {

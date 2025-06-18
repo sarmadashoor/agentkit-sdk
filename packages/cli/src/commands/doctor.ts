@@ -155,7 +155,7 @@ async function checkPluginDirectory(): Promise<HealthCheck> {
       name: 'Plugin Directory',
       status: 'fail',
       message: 'Cannot access plugin directory',
-      details: `${pluginDir}: ${error.message}`
+      details: `${pluginDir}: ${error instanceof Error ? error.message : String(error)}`
     }
   }
 }
@@ -200,7 +200,7 @@ async function checkSDKInstallation(): Promise<HealthCheck> {
       name: 'AgentKit SDK',
       status: 'fail',
       message: 'Error checking SDK installation',
-      details: error.message
+      details: error instanceof Error ? error.message : String(error)
     }
   }
 }
@@ -246,7 +246,7 @@ async function checkNetworkRequirements(): Promise<HealthCheck> {
       name: 'Network Configuration',
       status: 'warn',
       message: 'Network configuration issues detected',
-      details: error.message
+      details: error instanceof Error ? error.message : String(error)
     }
   }
 }

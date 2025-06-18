@@ -15,9 +15,10 @@
   "scripts": {
     "build": "tsup",
     "clean": "rm -rf dist",
-    "test": "node scripts/validate-tests.mjs && vitest",
+    "test": "node scripts/validate-tests.mjs && vitest run",
+    "test:watch": "vitest",
     "test:manual": "vitest test/manual/",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

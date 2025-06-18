@@ -53,7 +53,7 @@ export const signPluginCommand = new Command('sign-plugin')
       }
 
       // Generate signature
-      const expirationDays = parseInt(options.expires || '365', 10)
+      const expirationDays = parseInt(String(options.expires || '365'), 10)
       const signature = await signPlugin(
         pluginPath,
         keyPair.privateKey,
@@ -65,7 +65,7 @@ export const signPluginCommand = new Command('sign-plugin')
       const outputPath = options.output || getDefaultSignaturePath(pluginPath)
       
       // Check if signature file already exists
-      await checkExistingSignature(outputPath, options.force, spinner)
+      await checkExistingSignature(outputPath, options.force || false, spinner)
 
       // Write signature file
       spinner.text = 'Writing signature file...'
@@ -98,7 +98,7 @@ export const signPluginCommand = new Command('sign-plugin')
 /**
  * Validate that plugin file exists and is readable
  */
-async function validatePluginFile(pluginPath: string, spinner: ora.Ora): Promise<void> {
+async function validatePluginFile(pluginPath: string, spinner: ReturnType<typeof ora>): Promise<void> {
   try {
     await access(pluginPath)
     const stats = await stat(pluginPath)
@@ -134,7 +134,7 @@ function getDefaultSignaturePath(pluginPath: string): string {
 async function checkExistingSignature(
   outputPath: string, 
   force: boolean, 
-  spinner: ora.Ora
+  spinner: ReturnType<typeof ora>
 ): Promise<void> {
   try {
     await access(outputPath)

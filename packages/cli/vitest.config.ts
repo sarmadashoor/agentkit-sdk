@@ -12,6 +12,12 @@ export default defineConfig({
     testTimeout: 120000,
     // Timeout for individual hooks
     hookTimeout: 30000,
+    include: [
+      '__tests__/**/*.test.ts',
+      '__tests__/**/*.spec.ts',
+      'test/**/*.test.ts',
+      'test/**/*.spec.ts'
+    ],
     coverage: {
       reporter: ['text', 'html', 'json'],
       exclude: [

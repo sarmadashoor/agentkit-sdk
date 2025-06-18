@@ -2,7 +2,7 @@
  * Validation-specific error classes for AgentKit input validation
  */
 
-import { AgentKitError, AgentKitErrorOptions, ErrorCode, ErrorCategory } from './base'
+import { AgentKitError, AgentKitErrorOptions, ErrorCode } from './base'
 
 /**
  * Base class for all validation-related errors

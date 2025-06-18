@@ -27,7 +27,8 @@
     "build": "tsc -p tsconfig.build.json",
     "build:size-report": "npm run build && npm run size:check",
     "size:check": "echo 'Bundle size analysis:' && echo 'Main bundle (with external deps):' && wc -c dist/index.js dist/BrowserTransport.js && echo 'Lite bundle (self-contained):' && wc -c dist/lite.js dist/BrowserTransportLite.js && echo 'Target: <20KB (20480 bytes)'",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:coverage": "vitest --coverage",
     "test:browser": "playwright test",
     "test:browser:headed": "playwright test --headed",
@@ -35,7 +36,7 @@
     "serve:test": "node tests/test-server.js",
     "validate:browser": "node validate-browser.js",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [

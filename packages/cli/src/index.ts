@@ -107,9 +107,9 @@ async function main() {
     console.log('Run "agentkit --help" for available commands.')
     process.exit(1)
   } catch (error) {
-    console.log(styles.red('❌ Error:'), error.message)
+    console.log(styles.red('❌ Error:'), error instanceof Error ? error.message : String(error))
     if (hasVerbose) {
-      console.log(styles.dim(error.stack))
+      console.log(styles.dim(error instanceof Error ? (error.stack || String(error)) : String(error)))
     }
     process.exit(1)
   }

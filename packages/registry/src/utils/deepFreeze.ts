@@ -9,23 +9,24 @@
  * Handles circular references by tracking visited objects
  * Limited depth to prevent performance issues with very deep objects
  */
-export function deepFreeze<T extends object>(obj: T, visited = new WeakSet(), depth = 0, maxDepth = 10): Readonly<T> {
-  // Avoid infinite recursion with circular references or excessive depth
-  if (visited.has(obj) || depth > maxDepth) {
+export function deepFreeze<T extends object>(obj: T, visited = new WeakSet(), depth = 0, maxDepth = 5): Readonly<T> {
+  // Early bailout for performance
+  if (visited.has(obj) || depth > maxDepth || Object.isFrozen(obj)) {
     return obj as Readonly<T>
   }
   visited.add(obj)
   
-  // Retrieve the property names defined on obj
-  Object.getOwnPropertyNames(obj).forEach(prop => {
-    const value = (obj as Record<string, unknown>)[prop]
-    
-    // Freeze properties that are objects, 
-    // unless they're already frozen
-    if (value && typeof value === 'object' && !Object.isFrozen(value)) {
-      deepFreeze(value, visited, depth + 1, maxDepth)
+  // Use for..in loop for better performance with sparse objects
+  for (const prop in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, prop)) {
+      const value = (obj as Record<string, unknown>)[prop]
+      
+      // Freeze properties that are objects, unless they're already frozen
+      if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+        deepFreeze(value, visited, depth + 1, maxDepth)
+      }
     }
-  })
+  }
   
   // Freeze self
   return Object.freeze(obj)
@@ -35,7 +36,7 @@ export function deepFreeze<T extends object>(obj: T, visited = new WeakSet(), de
  * Create a deep copy of an object with circular reference handling
  * Limited depth to prevent performance issues with very deep objects
  */
-function deepCopy<T>(obj: T, visited = new WeakMap(), depth = 0, maxDepth = 10): T {
+function deepCopy<T>(obj: T, visited = new WeakMap(), depth = 0, maxDepth = 5): T {
   // Handle primitives
   if (obj === null || typeof obj !== 'object') {
     return obj
@@ -46,9 +47,9 @@ function deepCopy<T>(obj: T, visited = new WeakMap(), depth = 0, maxDepth = 10):
     return visited.get(obj as object) || obj
   }
   
-  // Handle arrays
+  // Handle arrays with optimized copying
   if (Array.isArray(obj)) {
-    const copy: unknown[] = []
+    const copy: unknown[] = new Array(obj.length)
     visited.set(obj as object, copy)
     for (let i = 0; i < obj.length; i++) {
       copy[i] = deepCopy(obj[i], visited, depth + 1, maxDepth)
@@ -56,7 +57,7 @@ function deepCopy<T>(obj: T, visited = new WeakMap(), depth = 0, maxDepth = 10):
     return copy as T
   }
   
-  // Handle objects
+  // Handle objects with optimized property copying
   const copy: Record<string, unknown> = {}
   visited.set(obj as object, copy)
   
@@ -83,21 +84,23 @@ export function createFrozenCopy<T extends object>(obj: T): Readonly<T> {
  * Check if an object is deeply frozen
  * Limited depth check to prevent performance issues
  */
-export function isDeeplyFrozen(obj: unknown, depth = 0, maxDepth = 5): boolean {
+export function isDeeplyFrozen(obj: unknown, depth = 0, maxDepth = 3): boolean {
   if (typeof obj !== 'object' || obj === null || !Object.isFrozen(obj)) {
     return false
   }
   
-  // Limit depth check for performance
+  // Limit depth check for performance - assume frozen at deep levels
   if (depth > maxDepth) {
-    return true // Assume frozen at deep levels
+    return true
   }
   
-  // Check all properties recursively
-  for (const prop of Object.getOwnPropertyNames(obj)) {
-    const value = (obj as Record<string, unknown>)[prop]
-    if (value && typeof value === 'object' && !isDeeplyFrozen(value, depth + 1, maxDepth)) {
-      return false
+  // Use for..in for better performance
+  for (const prop in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, prop)) {
+      const value = (obj as Record<string, unknown>)[prop]
+      if (value && typeof value === 'object' && !isDeeplyFrozen(value, depth + 1, maxDepth)) {
+        return false
+      }
     }
   }
   

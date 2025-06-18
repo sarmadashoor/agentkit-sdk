@@ -125,7 +125,9 @@ export class HttpError extends TransportError {
    */
   isRetryable(): boolean {
     // Retry on server errors and specific client errors
-    if (this.isServerError()) return true
+    if (this.isServerError()) {
+      return true
+    }
     
     // Retry on specific 4xx codes
     const retryable4xx = [408, 429] // Request Timeout, Too Many Requests

@@ -31,3 +31,12 @@ const helloWorldPlugin: AgentKitPlugin = {
 
 export default helloWorldPlugin"
 `;
+
+exports[`CLI Scaffolding Validation > File Tree Snapshot > should match golden scaffold snapshot > plugin-scaffold-file-tree 1`] = `
+{
+  "README.md": "file",
+  "index.ts": "file",
+  "package.json": "file",
+  "plugin.json": "file",
+}
+`;

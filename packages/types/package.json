@@ -15,15 +15,16 @@
   "scripts": {
     "build": "tsup",
     "clean": "rm -rf dist",
-    "test": "vitest",
-    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@agentkit/errors": "*",
+    "@agentkit/errors": "workspace:*",
     "@types/node": "^20.11.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3",

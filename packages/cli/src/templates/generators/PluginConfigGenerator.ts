@@ -67,12 +67,12 @@ export class PluginConfigGenerator {
       author: config.author,
       license: config.license,
       peerDependencies: {
-        '@agentkit/types': '^0.1.0',
-        '@agentkit/sdk': '^0.1.0'
+        '@agentkit/types': '^0.1.0-alpha',
+        '@agentkit/sdk': '^0.1.0-alpha'
       },
       devDependencies: {
-        '@agentkit/types': 'workspace:*',
-        '@agentkit/sdk': 'workspace:*',
+        '@agentkit/types': '^0.1.0-alpha',
+        '@agentkit/sdk': '^0.1.0-alpha',
         '@types/node': '^20.10.4',
         '@typescript-eslint/eslint-plugin': '^6.13.2',
         '@typescript-eslint/parser': '^6.13.2',

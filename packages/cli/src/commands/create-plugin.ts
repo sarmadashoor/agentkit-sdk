@@ -47,7 +47,7 @@ export const createPluginCommand = new Command('create-plugin')
       showNextSteps(config.name)
       
     } catch (error) {
-      console.error(chalk.red('\n❌ Error creating plugin:'), error.message)
+      console.error(chalk.red('\n❌ Error creating plugin:'), error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
   })

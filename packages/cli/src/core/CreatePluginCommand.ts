@@ -14,7 +14,26 @@ export class CreatePluginCommand {
   }
 
   async execute(config: PluginConfig): Promise<void> {
+    // Validate plugin name
+    if (!config.name || !/^[a-z][a-z0-9-]*$/.test(config.name)) {
+      throw new Error(`Invalid plugin name: ${config.name}. Must be lowercase, start with a letter, and contain only letters, numbers, and hyphens.`)
+    }
+
+    // Validate hooks
+    const validHooks = ['onInit', 'onSend', 'onReceive', 'onError', 'onShutdown']
+    for (const hook of config.hooks) {
+      if (!validHooks.includes(hook)) {
+        throw new Error(`Invalid hook name: ${hook}. Valid hooks are: ${validHooks.join(', ')}`)
+      }
+    }
+
     const pluginDir = path.join(process.cwd(), 'plugins', config.name)
+
+    // Check if plugin already exists
+    if (await fs.pathExists(pluginDir)) {
+      console.warn(`Plugin directory ${pluginDir} already exists`)
+      throw new Error(`Plugin directory already exists: ${pluginDir}`)
+    }
 
     // Create plugin directory
     await fs.ensureDir(pluginDir)
@@ -34,7 +53,7 @@ export class CreatePluginCommand {
 
   private async generatePluginFiles(pluginDir: string, config: PluginConfig): Promise<void> {
     // Choose template based on debug/DX features
-    const useEnhanced = config.withDebug || config.withHotReload || config.withPerformance || config.template === 'enhanced' || config.template === 'advanced' || config.template === 'debug' || config.template === 'performance'
+    const useEnhanced = config.withDebug || config.withHotReload || config.withPerformance || config.template === 'advanced' || config.template === 'debug' || config.template === 'performance'
     const activeTemplate = useEnhanced ? this.enhancedTemplate : this.template
     
     // Main plugin file
@@ -57,7 +76,7 @@ export class CreatePluginCommand {
   }
 
   private async generateTestFiles(pluginDir: string, config: PluginConfig): Promise<void> {
-    if (!config.withTests) return
+    if (!config.withTests) {return}
 
     // Unit tests
     const testCode = this.template.generateTests(config)
@@ -130,7 +149,7 @@ export class CreatePluginCommand {
   private async initializeGit(pluginDir: string): Promise<void> {
     // Check if we're already in a git repo
     const isGitRepo = await fs.pathExists(path.join(pluginDir, '.git'))
-    if (isGitRepo) return
+    if (isGitRepo) {return}
 
     // Initialize git in plugin directory
     const { execSync } = require('child_process')

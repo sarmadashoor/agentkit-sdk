@@ -89,7 +89,7 @@ export async function runCreatePluginCommand(args: string[], options: CreatePlug
     console.log(styles.green('📖 Check README.md for usage instructions\n'))
     
   } catch (error) {
-    console.log(styles.red('❌ Error creating plugin:'), error.message)
+    console.log(styles.red('❌ Error creating plugin:'), error instanceof Error ? error.message : String(error))
     process.exit(1)
   }
 }

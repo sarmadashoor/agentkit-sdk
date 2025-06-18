@@ -7,15 +7,21 @@
     "agentkit": "./bin/agentkit.js"
   },
   "dependencies": {
+    "@inquirer/prompts": "7.5.3",
     "chalk": "^4.1.2",
+    "commander": "14.0.0",
     "fs-extra": "^11.2.0",
+    "ora": "8.2.0",
     "path": "^0.12.7",
-    "readline-sync": "^1.4.10"
+    "readline-sync": "^1.4.10",
+    "validate-npm-package-name": "6.0.1"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
+    "@types/mock-fs": "4.13.4",
     "@types/node": "^20.10.4",
     "@types/readline-sync": "^1.4.4",
+    "mock-fs": "5.5.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3",
     "vitest": "^1.6.1"
@@ -24,8 +30,9 @@
     "build": "tsup && cp dist/index-standalone.js bin/agentkit.js && chmod +x bin/agentkit.js",
     "dev": "npm run build",
     "pretest": "npm run build",
-    "test": "vitest",
-    "lint": "eslint . --ext .ts,.tsx",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
   },

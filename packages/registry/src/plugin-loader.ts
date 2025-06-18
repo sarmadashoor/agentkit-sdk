@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { watch } from 'chokidar'
+import { watch, type FSWatcher } from 'chokidar'
 import type { AgentKitPlugin } from '@agentkit/types'
 
 /**
@@ -8,7 +8,7 @@ import type { AgentKitPlugin } from '@agentkit/types'
  */
 export class PluginLoader {
   private plugins: Map<string, AgentKitPlugin> = new Map()
-  private watcher?: any
+  private watcher?: FSWatcher
   private pluginsDir: string
 
   constructor(pluginsDir: string = path.join(process.cwd(), 'plugins')) {
@@ -27,7 +27,7 @@ export class PluginLoader {
 
     // Watch for new plugins
     this.watcher = watch(this.pluginsDir, {
-      ignored: /(^|[\/\\])\../, // ignore dotfiles
+      ignored: /(^|[/\\])\../, // ignore dotfiles
       persistent: true,
       depth: 1
     })
@@ -128,14 +128,14 @@ export class PluginLoader {
   /**
    * Called when a new plugin is discovered
    */
-  protected onPluginDiscovered(name: string, metadata: any): void {
+  protected onPluginDiscovered(_name: string, _metadata: unknown): void {
     // Override in subclasses or emit events
   }
 
   /**
    * Called when a plugin is removed
    */
-  protected onPluginRemoved(name: string): void {
+  protected onPluginRemoved(_name: string): void {
     // Override in subclasses or emit events
   }
 

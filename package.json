@@ -2,8 +2,14 @@
   "name": "agentkit-sdk",
   "version": "0.1.0-alpha",
   "private": true,
+  "type": "module",
   "description": "Modular, secure, agent-agnostic TypeScript SDK for managing AI agents inside host applications",
-  "keywords": ["ai", "agents", "sdk", "typescript"],
+  "keywords": [
+    "ai",
+    "agents",
+    "sdk",
+    "typescript"
+  ],
   "license": "MIT",
   "workspaces": [
     "packages/*"
@@ -37,7 +43,13 @@
     "madge:all": "pnpm analyze:deps"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
+    "@eslint/js": "^8.56.0",
+    "@types/fs-extra": "^11.0.4",
+    "@types/glob": "8.1.0",
+    "@types/inquirer": "9.0.8",
+    "@types/node": "^20.19.0",
+    "@types/ora": "3.2.0",
+    "@types/validate-npm-package-name": "4.0.2",
     "@typescript-eslint/eslint-plugin": "^6.18.1",
     "@typescript-eslint/parser": "^6.18.1",
     "eslint": "^8.56.0",

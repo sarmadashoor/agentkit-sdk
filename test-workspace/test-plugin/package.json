@@ -5,7 +5,9 @@
   "main": "index.ts",
   "scripts": {
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",

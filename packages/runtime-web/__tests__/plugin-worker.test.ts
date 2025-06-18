@@ -608,7 +608,7 @@ describe('WebWorker Plugin Isolation', () => {
 
   describe('Worker Pool', () => {
     it('should manage multiple plugins in pool', async () => {
-      const { PluginWorkerPool } = await import('../worker/PluginWorkerHost')
+      const { PluginWorkerPool } = await import('../src/worker/PluginWorkerHost')
       
       const pool = new PluginWorkerPool()
       
