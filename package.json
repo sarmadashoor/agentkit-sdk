@@ -20,6 +20,7 @@
     "test:node": "pnpm -r --parallel --filter='!@agentkit/runtime-web' run test",
     "test:browser": "pnpm --filter @agentkit/runtime-web run test",
     "test:all": "pnpm test",
+    "test:integration": "pnpm -C packages/sdk run test:integration",
     "clean": "pnpm -r --parallel run clean",
     "lint": "pnpm -r --parallel run lint",
     "typecheck": "pnpm -r --parallel run typecheck",

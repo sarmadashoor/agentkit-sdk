@@ -18,6 +18,7 @@
     "test": "node scripts/validate-tests.mjs && vitest run",
     "test:watch": "vitest",
     "test:manual": "vitest test/manual/",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
