@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Simple wrapper for dev commands
+exec npx tsx scripts/dev.ts "$@"

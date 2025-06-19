@@ -164,6 +164,45 @@ export class SecurePluginManager {
   }
 
   /**
+   * Serialize a function to ensure proper syntax
+   */
+  private serializeFunction(fn: Function): string {
+    const fnString = fn.toString()
+    
+    // Check if it's a method definition (e.g., "methodName() { ... }")
+    if (/^\w+\s*\(/.test(fnString)) {
+      // Convert method to function expression
+      const match = fnString.match(/^(\w+)\s*(\(.+)/)
+      if (match) {
+        return `function${match[2]}`
+      }
+    }
+    
+    // Check if it's an arrow function and convert to regular function
+    if (fnString.includes('=>')) {
+      const arrowIndex = fnString.indexOf('=>')
+      const paramsStr = fnString.substring(0, arrowIndex).trim()
+      const bodyStr = fnString.substring(arrowIndex + 2).trim()
+      
+      // Clean up parameter list (remove outer parentheses if present)
+      const cleanParams = paramsStr.startsWith('(') && paramsStr.endsWith(')') 
+        ? paramsStr.slice(1, -1) 
+        : paramsStr
+        
+      if (bodyStr.startsWith('{')) {
+        // Block arrow function: args => { ... }
+        return `function(${cleanParams}) ${bodyStr}`
+      } else {
+        // Expression arrow function: args => expr
+        return `function(${cleanParams}) { return ${bodyStr}; }`
+      }
+    }
+    
+    // Return as-is if it's already a proper function expression
+    return fnString
+  }
+
+  /**
    * Serialize plugin code for sandbox execution
    */
   private serializePlugin(plugin: AgentKitPlugin): string {
@@ -180,16 +219,16 @@ export class SecurePluginManager {
       
       // Add hook functions
       if (plugin.onInit) {
-        parts.push(`onInit: ${plugin.onInit.toString()},`)
+        parts.push(`onInit: ${this.serializeFunction(plugin.onInit)},`)
       }
       if (plugin.onSend) {
-        parts.push(`onSend: ${plugin.onSend.toString()},`)
+        parts.push(`onSend: ${this.serializeFunction(plugin.onSend)},`)
       }
       if (plugin.onError) {
-        parts.push(`onError: ${plugin.onError.toString()},`)
+        parts.push(`onError: ${this.serializeFunction(plugin.onError)},`)
       }
       if (plugin.onShutdown) {
-        parts.push(`onShutdown: ${plugin.onShutdown.toString()},`)
+        parts.push(`onShutdown: ${this.serializeFunction(plugin.onShutdown)},`)
       }
       
       parts.push('}')

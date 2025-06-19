@@ -285,7 +285,7 @@ export class AgentManager {
       onError: options.onError,
       onCleanup: options.onCleanup,
       onPluginHook: (hookName: string, ...args: any[]) => 
-        this.pluginRunner.callPluginHook(hookName as any, args[0], args[1]),
+        this.pluginRunner.callPluginHook(hookName as any, ...args),
       onExposeTimeline: () => this.observability.exposeTimelineGlobally()
     }
 
@@ -311,7 +311,7 @@ export class AgentManager {
     // Initialize sandboxed executor
     const executorCallbacks: ExecutorCallbacks = {
       onPluginHook: (hookName: string, ...args: any[]) => 
-        this.pluginRunner.callPluginHook(hookName as any, args[0], args[1]),
+        this.pluginRunner.callPluginHook(hookName as any, ...args),
       onError: (error: Error) => options.onError?.(error),
       onOutput: options.onOutput
     }

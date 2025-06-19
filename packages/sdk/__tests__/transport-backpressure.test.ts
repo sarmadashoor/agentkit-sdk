@@ -17,7 +17,8 @@ describe('Transport Backpressure API', () => {
       const transport = new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 2,
-        debug: true
+        debug: true,
+        responseDelay: 100 // Increase delay to keep messages in queue longer
       })
 
       // Disable backpressure queue to get immediate errors
@@ -27,11 +28,16 @@ describe('Transport Backpressure API', () => {
       }, [], 'backpressure-test')
       await manager.initialize()
 
-      await manager.send({ msg: 1 })
-      await manager.send({ msg: 2 })
+      // Send messages without awaiting to fill the queue
+      const promise1 = manager.send({ msg: 1 })
+      const promise2 = manager.send({ msg: 2 })
 
       // The error is wrapped by TransportSendError
       await expect(manager.send({ msg: 3 })).rejects.toThrow('failed to send output')
+
+      // Wait for the first two messages to complete
+      await promise1
+      await promise2
 
       await manager.shutdown()
     })
@@ -58,7 +64,9 @@ describe('Transport Backpressure API', () => {
     it('should provide accurate queue size information', async () => {
       const transport = new DummyTransport({
         enableBackpressure: true,
-        maxQueueSize: 5
+        maxQueueSize: 5,
+        responseDelay: 50, // Increase delay to keep messages in queue for testing
+        logMessages: true
       })
 
       manager = new AgentManager(agent, transport, { debug: true }, [], 'queue-size-test')
@@ -84,7 +92,9 @@ describe('Transport Backpressure API', () => {
     it('should provide complete transport status', async () => {
       const transport = new DummyTransport({
         enableBackpressure: true,
-        maxQueueSize: 10
+        maxQueueSize: 10,
+        logMessages: true,
+        responseDelay: 5
       })
 
       manager = new AgentManager(agent, transport, { debug: true }, [], 'status-test')
@@ -105,7 +115,9 @@ describe('Transport Backpressure API', () => {
     it('should report unhealthy status when transport is not initialized', async () => {
       const transport = new DummyTransport({
         enableBackpressure: true,
-        maxQueueSize: 10
+        maxQueueSize: 10,
+        logMessages: true,
+        responseDelay: 5
       })
 
       manager = new AgentManager(agent, transport, { debug: true }, [], 'unhealthy-test')
@@ -147,7 +159,8 @@ describe('Transport Backpressure API', () => {
       const transport = new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 3,
-        responseDelay: 50
+        responseDelay: 50,
+        logMessages: true
       })
 
       manager = new AgentManager(
@@ -191,7 +204,8 @@ describe('Transport Backpressure API', () => {
       const transport = new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 1,
-        responseDelay: 100 // Increased delay to ensure messages process slower
+        responseDelay: 100, // Increased delay to ensure messages process slower
+        logMessages: true
       })
 
       // Use default settings with backpressure queue enabled
@@ -231,7 +245,8 @@ describe('Transport Backpressure API', () => {
       const transport = new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 2,
-        responseDelay: 10
+        responseDelay: 100, // Increase delay to keep messages in queue
+        logMessages: true
       })
 
       // Disable backpressure queue to test immediate transport backpressure
@@ -241,12 +256,16 @@ describe('Transport Backpressure API', () => {
       }, [], 'recovery-test')
       await manager.initialize()
 
-      // Send messages to fill the queue
-      await manager.send({ msg: 1 })
-      await manager.send({ msg: 2 })
+      // Send messages to fill the queue without awaiting to keep them in processing queue
+      const promise1 = manager.send({ msg: 1 })
+      const promise2 = manager.send({ msg: 2 })
       
       // Queue should be full, trying to send another should fail
       await expect(manager.send({ msg: 3 })).rejects.toThrow('failed to send output')
+      
+      // Wait for the first two messages to complete
+      await promise1
+      await promise2
 
       // Basic check that status is reported
       const status = manager.getTransportStatus()
@@ -260,7 +279,8 @@ describe('Transport Backpressure API', () => {
       const transport = new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 5,
-        responseDelay: 5
+        responseDelay: 5,
+        logMessages: true
       })
 
       manager = new AgentManager(agent, transport, { debug: true }, [], 'realtime-test')

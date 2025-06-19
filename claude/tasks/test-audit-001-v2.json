@@ -1,7 +1,0 @@
-{
-  "id": "test-audit-001-snapshot-integration-v2",
-  "type": "run-command",
-  "cmd": "pnpm test",
-  "timeout": 120000,
-  "description": "Test audit: Run all tests to check project health first"
-}

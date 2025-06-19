@@ -6,6 +6,7 @@
 
 import { writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
+import { spawn, ChildProcess } from 'child_process'
 
 /**
  * Generate a timestamp string suitable for filenames
@@ -208,6 +209,50 @@ export function parseCommandOutput(output: string): {
  */
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/**
+ * Kill a process with optional force
+ * @param process Child process to kill
+ * @param options Kill options
+ */
+export function killProcess(process: ChildProcess, options: { force?: boolean } = {}): void {
+  if (!process.pid) return;
+  
+  try {
+    if (options.force) {
+      process.kill('SIGKILL');
+    } else {
+      process.kill('SIGTERM');
+    }
+  } catch (error) {
+    log(`Failed to kill process ${process.pid}: ${error}`, 'warn');
+  }
+}
+
+/**
+ * Safely spawn a child process with argument parsing
+ * @param cmd Command string to execute
+ * @param args Additional spawn options
+ * @returns Spawned child process
+ */
+export function safeSpawn(cmd: string, options: any = {}): ChildProcess {
+  // Parse command and arguments more safely
+  const parts = cmd.trim().split(/\s+/);
+  const command = parts[0];
+  const args = parts.slice(1);
+  
+  return spawn(command, args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: false, // Security: avoid shell injection
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      NODE_ENV: 'development',
+      CI: 'false'
+    },
+    ...options
+  });
 }
 
 /**

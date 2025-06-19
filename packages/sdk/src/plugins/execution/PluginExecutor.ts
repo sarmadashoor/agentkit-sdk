@@ -364,21 +364,41 @@ export class PluginExecutor {
   private prepareFunctionSource(hookSource: string): string {
     let functionBody = hookSource
     
-    // Handle different function formats
-    if (hookSource.includes('=>')) {
-      // Arrow function - need to handle differently
-      if (hookSource.includes('{')) {
-        // Block arrow function: args => { ... }
-        const arrowIndex = hookSource.indexOf('=>')
-        const paramsStr = hookSource.substring(0, arrowIndex).trim()
-        const bodyStr = hookSource.substring(arrowIndex + 2).trim()
-        functionBody = `function ${paramsStr} ${bodyStr}`
-      } else {
-        // Expression arrow function: args => expr
-        const arrowIndex = hookSource.indexOf('=>')
-        const paramsStr = hookSource.substring(0, arrowIndex).trim()
-        const exprStr = hookSource.substring(arrowIndex + 2).trim()
-        functionBody = `function ${paramsStr} { return ${exprStr}; }`
+    // Handle method definitions like "onInit(params) { ... }"
+    const methodMatch = hookSource.match(/^(\w+)\s*\(([^)]*)\)\s*:\s*\w+\s*\{([\s\S]*)\}$/)
+    if (methodMatch) {
+      // TypeScript method with type annotation: onInit(context: AgentContext): void { ... }
+      const [, methodName, params, body] = methodMatch
+      functionBody = `function(${params}) {${body}}`
+    } else {
+      // Check for simple method without type annotation: onInit(params) { ... }
+      const simpleMethodMatch = hookSource.match(/^(\w+)\s*\(([^)]*)\)\s*\{([\s\S]*)\}$/)
+      if (simpleMethodMatch) {
+        const [, methodName, params, body] = simpleMethodMatch
+        functionBody = `function(${params}) {${body}}`
+      } else if (hookSource.includes('=>')) {
+        // Handle arrow functions
+        if (hookSource.includes('{')) {
+          // Block arrow function: args => { ... }
+          const arrowIndex = hookSource.indexOf('=>')
+          const paramsStr = hookSource.substring(0, arrowIndex).trim()
+          const bodyStr = hookSource.substring(arrowIndex + 2).trim()
+          // Clean up parameter list (remove outer parentheses if present)
+          const cleanParams = paramsStr.startsWith('(') && paramsStr.endsWith(')') 
+            ? paramsStr.slice(1, -1) 
+            : paramsStr
+          functionBody = `function(${cleanParams}) ${bodyStr}`
+        } else {
+          // Expression arrow function: args => expr
+          const arrowIndex = hookSource.indexOf('=>')
+          const paramsStr = hookSource.substring(0, arrowIndex).trim()
+          const exprStr = hookSource.substring(arrowIndex + 2).trim()
+          // Clean up parameter list (remove outer parentheses if present)
+          const cleanParams = paramsStr.startsWith('(') && paramsStr.endsWith(')') 
+            ? paramsStr.slice(1, -1) 
+            : paramsStr
+          functionBody = `function(${cleanParams}) { return ${exprStr}; }`
+        }
       }
     }
     

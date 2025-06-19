@@ -155,10 +155,16 @@ describe('CircuitBreaker', () => {
       mockFn.mockRejectedValue(error)
       
       // Execute twice to open circuit
-      await Promise.allSettled([
-        circuitBreaker.execute(mockFn),
-        circuitBreaker.execute(mockFn)
-      ])
+      try {
+        await circuitBreaker.execute(mockFn)
+      } catch {
+        // Expected failure
+      }
+      try {
+        await circuitBreaker.execute(mockFn)
+      } catch {
+        // Expected failure that should open circuit
+      }
       
       // Clear the mock call history after setup
       mockFn.mockClear()
@@ -180,8 +186,8 @@ describe('CircuitBreaker', () => {
         const cbError = error as CircuitBreakerError
         expect(cbError.code).toBe('CIRCUIT_BREAKER_OPEN')
         expect(cbError.category).toBe('resource')
-        expect(cbError.state).toBe(CircuitState.OPEN)
-        expect(cbError.stats.nextAttemptAt).toBeDefined()
+        expect(cbError.context?.stats?.state).toBe(CircuitState.OPEN)
+        expect(cbError.context?.nextAttemptAt).toBeDefined()
       }
     })
 
@@ -218,10 +224,16 @@ describe('CircuitBreaker', () => {
       // Open the circuit
       const error = new Error('test error')
       mockFn.mockRejectedValue(error)
-      await Promise.allSettled([
-        circuitBreaker.execute(mockFn),
-        circuitBreaker.execute(mockFn)
-      ])
+      try {
+        await circuitBreaker.execute(mockFn)
+      } catch {
+        // Expected failure
+      }
+      try {
+        await circuitBreaker.execute(mockFn)
+      } catch {
+        // Expected failure that should open circuit
+      }
       
       // Advance time to trigger half-open transition
       vi.advanceTimersByTime(31000)
@@ -265,15 +277,21 @@ describe('CircuitBreaker', () => {
       // Open the circuit
       const error = new Error('test error')
       mockFn.mockRejectedValue(error)
-      await Promise.allSettled([
-        circuitBreaker.execute(mockFn),
-        circuitBreaker.execute(mockFn)
-      ])
+      try {
+        await circuitBreaker.execute(mockFn)
+      } catch {
+        // Expected failure
+      }
+      try {
+        await circuitBreaker.execute(mockFn)
+      } catch {
+        // Expected failure that should open circuit
+      }
       
       expect(circuitBreaker.getStats().state).toBe(CircuitState.OPEN)
       
       // Manual reset
-      circuitBreaker.reset()
+      await circuitBreaker.reset()
       
       const stats = circuitBreaker.getStats()
       expect(stats.state).toBe(CircuitState.CLOSED)
@@ -282,10 +300,10 @@ describe('CircuitBreaker', () => {
       expect(stats.openedAt).toBeUndefined()
     })
 
-    it('should allow manual force open', () => {
+    it('should allow manual force open', async () => {
       expect(circuitBreaker.getStats().state).toBe(CircuitState.CLOSED)
       
-      circuitBreaker.forceOpen()
+      await circuitBreaker.forceOpen()
       
       const stats = circuitBreaker.getStats()
       expect(stats.state).toBe(CircuitState.OPEN)
@@ -339,11 +357,21 @@ describe('CircuitBreaker', () => {
       // Open the circuit
       const error = new Error('test error')
       mockFn.mockRejectedValue(error)
-      await Promise.allSettled([
-        circuitBreaker.execute(mockFn),
-        circuitBreaker.execute(mockFn),
-        circuitBreaker.execute(mockFn)
-      ])
+      try {
+        await circuitBreaker.execute(mockFn)
+      } catch {
+        // Expected failure
+      }
+      try {
+        await circuitBreaker.execute(mockFn)
+      } catch {
+        // Expected failure
+      }
+      try {
+        await circuitBreaker.execute(mockFn)
+      } catch {
+        // Expected failure that should open circuit
+      }
       
       const stats = circuitBreaker.getStats()
       expect(stats.state).toBe(CircuitState.OPEN)

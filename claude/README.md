@@ -1,394 +1,246 @@
-# Claude Automation Runner
+# Claude Autonomous Test Daemon
 
-A self-contained automation system for executing shell commands and monitoring results within the AgentKit SDK monorepo.
-
-## Overview
-
-The Claude Automation Runner enables autonomous task execution through a file-based task queue system. Tasks are defined as JSON files, executed by a daemon process, and results are captured comprehensively for analysis.
+A fully autonomous and observably reliable test runner for the AgentKit SDK. This refactored daemon system executes test tasks one at a time, with comprehensive timeout handling, structured output, and Claude-compatible result parsing.
 
 ## Architecture
 
 ```
 claude/
-├── daemon.ts              # Main daemon process - monitors and executes tasks
-├── taskRunner.ts          # Command execution engine with security controls
-├── utils.ts               # Utility functions for logging, timestamps, file ops
-├── tasks/                 # Task queue directory (monitored by daemon)
-│   ├── sample-test-task.json
-│   └── lint-task.json
-├── results/               # Execution results directory
-│   ├── .gitkeep
-│   └── task-{id}-{timestamp}.json  # Generated results
-└── README.md             # This documentation
+├── daemon.ts              # Main daemon - monitors /tasks, runs taskRunner
+├── taskRunner.ts          # Subprocess execution with timeout handling  
+├── schema.ts              # TypeScript definitions for tasks and results
+├── utils.ts               # File system and process utilities
+├── tasks/                 # Input: JSON task files
+│   └── *.json
+└── results/               # Output: structured results
+    ├── *.status.json      # Structured metadata per task
+    └── *.log              # Full stdout/stderr per task
 ```
 
-## Quick Start
+## Key Features
 
-### 1. Start the Daemon
+- **Sequential Execution**: One task at a time, no concurrency issues
+- **Timeout Handling**: Graceful SIGTERM → Force SIGKILL sequence  
+- **Structured Output**: Separate `.status.json` + `.log` files per task
+- **Security Filtered**: Only allows safe test-related commands
+- **Claude Compatible**: Results designed for easy parsing and analysis
+- **Self-Diagnosing**: Comprehensive logging and error handling
+
+## Usage
+
+### Starting the Daemon
 
 ```bash
-# From the project root
-cd claude/
-npx tsx daemon.ts
+# Start the daemon
+npx tsx claude/daemon.ts
+
+# Or using Node.js directly
+node claude/daemon.js
 ```
 
 The daemon will:
-- Monitor the `tasks/` directory for new `.json` files
-- Execute commands when tasks appear
-- Write results to `results/` directory  
-- Remove completed tasks automatically
+1. Monitor `claude/tasks/` for new `.json` files
+2. Process existing tasks first, then watch for new ones
+3. Execute tasks sequentially (one at a time)
+4. Write results to `claude/results/`
+5. Clean up processed task files
 
-### 2. Create a Task
+### Creating Tasks
 
 Create a JSON file in `claude/tasks/`:
 
 ```json
 {
-  "id": "my-task-001",
+  "id": "test-07-bounded-executor",
   "type": "run-command", 
-  "cmd": "pnpm test",
-  "timeout": 120000,
-  "description": "Run tests to validate changes"
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts -t \"should work together with bounded executor limits\"",
+  "description": "Runs one test case from the backpressure suite",
+  "timeout": 60000
 }
 ```
 
-### 3. Monitor Results
-
-Results appear in `claude/results/` as JSON files:
-
-```json
-{
-  "taskId": "my-task-001",
-  "cmd": "pnpm test",
-  "startTime": "2024-01-15T10:30:00.000Z",
-  "endTime": "2024-01-15T10:31:45.123Z", 
-  "duration": 105123,
-  "stdout": "✓ All tests passed...",
-  "stderr": "",
-  "exitCode": 0,
-  "success": true,
-  "timestamp": "20240115-103145-123"
-}
-```
-
-## Task Format
-
-### Required Fields
-
+**Task Schema:**
 - `id`: Unique identifier for the task
-- `type`: Must be `"run-command"` 
+- `type`: Must be "run-command"  
 - `cmd`: Shell command to execute
+- `timeout`: Optional timeout in milliseconds (default: 60000)
+- `description`: Optional human-readable description
 
-### Optional Fields
+### Reading Results
 
-- `timeout`: Maximum execution time in milliseconds (default: 60000)
-- `description`: Human-readable description of the task
+After task execution, two files are created:
 
-### Example Tasks
-
-**Run Tests:**
+**`{taskId}.status.json`** - Structured metadata:
 ```json
 {
-  "id": "test-all",
-  "type": "run-command",
-  "cmd": "pnpm test",
-  "timeout": 180000,
-  "description": "Execute full test suite"
+  "id": "test-07-bounded-executor",
+  "cmd": "pnpm test ...",
+  "startTime": "2025-06-18T06:10:12.345Z", 
+  "durationMs": 5310,
+  "exitCode": 1,
+  "status": "fail",
+  "error": "Test runner crashed with ENOMEM"
 }
 ```
 
-**Type Check:**
-```json
-{
-  "id": "typecheck",
-  "type": "run-command", 
-  "cmd": "pnpm typecheck",
-  "timeout": 60000,
-  "description": "Validate TypeScript types across packages"
-}
+**`{taskId}.log`** - Full execution log:
+```
+=== Task Execution Log ===
+Task ID: test-07-bounded-executor
+Command: pnpm test ...
+Start Time: 2025-06-18T06:10:12.345Z
+Duration: 5310ms
+Exit Code: 1  
+Status: fail
+Error: Process exited with code 1
+
+=== STDOUT ===
+ RUN  v1.6.1 /home/user/agentkit-sdk/packages/sdk
+...
+
+=== STDERR ===
+Error: Test failed
+...
 ```
 
-**Build All Packages:**
-```json
-{
-  "id": "build-all",
-  "type": "run-command",
-  "cmd": "pnpm build", 
-  "timeout": 120000,
-  "description": "Build all packages in dependency order"
-}
-```
+### Status Values
 
-## Security Features
+- `pass`: Command succeeded (exit code 0)
+- `fail`: Command failed (non-zero exit code)  
+- `timeout`: Command exceeded timeout limit
+- `error`: Command failed to execute or system error
 
-### Command Filtering
+## Security
 
-Only safe commands are allowed. The daemon blocks:
+The daemon includes comprehensive command filtering:
 
-- File deletion (`rm -rf`)
-- Privilege escalation (`sudo`)
-- Package installation (`npm install`, `pnpm install`)
-- Pipe to shell (`curl | sh`)
-- Disk operations (`dd`, `fdisk`)
-- Network downloads (`wget`, `curl`)
+**Blocked Commands:**
+- `rm -rf`, `sudo`, `chmod +x`
+- Package installations (`npm install`, etc.)
+- System operations (`mount`, `fdisk`, etc.)
+- Shell injections (`curl | sh`, etc.)
 
-### Allowed Commands
+**Allowed Commands:**
+- Test runners (`pnpm test`, `vitest`, `dev test`)
+- Development tools (`tsx`, `node`)
+- Safe utilities (`echo`, `ls`, `grep`, etc.)
 
-Safe commands include:
-- `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm build`
-- `npm test`, `npm run <script>`
-- File inspection: `ls`, `cat`, `head`, `tail`, `grep`
-- Basic utilities: `echo`, `pwd`, `wc`
+## Testing the System
 
-### Execution Environment
-
-- No shell injection (commands parsed safely)
-- Timeout protection prevents hanging processes
-- Process isolation with controlled environment variables
-- Automatic cleanup of resources
-
-## Result Analysis
-
-### Success Indicators
-
-```javascript
-// Check if task succeeded
-const result = JSON.parse(fs.readFileSync('results/task-001-20240115-103145-123.json'))
-if (result.success && result.exitCode === 0) {
-  console.log('Task completed successfully')
-}
-```
-
-### Error Analysis
-
-```javascript
-// Analyze failures
-if (!result.success) {
-  console.log(`Command failed with exit code: ${result.exitCode}`)
-  console.log(`Error output: ${result.stderr}`)
-  
-  if (result.timedOut) {
-    console.log(`Task timed out after ${result.duration}ms`)
-  }
-}
-```
-
-### Output Parsing
-
-```javascript
-// Parse command output
-const lines = result.stdout.split('\n')
-const errors = lines.filter(line => line.includes('ERROR'))
-const warnings = lines.filter(line => line.includes('WARN'))
-
-console.log(`Found ${errors.length} errors and ${warnings.length} warnings`)
-```
-
-## Daemon Management
-
-### Starting the Daemon
+Run the included test script:
 
 ```bash
-# Foreground (with logs)
-npx tsx daemon.ts
-
-# Background (production)
-nohup npx tsx daemon.ts > claude-daemon.log 2>&1 &
+npx tsx claude/test-daemon.ts
 ```
 
-### Stopping the Daemon
+This creates a simple echo task and verifies the daemon processes it correctly.
 
-```bash
-# Graceful shutdown
-kill -SIGTERM <daemon-pid>
+## Integration with Claude
 
-# Force stop
-kill -SIGKILL <daemon-pid>
-```
+The structured output format is designed for easy parsing by Claude or other automation tools:
 
-### Daemon Logs
+```typescript
+import { readFileSync } from 'fs';
 
-The daemon provides structured logging:
+// Read task result
+const result = JSON.parse(readFileSync('claude/results/my-task.status.json', 'utf-8'));
 
-```
-[2024-01-15T10:30:00.000Z] 🤖 Claude Daemon started - monitoring tasks directory...
-[2024-01-15T10:30:00.001Z] 📁 Tasks: /path/to/claude/tasks
-[2024-01-15T10:30:00.002Z] 📊 Results: /path/to/claude/results
-[2024-01-15T10:31:00.000Z] 🔄 Processing task: /path/to/claude/tasks/test-task.json
-[2024-01-15T10:31:00.001Z] ▶️  Executing: pnpm test
-[2024-01-15T10:32:45.123Z] ✅ Task test-task completed successfully (105122ms)
+if (result.status === 'fail') {
+  // Read full logs for debugging
+  const logs = readFileSync('claude/results/my-task.log', 'utf-8');
+  console.log('Task failed, analyzing logs...', logs);
+}
 ```
 
 ## Advanced Usage
 
-### Batch Task Execution
+### Batch Task Creation
 
-Create multiple tasks for sequential execution:
+Create multiple tasks programmatically:
 
-```bash
-# Create multiple tasks
-echo '{"id":"task-1","type":"run-command","cmd":"pnpm lint"}' > tasks/01-lint.json
-echo '{"id":"task-2","type":"run-command","cmd":"pnpm typecheck"}' > tasks/02-typecheck.json  
-echo '{"id":"task-3","type":"run-command","cmd":"pnpm test"}' > tasks/03-test.json
+```typescript
+import { writeFileSync } from 'fs';
+
+const tests = [
+  'should respect transport backpressure when queue is full',
+  'should allow unlimited messages when backpressure is disabled',
+  'should provide accurate queue size information'
+];
+
+tests.forEach((testName, i) => {
+  const task = {
+    id: `test-${i + 1}-${testName.replace(/\s+/g, '-')}`,
+    type: 'run-command',
+    cmd: `pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts -t "${testName}"`,
+    timeout: 30000
+  };
+  
+  writeFileSync(`claude/tasks/test-${i + 1}.json`, JSON.stringify(task, null, 2));
+});
 ```
 
-### Result Monitoring
+### Result Analysis
 
-Watch for results in real-time:
+Parse all results for summary reporting:
 
-```bash
-# Monitor results directory
-watch -n 1 'ls -la claude/results/'
+```typescript
+import { readdirSync, readFileSync } from 'fs';
 
-# Tail daemon logs
-tail -f claude-daemon.log
+const results = readdirSync('claude/results')
+  .filter(f => f.endsWith('.status.json'))
+  .map(f => JSON.parse(readFileSync(`claude/results/${f}`, 'utf-8')));
+
+const summary = {
+  total: results.length,
+  passed: results.filter(r => r.status === 'pass').length,
+  failed: results.filter(r => r.status === 'fail').length,
+  timeout: results.filter(r => r.status === 'timeout').length,
+  error: results.filter(r => r.status === 'error').length
+};
+
+console.log('Test Summary:', summary);
 ```
-
-### Task Templates
-
-Create reusable task templates:
-
-```bash
-# Template for quick testing
-cat > templates/quick-test.json << EOF
-{
-  "id": "quick-test-$(date +%s)",
-  "type": "run-command",
-  "cmd": "pnpm test packages/types",
-  "timeout": 30000,
-  "description": "Quick test of types package"
-}
-EOF
-
-# Use template
-cp templates/quick-test.json tasks/
-```
-
-## Integration with Claude CLI
-
-### Inspecting Results
-
-As Claude CLI, you can:
-
-1. **Read task results directly:**
-   ```typescript
-   const result = await readJsonFile('claude/results/task-001-20240115-103145-123.json')
-   console.log(`Task ${result.taskId} took ${result.duration}ms`)
-   ```
-
-2. **Create tasks programmatically:**
-   ```typescript
-   const task = {
-     id: generateTaskId('lint'),
-     type: 'run-command',
-     cmd: 'pnpm lint --fix',
-     description: 'Auto-fix linting issues'
-   }
-   await writeJsonFile('claude/tasks/auto-lint.json', task)
-   ```
-
-3. **Monitor for specific outcomes:**
-   ```typescript
-   // Wait for test results
-   const watcher = watch('claude/results/')
-   for await (const event of watcher) {
-     if (event.filename?.includes('test-')) {
-       const result = await readJsonFile(`claude/results/${event.filename}`)
-       if (!result.success) {
-         console.log('Tests failed - investigating...')
-         // Analyze result.stderr and result.stdout
-       }
-     }
-   }
-   ```
-
-## Best Practices
-
-### Task Naming
-
-Use descriptive, sequential task IDs:
-- `lint-001`, `lint-002` for linting tasks
-- `test-full-001` for comprehensive tests  
-- `build-release-001` for release builds
-
-### Error Handling
-
-Always check results before proceeding:
-- Verify `success: true` and `exitCode: 0`
-- Parse `stderr` for warnings/errors
-- Check `timedOut` for timeout issues
-
-### Resource Management
-
-- Use appropriate timeouts for different command types
-- Monitor disk space in `results/` directory
-- Clean up old results periodically
-
-### Security
-
-- Never execute untrusted commands
-- Review allowed commands list regularly
-- Monitor daemon logs for security violations
-- Use timeouts to prevent resource exhaustion
 
 ## Troubleshooting
 
-### Daemon Not Starting
+**Daemon not processing tasks:**
+- Check daemon is running: `ps aux | grep daemon`
+- Verify task file format and permissions
+- Check daemon logs for errors
 
-```bash
-# Check if port/directory is available
-ls -la claude/tasks claude/results
+**Tasks timing out:**
+- Increase timeout value in task JSON
+- Check if command is actually running
+- Review security filtering (command may be blocked)
 
-# Check Node.js version
-node --version  # Should be >= 18
+**No result files:**
+- Ensure `claude/results/` directory exists and is writable
+- Check daemon has permission to write files
+- Verify task completed (wasn't killed externally)
 
-# Check TypeScript execution
-npx tsx --version
+## Migration from Old System
+
+The new system is backward compatible with the old task format, but uses new result format:
+
+**Old Result Format:**
+```json
+{
+  "taskId": "...",
+  "success": true,
+  "stdout": "...",
+  "stderr": "...",
+  "exitCode": 0
+}
 ```
 
-### Tasks Not Executing
+**New Result Format:**
+```json
+{
+  "id": "...",
+  "status": "pass",
+  "durationMs": 1234,
+  "exitCode": 0
+}
+```
 
-1. **Check task format:**
-   ```bash
-   cat tasks/my-task.json | jq .  # Validate JSON
-   ```
-
-2. **Check daemon logs:**
-   ```bash
-   tail -f claude-daemon.log
-   ```
-
-3. **Verify command safety:**
-   - Ensure command is in allowed list
-   - Check for dangerous patterns
-
-### Results Not Appearing
-
-1. **Check daemon is running:**
-   ```bash
-   ps aux | grep daemon.ts
-   ```
-
-2. **Check file permissions:**
-   ```bash
-   ls -la claude/results/
-   ```
-
-3. **Monitor daemon output:**
-   ```bash
-   npx tsx daemon.ts  # Run in foreground to see logs
-   ```
-
-## Examples
-
-See the `tasks/` directory for example task files:
-- `sample-test-task.json` - Run full test suite
-- `lint-task.json` - Execute linting across packages
-
-## Support
-
-For issues or questions:
-1. Check daemon logs for error messages
-2. Verify task JSON format against examples
-3. Ensure commands are in the allowed list
-4. Review security restrictions
+Update any scripts that parse results to use the new `.status.json` format.

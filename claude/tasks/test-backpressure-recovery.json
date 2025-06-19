@@ -1,0 +1,4 @@
+{
+  "taskId": "test-backpressure-recovery", 
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts -t \"should recover from backpressure when queue drains\" --reporter=verbose"
+}

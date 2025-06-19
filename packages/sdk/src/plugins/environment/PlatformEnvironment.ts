@@ -85,11 +85,11 @@ export class PlatformEnvironment {
       __dirname: undefined,
       __filename: undefined,
       Buffer: undefined,
-      console: enableDebugMode ? {
-        log: (...args: any[]) => debugLog.operation('sandbox-console', { args }, this.debug),
-        error: (...args: any[]) => debugLog.error('sandbox-console-error', new Error(String(args[0])), this.debug),
-        warn: (...args: any[]) => debugLog.operation('sandbox-console-warn', { args }, this.debug)
-      } : undefined,
+      console: {
+        log: (...args: any[]) => enableDebugMode ? debugLog.operation('sandbox-console', { args }, this.debug) : undefined,
+        error: (...args: any[]) => enableDebugMode ? debugLog.error('sandbox-console-error', new Error(String(args[0])), this.debug) : undefined,
+        warn: (...args: any[]) => enableDebugMode ? debugLog.operation('sandbox-console-warn', { args }, this.debug) : undefined
+      },
       
       // Block constructor access
       constructor: undefined,

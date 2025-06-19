@@ -372,16 +372,8 @@ export class AgentLifecycle {
           }, this.config.debug)
         }
 
-        // Shutdown observability tracker
-        debugLog.lifecycle('shutdown start', 'ObservabilityTracker', { 
-          requestId 
-        }, this.config.debug)
-        
-        this.observabilityTracker.shutdown()
-        
-        debugLog.lifecycle('shutdown complete', 'ObservabilityTracker', { 
-          requestId 
-        }, this.config.debug)
+        // Note: ObservabilityTracker shutdown moved outside trackRequest callback
+        // to prevent clearing hooks before onRequestEnd can be called
 
         try {
           // Shutdown transport if it has a shutdown method
@@ -475,6 +467,19 @@ export class AgentLifecycle {
         wasInitialized: this.state === LifecycleState.ACTIVE
       }
     )
+    
+    // Shutdown observability tracker after tracking is complete
+    debugLog.lifecycle('shutdown start', 'ObservabilityTracker', { 
+      agentId: this.config.agentId,
+      transportId: this.transport.id
+    }, this.config.debug)
+    
+    this.observabilityTracker.shutdown()
+    
+    debugLog.lifecycle('shutdown complete', 'ObservabilityTracker', { 
+      agentId: this.config.agentId,
+      transportId: this.transport.id
+    }, this.config.debug)
     
     // Record shutdown metrics
     const duration = Date.now() - startTime

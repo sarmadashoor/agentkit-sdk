@@ -1,190 +1,202 @@
 #!/usr/bin/env node
 
 /**
- * Claude Automation Daemon
+ * Autonomous Claude Test Daemon
  * 
- * Long-running TypeScript watcher that monitors claude/tasks/ for JSON task files,
- * executes shell commands, and writes results to claude/results/
+ * Monitors /tasks directory for JSON task files, executes them one at a time,
+ * and writes structured results to /results directory.
+ * 
+ * Key features:
+ * - Sequential task execution (one at a time)
+ * - Timeout handling with graceful/force kill
+ * - Structured .status.json + .log output per task
+ * - Security-filtered command execution
+ * - Self-diagnosing and Claude-compatible
  */
 
-import { watch } from 'fs/promises'
-import { existsSync, readFileSync, unlinkSync, mkdirSync, readdirSync } from 'fs'
-import { join, resolve } from 'path'
-import { runShellCommand } from './taskRunner.js'
-import { writeJsonFile, generateTimestamp, log } from './utils.js'
+import { watch } from 'fs/promises';
+import { existsSync, readFileSync, unlinkSync, mkdirSync, readdirSync } from 'fs';
+import { join, resolve } from 'path';
+import { ClaudeTask, ClaudeResult } from './schema.js';
+import { TaskRunner } from './taskRunner.js';
+import { log, sleep } from './utils.js';
 
-interface Task {
-  id: string
-  type: 'run-command'
-  cmd: string
-  timeout?: number
-  description?: string
-}
-
-interface TaskResult {
-  taskId: string
-  cmd: string
-  startTime: string
-  endTime: string
-  duration: number
-  stdout: string
-  stderr: string
-  exitCode: number
-  success: boolean
-  error?: string
-  timestamp: string
-}
-
-class ClaudeDaemon {
-  private isRunning = false
-  private tasksDir: string
-  private resultsDir: string
+export class ClaudeDaemon {
+  private isRunning = false;
+  private isProcessing = false;
+  private tasksDir: string;
+  private resultsDir: string;
+  private taskRunner: TaskRunner;
+  private taskQueue: string[] = [];
 
   constructor() {
-    this.tasksDir = resolve('./claude/tasks')
-    this.resultsDir = resolve('./claude/results')
+    this.tasksDir = resolve('./claude/tasks');
+    this.resultsDir = resolve('./claude/results');
+    this.taskRunner = new TaskRunner(this.resultsDir);
     
     // Ensure directories exist
+    this.ensureDirectories();
+  }
+
+  private ensureDirectories(): void {
     if (!existsSync(this.tasksDir)) {
-      mkdirSync(this.tasksDir, { recursive: true })
+      mkdirSync(this.tasksDir, { recursive: true });
     }
     if (!existsSync(this.resultsDir)) {
-      mkdirSync(this.resultsDir, { recursive: true })
+      mkdirSync(this.resultsDir, { recursive: true });
     }
   }
 
   async start(): Promise<void> {
     if (this.isRunning) {
-      log('Daemon is already running')
-      return
+      log('Daemon is already running');
+      return;
     }
 
-    this.isRunning = true
-    log('🤖 Claude Daemon started - monitoring tasks directory...')
-    log(`📁 Tasks: ${this.tasksDir}`)
-    log(`📊 Results: ${this.resultsDir}`)
+    this.isRunning = true;
+    log('🤖 Claude Autonomous Test Daemon started');
+    log(`📁 Tasks: ${this.tasksDir}`);
+    log(`📊 Results: ${this.resultsDir}`);
+    log('🔄 Running tasks sequentially, one at a time');
 
     // Process any existing tasks first
-    await this.processExistingTasks()
+    await this.discoverAndQueueTasks();
+
+    // Start the main processing loop
+    this.startProcessingLoop();
 
     // Start watching for new tasks
+    this.startFileWatcher();
+  }
+
+  async stop(): Promise<void> {
+    this.isRunning = false;
+    log('🛑 Claude Daemon stopping...');
+    
+    // Wait for current processing to finish
+    while (this.isProcessing) {
+      await sleep(100);
+    }
+    
+    log('🛑 Claude Daemon stopped');
+  }
+
+  /**
+   * Discover existing task files and add them to queue
+   */
+  private async discoverAndQueueTasks(): Promise<void> {
     try {
-      const watcher = watch(this.tasksDir, { recursive: false })
+      const files = readdirSync(this.tasksDir);
+      const taskFiles = files.filter((f: string) => f.endsWith('.json'));
+      
+      if (taskFiles.length > 0) {
+        log(`📋 Found ${taskFiles.length} existing task(s) to queue`);
+        this.taskQueue.push(...taskFiles.map(f => join(this.tasksDir, f)));
+      }
+    } catch (error) {
+      log(`❌ Error discovering tasks: ${error}`, 'error');
+    }
+  }
+
+  /**
+   * Main processing loop - handles one task at a time
+   */
+  private async startProcessingLoop(): Promise<void> {
+    while (this.isRunning) {
+      if (this.taskQueue.length > 0 && !this.isProcessing) {
+        this.isProcessing = true;
+        
+        const taskPath = this.taskQueue.shift()!;
+        await this.processTask(taskPath);
+        
+        this.isProcessing = false;
+      } else {
+        // Brief sleep to avoid busy waiting
+        await sleep(250);
+      }
+    }
+  }
+
+  /**
+   * Watch for new task files and add them to queue
+   */
+  private async startFileWatcher(): Promise<void> {
+    try {
+      const watcher = watch(this.tasksDir, { recursive: false });
+      
       for await (const event of watcher) {
-        if (!this.isRunning) break
+        if (!this.isRunning) break;
         
         if (event.eventType === 'rename' && event.filename?.endsWith('.json')) {
-          const taskPath = join(this.tasksDir, event.filename)
+          const taskPath = join(this.tasksDir, event.filename);
           
           // Wait a moment for file to be fully written
-          await new Promise(resolve => setTimeout(resolve, 100))
+          await sleep(100);
           
           if (existsSync(taskPath)) {
-            await this.processTask(taskPath)
+            log(`📥 New task detected: ${event.filename}`);
+            this.taskQueue.push(taskPath);
           }
         }
       }
     } catch (error) {
-      log(`❌ Watcher error: ${error}`)
-      this.isRunning = false
+      log(`❌ File watcher error: ${error}`, 'error');
     }
   }
 
-  async stop(): Promise<void> {
-    this.isRunning = false
-    log('🛑 Claude Daemon stopped')
-  }
-
-  private async processExistingTasks(): Promise<void> {
-    try {
-      const files = readdirSync(this.tasksDir)
-      const taskFiles = files.filter((f: string) => f.endsWith('.json'))
-      
-      if (taskFiles.length > 0) {
-        log(`📋 Found ${taskFiles.length} existing task(s) to process`)
-        
-        for (const file of taskFiles) {
-          const taskPath = join(this.tasksDir, file)
-          await this.processTask(taskPath)
-        }
-      }
-    } catch (error) {
-      log(`❌ Error processing existing tasks: ${error}`)
-    }
-  }
-
+  /**
+   * Process a single task file
+   */
   private async processTask(taskPath: string): Promise<void> {
     try {
-      log(`🔄 Processing task: ${taskPath}`)
+      log(`🔄 Processing: ${taskPath}`);
       
       // Read and parse task
-      const taskData = readFileSync(taskPath, 'utf-8')
-      const task: Task = JSON.parse(taskData)
+      const taskData = readFileSync(taskPath, 'utf-8');
+      const task: ClaudeTask = JSON.parse(taskData);
       
       // Validate task
       if (!this.isValidTask(task)) {
-        log(`❌ Invalid task format in ${taskPath}`)
-        return
+        log(`❌ Invalid task format in ${taskPath}`, 'error');
+        await this.writeErrorResult(task, 'Invalid task format');
+        this.cleanupTaskFile(taskPath);
+        return;
       }
 
-      // Security check - only allow safe commands
+      // Security check
       if (!this.isSafeCommand(task.cmd)) {
-        log(`🚫 Unsafe command blocked: ${task.cmd}`)
-        await this.writeErrorResult(task, 'Command blocked for security reasons')
-        unlinkSync(taskPath)
-        return
+        log(`🚫 Unsafe command blocked: ${task.cmd}`, 'warn');
+        await this.writeErrorResult(task, 'Command blocked for security reasons');
+        this.cleanupTaskFile(taskPath);
+        return;
       }
 
-      log(`▶️  Executing: ${task.cmd}`)
-      const startTime = new Date().toISOString()
+      // Execute task
+      const result = await this.taskRunner.run(task);
       
-      // Execute command
-      const result = await runShellCommand(task.cmd, task.timeout)
-      
-      // Create result object
-      const taskResult: TaskResult = {
-        taskId: task.id,
-        cmd: task.cmd,
-        startTime,
-        endTime: result.endTime,
-        duration: result.duration,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        exitCode: result.exitCode,
-        success: result.exitCode === 0,
-        timestamp: generateTimestamp()
-      }
-
-      // Write result
-      const resultPath = join(this.resultsDir, `${task.id}-${generateTimestamp()}.json`)
-      await writeJsonFile(resultPath, taskResult)
-      
-      // Log outcome
-      if (taskResult.success) {
-        log(`✅ Task ${task.id} completed successfully (${result.duration}ms)`)
-      } else {
-        log(`❌ Task ${task.id} failed with exit code ${result.exitCode}`)
-      }
-
-      // Remove processed task
-      unlinkSync(taskPath)
+      // Clean up task file on completion
+      this.cleanupTaskFile(taskPath);
       
     } catch (error) {
-      log(`❌ Error processing task ${taskPath}: ${error}`)
+      log(`❌ Error processing task ${taskPath}: ${error}`, 'error');
       
       try {
         // Try to read task for error result
-        const taskData = readFileSync(taskPath, 'utf-8')
-        const task: Task = JSON.parse(taskData)
-        await this.writeErrorResult(task, `Processing error: ${error}`)
-        unlinkSync(taskPath)
+        const taskData = readFileSync(taskPath, 'utf-8');
+        const task: ClaudeTask = JSON.parse(taskData);
+        await this.writeErrorResult(task, `Processing error: ${error}`);
       } catch (cleanupError) {
-        log(`❌ Error during cleanup: ${cleanupError}`)
+        log(`❌ Error during cleanup: ${cleanupError}`, 'error');
       }
+      
+      this.cleanupTaskFile(taskPath);
     }
   }
 
-  private isValidTask(task: any): task is Task {
+  /**
+   * Validate task structure
+   */
+  private isValidTask(task: any): task is ClaudeTask {
     return (
       typeof task === 'object' &&
       typeof task.id === 'string' &&
@@ -192,9 +204,12 @@ class ClaudeDaemon {
       task.type === 'run-command' &&
       typeof task.cmd === 'string' &&
       task.cmd.length > 0
-    )
+    );
   }
 
+  /**
+   * Security check for command safety
+   */
   private isSafeCommand(cmd: string): boolean {
     const dangerousPatterns = [
       /rm\s+-rf/,           // Dangerous file deletion
@@ -212,18 +227,20 @@ class ClaudeDaemon {
       /fdisk/,              // Disk partitioning
       /mount/,              // Mount operations
       /umount/,             // Unmount operations
-    ]
+    ];
 
     // Check against dangerous patterns first
     for (const pattern of dangerousPatterns) {
       if (pattern.test(cmd)) {
-        return false
+        return false;
       }
     }
 
-    // Test-related command patterns (flexible and comprehensive)
+    // Safe command patterns (comprehensive test patterns)
     const safePatterns = [
-      /^pnpm( run)?( --filter=[^ ]+)? test/,           // pnpm test variations
+      /^dev\s+test(\s|$)/,                             // dev test command
+      /^\.\/dev\s+test(\s|$)/,                         // ./dev test command
+      /^pnpm.*test.*/, // pnpm test with any args
       /^pnpm\s+(test|lint|typecheck|build|clean)(\s|$)/, // Other pnpm commands
       /^npm\s+(test|run\s+\w+)(\s|$)/,                 // npm commands
       /^cd .* && pnpm test/,                           // cd + pnpm test
@@ -238,57 +255,99 @@ class ClaudeDaemon {
       /^head\s+/,                                      // Head command
       /^tail\s+/,                                      // Tail command
       /^wc\s+/,                                        // Word count
-    ]
+      /^vitest\s+/,                                    // Vitest directly
+    ];
 
-    return safePatterns.some(pattern => pattern.test(cmd))
+    return safePatterns.some(pattern => pattern.test(cmd));
   }
 
-  private async writeErrorResult(task: Task, error: string): Promise<void> {
-    const errorResult: TaskResult = {
-      taskId: task.id,
-      cmd: task.cmd,
-      startTime: new Date().toISOString(),
-      endTime: new Date().toISOString(),
-      duration: 0,
-      stdout: '',
-      stderr: error,
-      exitCode: -1,
-      success: false,
-      error,
-      timestamp: generateTimestamp()
-    }
+  /**
+   * Write error result for failed tasks
+   */
+  private async writeErrorResult(task: ClaudeTask, error: string): Promise<void> {
+    try {
+      const errorResult: ClaudeResult = {
+        id: task.id,
+        cmd: task.cmd,
+        startTime: new Date().toISOString(),
+        durationMs: 0,
+        exitCode: null,
+        status: 'error',
+        error
+      };
 
-    const resultPath = join(this.resultsDir, `${task.id}-error-${generateTimestamp()}.json`)
-    await writeJsonFile(resultPath, errorResult)
+      // Use TaskRunner to write consistent result format
+      await this.taskRunner.run({
+        id: task.id,
+        type: 'run-command',
+        cmd: 'echo "Error: Task failed validation"'
+      });
+      
+    } catch (writeError) {
+      log(`❌ Failed to write error result: ${writeError}`, 'error');
+    }
+  }
+
+  /**
+   * Clean up processed task file
+   */
+  private cleanupTaskFile(taskPath: string): void {
+    try {
+      if (existsSync(taskPath)) {
+        unlinkSync(taskPath);
+        log(`🗑️  Cleaned up task file: ${taskPath}`);
+      }
+    } catch (error) {
+      log(`⚠️  Failed to cleanup task file ${taskPath}: ${error}`, 'warn');
+    }
+  }
+
+  /**
+   * Get current daemon status
+   */
+  getStatus(): {
+    isRunning: boolean;
+    isProcessing: boolean;
+    queueLength: number;
+    tasksDir: string;
+    resultsDir: string;
+  } {
+    return {
+      isRunning: this.isRunning,
+      isProcessing: this.isProcessing,
+      queueLength: this.taskQueue.length,
+      tasksDir: this.tasksDir,
+      resultsDir: this.resultsDir
+    };
   }
 }
 
 // CLI interface
-const isMain =
+const isMain = 
   import.meta.url === `file://${process.argv[1]}` ||
   import.meta.url === `file://${process.cwd()}/${process.argv[1]}`;
 
 if (isMain) {
-  const daemon = new ClaudeDaemon()
+  const daemon = new ClaudeDaemon();
   
   // Handle graceful shutdown
   process.on('SIGINT', async () => {
-    log('\n🛑 Received SIGINT, shutting down gracefully...')
-    await daemon.stop()
-    process.exit(0)
-  })
+    log('\\n🛑 Received SIGINT, shutting down gracefully...');
+    await daemon.stop();
+    process.exit(0);
+  });
 
   process.on('SIGTERM', async () => {
-    log('\n🛑 Received SIGTERM, shutting down gracefully...')
-    await daemon.stop()
-    process.exit(0)
-  })
+    log('\\n🛑 Received SIGTERM, shutting down gracefully...');
+    await daemon.stop();
+    process.exit(0);
+  });
 
   // Start daemon
   daemon.start().catch((error) => {
-    log(`❌ Daemon failed to start: ${error}`)
-    process.exit(1)
-  })
+    log(`❌ Daemon failed to start: ${error}`, 'error');
+    process.exit(1);
+  });
 }
 
-export { ClaudeDaemon }
+export { ClaudeDaemon };

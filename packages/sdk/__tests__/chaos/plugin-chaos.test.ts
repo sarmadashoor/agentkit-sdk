@@ -37,20 +37,16 @@ describe('Plugin Chaos Tests', () => {
       const crashPlugin: AgentKitPlugin = {
         name: 'crash-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async () => {
-            throw new Error('Plugin crashed during send!')
-          }
+        onSend: async () => {
+          throw new Error('Plugin crashed during send!')
         }
       }
 
       const workingPlugin: AgentKitPlugin = {
         name: 'working-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async () => {
-            // This should still execute
-          }
+        onSend: async () => {
+          // This should still execute
         }
       }
 
@@ -82,10 +78,8 @@ describe('Plugin Chaos Tests', () => {
       const crashPlugin: AgentKitPlugin = {
         name: 'init-crash-plugin',
         version: '1.0.0',
-        hooks: {
-          onInit: async () => {
-            throw new Error('Plugin crashed during init!')
-          }
+        onInit: async () => {
+          throw new Error('Plugin crashed during init!')
         }
       }
 
@@ -115,10 +109,8 @@ describe('Plugin Chaos Tests', () => {
       const crashPlugin: AgentKitPlugin = {
         name: 'shutdown-crash-plugin',
         version: '1.0.0',
-        hooks: {
-          onShutdown: async () => {
-            throw new Error('Plugin crashed during shutdown!')
-          }
+        onShutdown: async () => {
+          throw new Error('Plugin crashed during shutdown!')
         }
       }
 
@@ -151,12 +143,10 @@ describe('Plugin Chaos Tests', () => {
       const infiniteLoopPlugin: AgentKitPlugin = {
         name: 'infinite-loop-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async () => {
-            // Infinite loop
-            while (true) {
-              await new Promise(resolve => setTimeout(resolve, 1))
-            }
+        onSend: async () => {
+          // Infinite loop
+          while (true) {
+            await new Promise(resolve => setTimeout(resolve, 1))
           }
         }
       }
@@ -164,10 +154,8 @@ describe('Plugin Chaos Tests', () => {
       const fastPlugin: AgentKitPlugin = {
         name: 'fast-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async () => {
-            // Should complete normally
-          }
+        onSend: async () => {
+          // Should complete normally
         }
       }
 
@@ -203,12 +191,10 @@ describe('Plugin Chaos Tests', () => {
       const syncInfinitePlugin: AgentKitPlugin = {
         name: 'sync-infinite-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: () => {
-            // Synchronous infinite loop
-            while (true) {
-              // This will block the event loop
-            }
+        onSend: () => {
+          // Synchronous infinite loop
+          while (true) {
+            // This will block the event loop
           }
         }
       }
@@ -244,15 +230,13 @@ describe('Plugin Chaos Tests', () => {
       const memoryLeakPlugin: AgentKitPlugin = {
         name: 'memory-leak-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async () => {
-            // Create memory leak
-            const leak: any[] = []
-            for (let i = 0; i < 100000; i++) {
-              leak.push({ data: new Array(1000).fill('leak') })
-            }
-            // Intentionally don't clean up
+        onSend: async () => {
+          // Create memory leak
+          const leak: any[] = []
+          for (let i = 0; i < 100000; i++) {
+            leak.push({ data: new Array(1000).fill('leak') })
           }
+          // Intentionally don't clean up
         }
       }
 
@@ -285,11 +269,9 @@ describe('Plugin Chaos Tests', () => {
       const largePayloadPlugin: AgentKitPlugin = {
         name: 'large-payload-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async (payload) => {
-            // Try to create oversized payload
-            (payload as any).largeData = new Array(1000000).fill('x').join('')
-          }
+        onSend: async (payload) => {
+          // Try to create oversized payload
+          (payload as any).largeData = new Array(1000000).fill('x').join('')
         }
       }
 
@@ -329,10 +311,8 @@ describe('Plugin Chaos Tests', () => {
       const weirdThrowPlugin: AgentKitPlugin = {
         name: 'weird-throw-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async () => {
-            throw 'This is a string error'
-          }
+        onSend: async () => {
+          throw 'This is a string error'
         }
       }
 
@@ -360,20 +340,16 @@ describe('Plugin Chaos Tests', () => {
       const nullThrowPlugin: AgentKitPlugin = {
         name: 'null-throw-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async () => {
-            throw null
-          }
+        onSend: async () => {
+          throw null
         }
       }
 
       const undefinedThrowPlugin: AgentKitPlugin = {
         name: 'undefined-throw-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async () => {
-            throw undefined
-          }
+        onSend: async () => {
+          throw undefined
         }
       }
 
@@ -406,14 +382,12 @@ describe('Plugin Chaos Tests', () => {
       const recursivePlugin: AgentKitPlugin = {
         name: 'recursive-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async (payload, context) => {
-            recursionCount++
-            if (recursionCount < maxRecursion) {
-              // This should not cause infinite recursion
-              // as plugins should not be able to trigger SDK operations
-              console.log(`Recursive call ${recursionCount}`)
-            }
+        onSend: async (payload, context) => {
+          recursionCount++
+          if (recursionCount < maxRecursion) {
+            // This should not cause infinite recursion
+            // as plugins should not be able to trigger SDK operations
+            console.log(`Recursive call ${recursionCount}`)
           }
         }
       }
@@ -446,17 +420,15 @@ describe('Plugin Chaos Tests', () => {
       const corruptionPlugin: AgentKitPlugin = {
         name: 'corruption-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async (payload, context) => {
-            // Attempt to corrupt context
-            try {
-              (context as any).agentId = 'hacked-agent-id'
-              context.requestId = 'hacked-request-id'
-              ;(context as any).isShutdown = true
-              ;(context as any).__proto__.maliciousMethod = () => console.log('hacked')
-            } catch (e) {
-              // Plugin might fail when trying to corrupt immutable data
-            }
+        onSend: async (payload, context) => {
+          // Attempt to corrupt context
+          try {
+            (context as any).agentId = 'hacked-agent-id'
+            context.requestId = 'hacked-request-id'
+            ;(context as any).isShutdown = true
+            ;(context as any).__proto__.maliciousMethod = () => console.log('hacked')
+          } catch (e) {
+            // Plugin might fail when trying to corrupt immutable data
           }
         }
       }
@@ -496,14 +468,12 @@ describe('Plugin Chaos Tests', () => {
       const plugins: AgentKitPlugin[] = Array.from({ length: 10 }, (_, i) => ({
         name: `chaos-plugin-${i}`,
         version: '1.0.0',
-        hooks: {
-          onSend: async () => {
-            if (Math.random() > 0.5) {
-              throw new Error(`Random failure from plugin ${i}`)
-            }
-            if (Math.random() > 0.8) {
-              await new Promise(resolve => setTimeout(resolve, 100))
-            }
+        onSend: async () => {
+          if (Math.random() > 0.5) {
+            throw new Error(`Random failure from plugin ${i}`)
+          }
+          if (Math.random() > 0.8) {
+            await new Promise(resolve => setTimeout(resolve, 100))
           }
         }
       }))
@@ -544,13 +514,11 @@ describe('Plugin Chaos Tests', () => {
       const chaosPlugins: AgentKitPlugin[] = Array.from({ length: 5 }, (_, i) => ({
         name: `shutdown-chaos-${i}`,
         version: '1.0.0',
-        hooks: {
-          onShutdown: async () => {
-            if (i % 2 === 0) {
-              throw new Error(`Shutdown chaos from plugin ${i}`)
-            }
-            await new Promise(resolve => setTimeout(resolve, 50))
+        onShutdown: async () => {
+          if (i % 2 === 0) {
+            throw new Error(`Shutdown chaos from plugin ${i}`)
           }
+          await new Promise(resolve => setTimeout(resolve, 50))
         }
       }))
 
@@ -591,24 +559,22 @@ describe('Plugin Chaos Tests', () => {
       const resourceExhaustionPlugin: AgentKitPlugin = {
         name: 'resource-exhaustion-plugin',
         version: '1.0.0',
-        hooks: {
-          onSend: async () => {
-            // Try to exhaust various resources
-            const resources = []
-            
-            // Create many promises
-            for (let i = 0; i < 1000; i++) {
-              resources.push(new Promise(resolve => setTimeout(resolve, 1000)))
-            }
-            
-            // Create large objects
-            for (let i = 0; i < 100; i++) {
-              resources.push(new Array(10000).fill('data'))
-            }
-            
-            // Don't await everything (partial resource exhaustion)
-            await Promise.race(resources.slice(0, 10))
+        onSend: async () => {
+          // Try to exhaust various resources
+          const resources = []
+          
+          // Create many promises
+          for (let i = 0; i < 1000; i++) {
+            resources.push(new Promise(resolve => setTimeout(resolve, 1000)))
           }
+          
+          // Create large objects
+          for (let i = 0; i < 100; i++) {
+            resources.push(new Array(10000).fill('data'))
+          }
+          
+          // Don't await everything (partial resource exhaustion)
+          await Promise.race(resources.slice(0, 10))
         }
       }
 
