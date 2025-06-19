@@ -20,6 +20,7 @@ export class DummyTransport implements Transport {
   config: DummyTransportConfig
   private messageQueue: unknown[] = []
   private sentMessages: unknown[] = []
+  private processingQueue: unknown[] = [] // Track messages being processed for backpressure
   private initialized = false
   private callbacks: ((msg: unknown) => void)[] = []
 
@@ -28,9 +29,18 @@ export class DummyTransport implements Transport {
   }
 
   async init(config?: unknown): Promise<void> {
-    // Merge provided config with constructor config
-    const mergedConfig = config ? { ...this.config, ...config } : this.config
-    this.config = DummyTransportConfigSchema.parse(mergedConfig)
+    // If additional config is provided, merge it
+    if (config) {
+      // Create a new merged config since the existing one might be frozen
+      const mergedConfig = { ...this.config, ...config }
+      const validatedConfig = DummyTransportConfigSchema.parse(mergedConfig)
+      
+      // If config is frozen (from registry), we can't reassign it
+      // So we'll just validate that the merged config is valid
+      if (!Object.isFrozen(this)) {
+        this.config = validatedConfig
+      }
+    }
     
     if (this.config.debug) {
       console.log('[DummyTransport] Initializing with config:', this.config)
@@ -49,48 +59,79 @@ export class DummyTransport implements Transport {
     
     // Check backpressure before accepting the message
     if (this.config.enableBackpressure && !this.canAcceptMore()) {
-      throw new Error(`Transport "${this.id}" queue is full (${this.messageQueue.length}/${this.config.maxQueueSize}). Cannot accept more messages.`)
+      throw new Error(`Transport "${this.id}" queue is full (${this.processingQueue.length}/${this.config.maxQueueSize}). Cannot accept more messages.`)
     }
     
     if (this.config.debug) {
       console.log('[DummyTransport] Sending message:', message)
     }
     
+    // Add to processing queue for backpressure tracking
+    const messageId = Date.now() + '-' + Math.random().toString(36).substr(2, 9)
+    let messageWithId: any = message
+    if (this.config.enableBackpressure) {
+      messageWithId = typeof message === 'object' && message !== null
+        ? Object.assign({}, message, { __messageId: messageId })
+        : { value: message, __messageId: messageId }
+      this.processingQueue.push(messageWithId)
+      if (this.config.debug) {
+        console.log(`[${this.name}] Added to processing queue (id: ${messageId}, size: ${this.processingQueue.length})`)
+      }
+    }
+    
     this.sentMessages.push(message)
     
-    // If fixedResponse is configured, add it to queue
-    if (this.config.fixedResponse !== undefined) {
-      this.messageQueue.push(this.config.fixedResponse)
-    } else {
-      // Default behavior: echo the message with transformation
-      const response = {
-        result: `echo:${JSON.stringify(message)}`,
-        metadata: {
-          agentId: 'dummy-agent',
-          version: '1.0.0',
-          timestamp: new Date().toISOString(),
-          initData: { ready: true, timestamp: new Date().toISOString() }
+    // Simulate async processing
+    setTimeout(() => {
+      // If fixedResponse is configured, add it to queue
+      if (this.config.fixedResponse !== undefined) {
+        this.messageQueue.push(this.config.fixedResponse)
+      } else {
+        // Default behavior: echo the message with transformation
+        const response = {
+          result: `echo:${JSON.stringify(message)}`,
+          metadata: {
+            agentId: 'dummy-agent',
+            version: '1.0.0',
+            timestamp: new Date().toISOString(),
+            initData: { ready: true, timestamp: new Date().toISOString() }
+          }
+        }
+        this.messageQueue.push(response)
+      }
+      
+      // Log messages if enabled
+      if (this.config.logMessages) {
+        const responseToLog = this.config.fixedResponse !== undefined ? 
+          this.config.fixedResponse : 
+          { result: `echo:${JSON.stringify(message)}`, metadata: { agentId: 'dummy-agent', version: '1.0.0' } }
+        console.log(`[${this.name}] Message sent:`, responseToLog)
+      }
+      
+      // Remove from processing queue (message is now complete)
+      if (this.config.enableBackpressure) {
+        const index = this.processingQueue.findIndex(item => 
+          (item as any).__messageId === (messageWithId as any).__messageId
+        )
+        if (index !== -1) {
+          const removedItem = this.processingQueue.splice(index, 1)[0]
+          if (this.config.debug) {
+            console.log(`[${this.name}] Removed from processing queue (id: ${(removedItem as any).__messageId}, size: ${this.processingQueue.length})`)
+          }
+        } else if (this.config.debug) {
+          console.log(`[${this.name}] Message not found in processing queue for removal (id: ${(messageWithId as any).__messageId})`)
         }
       }
-      this.messageQueue.push(response)
-    }
+      
+      // Trigger callbacks for received messages
+      if (this.callbacks.length > 0 && this.messageQueue.length > 0) {
+        const msg = this.messageQueue.shift()
+        this.callbacks.forEach(cb => cb(msg))
+      }
+    }, this.config.responseDelay ?? 5)
     
-    // Log messages if enabled
-    if (this.config.logMessages) {
-      const responseToLog = this.config.fixedResponse !== undefined ? 
-        this.config.fixedResponse : 
-        { result: `echo:${JSON.stringify(message)}`, metadata: { agentId: 'dummy-agent', version: '1.0.0' } }
-      console.log(`[${this.name}] Message sent:`, responseToLog)
-    }
-    
-    // Simulate async send
-    await new Promise<void>(resolve => setTimeout(resolve, this.config.responseDelay ?? 5))
-    
-    // Trigger callbacks for received messages
-    if (this.callbacks.length > 0 && this.messageQueue.length > 0) {
-      const msg = this.messageQueue.shift()
-      this.callbacks.forEach(cb => cb(msg))
-    }
+    // Simulate async send delay (but don't block - processing happens in background)
+    await new Promise<void>(resolve => setTimeout(resolve, Math.min(this.config.responseDelay ?? 5, 1)))
   }
 
   async receive(): Promise<TransportMessage> {
@@ -127,6 +168,10 @@ export class DummyTransport implements Transport {
     return this.messageQueue.length
   }
 
+  getProcessingQueueSize(): number {
+    return this.processingQueue.length
+  }
+
   getSentMessages(): unknown[] {
     return [...this.sentMessages]
   }
@@ -134,6 +179,7 @@ export class DummyTransport implements Transport {
   clearMessages(): void {
     this.messageQueue = []
     this.sentMessages = []
+    this.processingQueue = []
   }
 
   isInitialized(): boolean {
@@ -146,14 +192,18 @@ export class DummyTransport implements Transport {
       return true // Backpressure disabled
     }
     
-    return this.messageQueue.length < (this.config.maxQueueSize ?? 100)
+    const canAccept = this.processingQueue.length < (this.config.maxQueueSize ?? 100)
+    if (this.config.debug) {
+      console.log(`[${this.name}] canAcceptMore: ${canAccept} (processingQueue: ${this.processingQueue.length}/${this.config.maxQueueSize})`)
+    }
+    return canAccept
   }
 
   getStatus(): TransportStatus {
-    const queueSize = this.messageQueue.length
+    const queueSize = this.config.enableBackpressure ? this.processingQueue.length : this.messageQueue.length
     const maxQueueSize = this.config.maxQueueSize ?? 100
     const canAcceptMore = this.config.enableBackpressure ? 
-      queueSize < maxQueueSize : true
+      this.processingQueue.length < maxQueueSize : true
 
     return {
       canAcceptMore,

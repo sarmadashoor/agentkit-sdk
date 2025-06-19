@@ -1,0 +1,7 @@
+{
+  "id": "test-audit-001-snapshot-integration",
+  "type": "run-command",
+  "cmd": "npm test -- --run examples/snapshot-agent/__tests__/integration.test.ts",
+  "timeout": 120000,
+  "description": "Test audit: Snapshot Agent Integration Tests"
+}

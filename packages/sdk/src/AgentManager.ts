@@ -106,10 +106,11 @@ export class AgentManager {
     this.registeredScopes = registeredScopes
     this.agentId = agentId
 
-    // Initialize observability tracker
-    this.observabilityTracker = new ObservabilityTracker({
-      // ObservabilityHooks can be added here if needed
-    }, options.debug || false)
+    // Initialize observability tracker with user-provided hooks
+    this.observabilityTracker = new ObservabilityTracker(
+      options.observability || {},
+      options.debug || false
+    )
 
     // Initialize bounded executor for concurrency control
     this.boundedExecutor = new BoundedExecutor({

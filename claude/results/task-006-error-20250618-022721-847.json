@@ -1,0 +1,13 @@
+{
+  "taskId": "task-006",
+  "cmd": "pnpm run --filter=@agentkit/cli test",
+  "startTime": "2025-06-18T09:27:21.847Z",
+  "endTime": "2025-06-18T09:27:21.847Z",
+  "duration": 0,
+  "stdout": "",
+  "stderr": "Command blocked for security reasons",
+  "exitCode": -1,
+  "success": false,
+  "error": "Command blocked for security reasons",
+  "timestamp": "20250618-022721-847"
+}

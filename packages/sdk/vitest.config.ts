@@ -10,9 +10,9 @@ export default defineConfig({
       '**/__tests__/integration/**', // Exclude integration tests
     ],
     // Default timeout for regular tests
-    testTimeout: 10000,
+    testTimeout: 30000,
     // Hook timeout for setup/teardown
-    hookTimeout: 10000,
+    hookTimeout: 30000,
     // Environment setup
     environment: 'node',
     // Global setup

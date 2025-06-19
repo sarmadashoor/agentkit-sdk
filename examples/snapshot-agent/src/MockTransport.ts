@@ -4,7 +4,7 @@
  */
 
 // IMPORTANT: Only importing from public SDK API
-import type { Transport } from '@agentkit/sdk'
+import type { Transport, TransportMessage, TransportStatus } from '@agentkit/sdk'
 
 export interface MockTransportConfig {
   /** Base latency for message delivery (ms) */
@@ -38,7 +38,7 @@ export class MockTransport implements Transport {
     }
   }
 
-  async init(transportConfig?: unknown): Promise<void> {
+  async init(transportConfig?: any): Promise<void> {
     if (this.isInitialized) {
       throw new Error('MockTransport is already initialized')
     }
@@ -53,8 +53,8 @@ export class MockTransport implements Transport {
       })
     }
 
-    // Simulate potential initialization failure
-    if (Math.random() < 0.05) { // 5% chance of init failure
+    // Simulate potential initialization failure (only for reliability testing)
+    if (this.config.failureRate >= 1.0) { // Only fail if configured to always fail
       throw new Error('MockTransport initialization failed due to network issues')
     }
 
@@ -65,7 +65,7 @@ export class MockTransport implements Transport {
     }
   }
 
-  async send(data: unknown): Promise<void> {
+  async send(message: TransportMessage): Promise<void> {
     if (!this.isInitialized) {
       throw new Error('MockTransport must be initialized before sending messages')
     }
@@ -75,8 +75,8 @@ export class MockTransport implements Transport {
 
     if (this.config.enableLogging) {
       console.log(`[MockTransport] Sending message ${messageId}:`, {
-        type: typeof data,
-        preview: this.truncateData(data)
+        type: typeof message,
+        preview: this.truncateData(message)
       })
     }
 
@@ -101,7 +101,7 @@ export class MockTransport implements Transport {
     }
   }
 
-  async receive(): Promise<unknown> {
+  async receive(): Promise<TransportMessage> {
     if (!this.isInitialized) {
       throw new Error('MockTransport must be initialized before receiving messages')
     }
@@ -115,11 +115,14 @@ export class MockTransport implements Transport {
     // Simulate some latency
     await this.simulateLatency(50)
     
-    // Return a mock response
+    // Return a mock response that satisfies TransportMessage interface
     return {
-      type: 'mock-response',
-      timestamp: Date.now(),
-      message: 'Mock transport does not implement actual message receiving'
+      content: null, 
+      metadata: {
+        transportId: this.id,
+        timestamp: new Date().toISOString(),
+        mockMessage: 'Mock transport does not implement actual message receiving'
+      }
     }
   }
 
@@ -155,6 +158,21 @@ export class MockTransport implements Transport {
     // For mock transport, we can simulate backpressure based on failure rate
     // High failure rate might indicate system stress
     return this.config.failureRate < 0.8 // Allow backpressure when failure rate is high
+  }
+
+  /**
+   * Get detailed transport status including capacity and health
+   */
+  getStatus(): TransportStatus {
+    return {
+      canAcceptMore: this.canAcceptMore(),
+      queueSize: 0, // Mock transport doesn't queue messages
+      maxQueueSize: undefined, // No queue limit
+      isHealthy: this.isInitialized && this.config.failureRate < 0.5,
+      healthMessage: this.isInitialized ? 
+        (this.config.failureRate < 0.5 ? 'Transport operational' : 'High failure rate detected') :
+        'Transport not initialized'
+    }
   }
 
   /**

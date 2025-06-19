@@ -25,7 +25,7 @@ describe('Plugin Lifecycle Simulation Demo', () => {
     await expect(runLifecycleSimulation()).resolves.toBeUndefined()
     await expect(runChaosSimulation()).resolves.toBeUndefined()
     await expect(runIsolationDemo()).resolves.toBeUndefined()
-    await expect(generateObservabilityReport()).resolves.toBeUndefined()
+    await expect(generateObservabilityReport()).resolves.toContain('Observability Report')
     
     console.log('\n🏁 Demo completed successfully!')
   }, 30000) // 30 second timeout for comprehensive demo

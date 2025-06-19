@@ -234,6 +234,7 @@ describe('Create Plugin CLI', () => {
         name: 'browser-safe',
         hooks: ['onInit'],
         browserSafe: true,
+        withTests: true,
         author: 'Test',
         license: 'MIT'
       })
@@ -244,7 +245,7 @@ describe('Create Plugin CLI', () => {
       // Check if plugin was created successfully 
       expect(packageJson.name).toBe('agentkit-plugin-browser-safe')
       
-      // Should include Playwright config
+      // Should include Playwright config (only when withTests is also true)
       expect(fs.existsSync(path.join(tmpDir, 'plugins', 'browser-safe', 'playwright.config.ts'))).toBe(true)
     })
 

@@ -59,13 +59,12 @@ export class AgentRegistry implements AgentRegistryInterface {
       throw new DuplicateTransportIdError(transport.id)
     }
     
-    // Create a frozen copy to prevent mutations while preserving original behavior
-    // Note: We create a shallow copy and freeze only the config deeply
-    const frozenTransport = {
-      ...transport,
-      config: transport.config ? createFrozenCopy(transport.config) : undefined
+    // For transports, we don't freeze the entire object to allow internal state changes
+    // We only freeze the config to prevent external modifications
+    if (transport.config) {
+      transport.config = createFrozenCopy(transport.config)
     }
-    this.transports.set(transport.id, Object.freeze(frozenTransport) as Transport)
+    this.transports.set(transport.id, transport)
   }
 
   lookup(agentId: string): AgentMetadata {

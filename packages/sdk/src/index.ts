@@ -11,7 +11,7 @@ import {
   TransportConfig,
   TransportMessage
 } from '@agentkit/types'
-import { AgentRegistry, defaultRegistry } from '@agentkit/registry'
+import { defaultRegistry } from '@agentkit/registry'
 import { AgentManager } from './AgentManager'
 import { 
   AgentNotFoundError,
@@ -271,11 +271,25 @@ export type {
 }
 
 export { 
-  AgentRegistry, 
   defaultRegistry, 
   initializeDefaultRegistry,
   LegacyAgentRegistry 
 } from '@agentkit/registry'
+
+// Import the original AgentRegistry class
+import { AgentRegistry as _AgentRegistry } from '@agentkit/registry'
+
+// Create a hybrid AgentRegistry that is both a class constructor and has static methods
+// This maintains backwards compatibility for tests that expect static methods
+export const AgentRegistry = Object.assign(_AgentRegistry, {
+  register: (metadata: AgentMetadata) => defaultRegistry.register(metadata),
+  registerTransport: (transport: Transport) => defaultRegistry.registerTransport(transport),
+  lookup: (agentId: string) => defaultRegistry.lookup(agentId),
+  lookupTransport: (transportId: string) => defaultRegistry.lookupTransport(transportId),
+  clear: () => defaultRegistry.clear(),
+  listAgents: () => defaultRegistry.listAgents(),
+  listTransports: () => defaultRegistry.listTransports()
+})
 
 // Backwards compatibility - export static methods that delegate to default registry
 // These can be removed in a future major version

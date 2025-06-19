@@ -14,7 +14,7 @@ export interface BackpressureQueueOptions {
   initialRetryDelay?: number
   /** Maximum retry delay in milliseconds (default: 5000) */
   maxRetryDelay?: number
-  /** Maximum number of retry attempts (default: 5) */
+  /** Maximum number of retry attempts (default: 3) */
   maxRetries?: number
   /** Backoff multiplier for exponential backoff (default: 2) */
   backoffMultiplier?: number
@@ -214,6 +214,10 @@ export class BackpressureQueue<T = any> {
     const startTime = Date.now()
 
     try {
+      // Increment attempt count for this processing attempt
+      item.attempts++
+      item.lastAttemptAt = now
+      
       // Check if transport can accept the item
       if (!this.transport.canAcceptMore()) {
         // Still under backpressure, schedule next retry
@@ -226,8 +230,6 @@ export class BackpressureQueue<T = any> {
       }
 
       // Try to send the item
-      item.attempts++
-      item.lastAttemptAt = now
       
       debugLog.operation('attempting backpressure retry', {
         itemId: item.id,

@@ -1,0 +1,7 @@
+{
+  "id": "task-007",
+  "type": "run-command",
+  "cmd": "pnpm test",
+  "timeout": 300000,
+  "description": "Run all tests across the repo to verify all fixes"
+}

@@ -73,6 +73,8 @@ function deepCopy<T>(obj: T, visited = new WeakMap(), depth = 0, maxDepth = 5): 
 /**
  * Create a deeply frozen copy of an object
  * Useful when you want to preserve the original object
+ * 
+ * Special handling for Transport objects to preserve prototype methods
  */
 export function createFrozenCopy<T extends object>(obj: T): Readonly<T> {
   // Create a deep copy first to avoid mutating the original

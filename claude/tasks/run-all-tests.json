@@ -1,0 +1,5 @@
+{
+  "type": "run-command",
+  "cmd": "pnpm test",
+  "description": "Run all tests across monorepo"
+}

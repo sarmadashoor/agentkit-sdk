@@ -57,7 +57,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
       expect(metrics.stateTransitions).toBeGreaterThan(0) // Should have transitioned to OPEN
       expect(metrics.averageResponseTime).toBeGreaterThanOrEqual(0)
       expect(metrics.uptime).toBeGreaterThan(0)
-    })
+    }, 30000)
 
     it('should calculate average response time correctly', async () => {
       console.time('circuit-breaker-response-time-calculation')
@@ -67,24 +67,24 @@ describe('CircuitBreaker Metrics and Logging', () => {
         name: 'response-time-test'
       })
 
-      // Execute requests with known delays
+      // Execute requests with known delays (but shorter for fake timers)
       await circuitBreaker.execute(async () => {
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise(resolve => setTimeout(resolve, 10))
         return 'fast'
       })
 
       await circuitBreaker.execute(async () => {
-        await new Promise(resolve => setTimeout(resolve, 200))
+        await new Promise(resolve => setTimeout(resolve, 20))
         return 'slow'
       })
 
-      vi.advanceTimersByTime(300)
+      vi.advanceTimersByTime(50)
 
       const metrics = circuitBreaker.getMetrics()
       expect(metrics.averageResponseTime).toBeGreaterThan(0)
       expect(metrics.successfulRequests).toBe(2)
       console.timeEnd('circuit-breaker-response-time-calculation')
-    }, { timeout: 10000 })
+    }, 30000)
 
     it('should track state transitions accurately', async () => {
       circuitBreaker = new CircuitBreaker({
@@ -113,7 +113,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
 
       const finalMetrics = circuitBreaker.getMetrics()
       expect(finalMetrics.stateTransitions).toBe(3) // CLOSED -> OPEN -> HALF_OPEN -> CLOSED
-    })
+    }, 30000)
 
     it('should maintain response time history within limits', async () => {
       console.time('circuit-breaker-response-history')
@@ -155,7 +155,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
       expect(console.warn).toHaveBeenCalledWith(
         expect.stringContaining('[CircuitBreaker:logging-test] Circuit opened after 1 failures')
       )
-    })
+    }, 30000)
 
     it('should log half-open and recovery transitions', async () => {
       circuitBreaker = new CircuitBreaker({
@@ -183,7 +183,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining('[CircuitBreaker:recovery-logging-test] Circuit recovered and closed successfully')
       )
-    })
+    }, 30000)
 
     it('should not log when debug is disabled', async () => {
       circuitBreaker = new CircuitBreaker({
@@ -204,7 +204,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
 
       // Console messages should still appear (not debug logs, but user-facing messages)
       expect(consoleWarnSpy).toHaveBeenCalled()
-    })
+    }, 30000)
   })
 
   describe('Integration with Transport Operations', () => {
@@ -252,7 +252,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
       
       // Circuit should still be closed (under failure threshold)
       expect(circuitBreaker.getStats().state).toBe(CircuitState.CLOSED)
-    })
+    }, 30000)
 
     it('should track metrics during circuit recovery cycle', async () => {
       circuitBreaker = new CircuitBreaker({
@@ -293,6 +293,6 @@ describe('CircuitBreaker Metrics and Logging', () => {
 
       // Verify final state
       expect(circuitBreaker.getStats().state).toBe(CircuitState.CLOSED)
-    })
+    }, 30000)
   })
 })

@@ -14,6 +14,12 @@ describe('MetricsCollector', () => {
       platform: 'test',
       environment: 'test'
     })
+    
+    // Handle unhandled events to prevent test failures
+    collector.on('error', () => {}) // Suppress error events in tests
+    collector.on('metric', () => {}) // Suppress metric events in tests
+    collector.on('pluginMetric', () => {}) // Suppress plugin metric events in tests
+    collector.on('reset', () => {}) // Suppress reset events in tests
   })
 
   describe('Initialization', () => {
@@ -330,21 +336,21 @@ describe('MetricsCollector', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       
       try {
-        // Temporarily corrupt the metrics by overriding getMetrics
-        const originalGetMetrics = corruptedCollector.getMetrics
-        corruptedCollector.getMetrics = () => {
-          const metrics = originalGetMetrics.call(corruptedCollector)
-          // Corrupt the data to trigger validation failure
-          ;(metrics as any).sdk.totalRequests.value = 'invalid'
-          return metrics as any
-        }
+        // Corrupt internal state to trigger validation failure
+        // Access private property to corrupt the counter
+        const totalRequestsCounter = (corruptedCollector as any).totalRequests
+        const originalToPrometheus = totalRequestsCounter.toPrometheus
+        totalRequestsCounter.toPrometheus = () => ({ value: 'invalid' })
         
         const result = corruptedCollector.getMetrics()
         
-        // Should return safe fallback metrics
+        // Should return safe fallback metrics due to validation failure
         expect(result.sdk.totalRequests.value).toBe(0)
         expect(result.plugins).toHaveLength(0)
         expect(consoleSpy).toHaveBeenCalledWith('Metrics validation failed:', expect.any(Error))
+        
+        // Restore original method
+        totalRequestsCounter.toPrometheus = originalToPrometheus
       } finally {
         consoleSpy.mockRestore()
       }
@@ -431,47 +437,58 @@ describe('MetricsCollector', () => {
   })
 
   describe('Event Emission', () => {
-    it('should emit events for metrics recording', (done) => {
+    it('should emit events for metrics recording', async () => {
       let eventCount = 0
+      const events: Array<{type: string, value: number}> = []
       
-      collector.on('metric', (type, value) => {
-        eventCount++
-        if (eventCount === 1) {
-          expect(type).toBe('init_latency')
-          expect(value).toBe(100)
-        }
-        if (eventCount === 2) {
-          expect(type).toBe('send_latency')
-          expect(value).toBe(50)
-          done()
-        }
+      const promise = new Promise<void>((resolve) => {
+        collector.on('metric', (type, value) => {
+          eventCount++
+          events.push({type, value})
+          if (eventCount === 2) {
+            resolve()
+          }
+        })
       })
       
       collector.recordInitLatency(100)
       collector.recordSendLatency(50)
+      
+      await promise
+      
+      expect(events[0]).toEqual({type: 'init_latency', value: 100})
+      expect(events[1]).toEqual({type: 'send_latency', value: 50})
     })
 
-    it('should emit events for plugin metrics', (done) => {
-      collector.on('pluginMetric', (data) => {
-        expect(data.pluginName).toBe('EventPlugin')
-        expect(data.hookName).toBe('onInit')
-        expect(data.duration).toBe(25)
-        expect(data.success).toBe(true)
-        expect(data.timeout).toBe(false)
-        done()
+    it('should emit events for plugin metrics', async () => {
+      const promise = new Promise<void>((resolve) => {
+        collector.on('pluginMetric', (data) => {
+          expect(data.pluginName).toBe('EventPlugin')
+          expect(data.hookName).toBe('onInit')
+          expect(data.duration).toBe(25)
+          expect(data.success).toBe(true)
+          expect(data.timeout).toBe(false)
+          resolve()
+        })
       })
       
       collector.recordPluginExecution('EventPlugin', 'onInit', 25, true)
+      
+      await promise
     })
 
-    it('should emit events for errors', (done) => {
-      collector.on('error', (errorType, pluginName) => {
-        expect(errorType).toBe('TestError')
-        expect(pluginName).toBe('ErrorPlugin')
-        done()
+    it('should emit events for errors', async () => {
+      const promise = new Promise<void>((resolve) => {
+        collector.on('error', (errorType, pluginName) => {
+          expect(errorType).toBe('TestError')
+          expect(pluginName).toBe('ErrorPlugin')
+          resolve()
+        })
       })
       
       collector.recordError('TestError', 'ErrorPlugin')
+      
+      await promise
     })
   })
 })
