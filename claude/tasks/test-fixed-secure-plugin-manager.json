@@ -1,0 +1,6 @@
+{
+  "id": "test-fixed-secure-plugin-manager",
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/plugins/SecurePluginManager.test.ts --reporter=verbose",
+  "timeout": 120000,
+  "description": "Test fixed SecurePluginManager.test.ts"
+}

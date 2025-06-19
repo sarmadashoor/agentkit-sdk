@@ -8,15 +8,17 @@ export interface ClaudeTask {
   cmd: string;
   timeout?: number;
   description?: string;
+  shell?: boolean;
 }
 
 export interface ClaudeResult {
   id: string;
   cmd: string;
   startTime: string;
+  endTime: string;
   durationMs: number;
   exitCode: number | null;
-  status: 'pass' | 'fail' | 'timeout' | 'error';
+  status: 'success' | 'timeout' | 'error';
   error?: string;
 }
 

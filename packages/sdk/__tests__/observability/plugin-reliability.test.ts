@@ -10,6 +10,8 @@ import type { Agent, Transport, AgentContext, SendPayload, AgentKitPlugin } from
 const createMockAgent = (): Agent => ({
   id: 'test-agent',
   name: 'Test Agent',
+  init: vi.fn().mockResolvedValue(undefined),
+  handle: vi.fn().mockResolvedValue({ data: 'mock response' }),
   shutdown: vi.fn().mockResolvedValue(undefined)
 })
 
@@ -18,7 +20,8 @@ const createMockTransport = (): Transport => ({
   name: 'Test Transport',
   config: {},
   init: vi.fn().mockResolvedValue(undefined),
-  send: vi.fn().mockResolvedValue(undefined)
+  send: vi.fn().mockResolvedValue(undefined),
+  canAcceptMore: vi.fn().mockReturnValue(true)
 })
 
 describe('Plugin Reliability and Error Handling', () => {

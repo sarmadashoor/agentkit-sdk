@@ -1,0 +1,9 @@
+{
+  "id": "test-echo-example",
+  "cmd": "echo 'Hello from autonomous test daemon!'",
+  "startTime": "2025-06-19T13:57:42.559Z",
+  "endTime": "2025-06-19T13:57:42.561Z",
+  "durationMs": 2,
+  "exitCode": 0,
+  "status": "success"
+}

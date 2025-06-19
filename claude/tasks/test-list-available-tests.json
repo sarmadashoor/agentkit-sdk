@@ -1,0 +1,6 @@
+{
+  "id": "test-list-available-tests",
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts --reporter=verbose --list",
+  "timeout": 30000,
+  "description": "List all available tests to understand what's happening"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "test-backpressure-recovery",
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts -t \"should recover from backpressure when queue drains\" --reporter=verbose",
+  "startTime": "2025-06-19T17:35:01.720Z",
+  "endTime": "2025-06-19T17:35:03.407Z",
+  "durationMs": 1687,
+  "exitCode": 0,
+  "status": "success"
+}

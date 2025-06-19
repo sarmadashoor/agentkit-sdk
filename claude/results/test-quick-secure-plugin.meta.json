@@ -1,0 +1,9 @@
+{
+  "id": "test-quick-secure-plugin",
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/plugins/SecurePluginManager.test.ts --reporter=verbose -t \"should enforce execution timeouts\"",
+  "startTime": "2025-06-19T17:56:13.848Z",
+  "endTime": "2025-06-19T17:56:15.040Z",
+  "durationMs": 1192,
+  "exitCode": 0,
+  "status": "success"
+}

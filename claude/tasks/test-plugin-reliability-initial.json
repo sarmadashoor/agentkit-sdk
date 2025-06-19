@@ -1,0 +1,6 @@
+{
+  "id": "test-plugin-reliability-initial",
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/observability/plugin-reliability.test.ts --reporter=verbose",
+  "timeout": 120000,
+  "description": "Initial run of plugin-reliability.test.ts to analyze failures"
+}

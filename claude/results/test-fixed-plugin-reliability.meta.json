@@ -1,0 +1,10 @@
+{
+  "id": "test-fixed-plugin-reliability",
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/observability/plugin-reliability.test.ts --reporter=verbose",
+  "startTime": "2025-06-19T17:56:38.826Z",
+  "endTime": "2025-06-19T17:56:40.395Z",
+  "durationMs": 1569,
+  "exitCode": 1,
+  "status": "error",
+  "error": "Process exited with code 1"
+}

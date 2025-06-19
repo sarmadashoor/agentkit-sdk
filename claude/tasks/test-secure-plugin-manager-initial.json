@@ -1,0 +1,6 @@
+{
+  "id": "test-secure-plugin-manager-initial",
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/plugins/SecurePluginManager.test.ts --reporter=verbose",
+  "timeout": 120000,
+  "description": "Initial run of SecurePluginManager.test.ts to analyze failures"
+}

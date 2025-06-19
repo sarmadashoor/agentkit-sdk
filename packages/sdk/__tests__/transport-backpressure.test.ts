@@ -65,7 +65,7 @@ describe('Transport Backpressure API', () => {
       const transport = new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 5,
-        responseDelay: 50, // Increase delay to keep messages in queue for testing
+        responseDelay: 1000, // ✅ Much longer delay to keep messages in queue during test
         logMessages: true
       })
 
@@ -77,12 +77,24 @@ describe('Transport Backpressure API', () => {
       expect(status.maxQueueSize).toBe(5)
       expect(status.canAcceptMore).toBe(true)
 
-      await manager.send({ msg: 1 })
-      await manager.send({ msg: 2 })
-
+      // ✅ Send messages without awaiting and check queue with small delay
+      const promise1 = manager.send({ msg: 1 })
+      const promise2 = manager.send({ msg: 2 })
+      
+      // ✅ Small delay to ensure transport.send() has been called
+      await new Promise(resolve => setTimeout(resolve, 20))
+      
       status = manager.getTransportStatus()
       expect(status.queueSize).toBe(2)
       expect(status.canAcceptMore).toBe(true)
+
+      // ✅ Wait for messages to complete processing
+      await promise1
+      await promise2
+
+      // ✅ Verify queue is empty after processing
+      status = manager.getTransportStatus()
+      expect(status.queueSize).toBe(0)
 
       await manager.shutdown()
     })
@@ -279,7 +291,7 @@ describe('Transport Backpressure API', () => {
       const transport = new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 5,
-        responseDelay: 5,
+        responseDelay: 500, // ✅ Longer delay to observe queue state changes
         logMessages: true
       })
 
@@ -290,22 +302,30 @@ describe('Transport Backpressure API', () => {
 
       queueSizes.push(manager.getTransportStatus().queueSize)
 
-      await manager.send({ msg: 1 })
-      queueSizes.push(manager.getTransportStatus().queueSize)
-
-      await manager.send({ msg: 2 })
-      queueSizes.push(manager.getTransportStatus().queueSize)
-
-      await transport.receive()
-      queueSizes.push(manager.getTransportStatus().queueSize)
-
-      // Wait a bit for processing to complete
+      // ✅ Send without awaiting to capture queue state during processing
+      const promise1 = manager.send({ msg: 1 })
+      // ✅ Small delay to ensure first message reaches transport
       await new Promise(resolve => setTimeout(resolve, 20))
+      queueSizes.push(manager.getTransportStatus().queueSize)
+
+      const promise2 = manager.send({ msg: 2 })
+      // ✅ Small delay to ensure second message reaches transport
+      await new Promise(resolve => setTimeout(resolve, 20))
+      queueSizes.push(manager.getTransportStatus().queueSize)
+
+      // ✅ Check queue size while messages are still processing
+      await new Promise(resolve => setTimeout(resolve, 50))
+      queueSizes.push(manager.getTransportStatus().queueSize)
+
+      // ✅ Wait for all processing to complete
+      await promise1
+      await promise2
       
-      // The queue sizes may vary due to async processing
+      // The queue sizes should show progression
       expect(queueSizes[0]).toBe(0) // Initial state
-      expect(queueSizes[1]).toBeGreaterThan(0) // After first send
-      expect(queueSizes[2]).toBeGreaterThanOrEqual(queueSizes[1]) // After second send
+      expect(queueSizes[1]).toBe(1) // After first send
+      expect(queueSizes[2]).toBe(2) // After second send 
+      expect(queueSizes[3]).toBeGreaterThanOrEqual(0) // During processing (may vary)
 
       await manager.shutdown()
     })

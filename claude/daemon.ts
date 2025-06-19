@@ -4,22 +4,25 @@
  * Autonomous Claude Test Daemon
  * 
  * Monitors /tasks directory for JSON task files, executes them one at a time,
- * and writes structured results to /results directory.
+ * with real-time log streaming and autonomous debugging support.
  * 
  * Key features:
  * - Sequential task execution (one at a time)
+ * - Real-time stdout/stderr streaming to separate files
  * - Timeout handling with graceful/force kill
- * - Structured .status.json + .log output per task
- * - Security-filtered command execution
- * - Self-diagnosing and Claude-compatible
+ * - Structured meta.json output per task
+ * - Support for massive log outputs without memory buffering
+ * - Detailed lifecycle logging with timestamps
  */
 
 import { watch } from 'fs/promises';
-import { existsSync, readFileSync, unlinkSync, mkdirSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, unlinkSync, mkdirSync, readdirSync, writeFileSync } from 'fs';
+import { writeFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { ClaudeTask, ClaudeResult } from './schema.js';
 import { TaskRunner } from './taskRunner.js';
 import { log, sleep } from './utils.js';
+import { config } from './config.js';
 
 export class ClaudeDaemon {
   private isRunning = false;
@@ -30,12 +33,32 @@ export class ClaudeDaemon {
   private taskQueue: string[] = [];
 
   constructor() {
-    this.tasksDir = resolve('./claude/tasks');
-    this.resultsDir = resolve('./claude/results');
+    this.tasksDir = resolve(config.tasksDir);
+    this.resultsDir = resolve(config.resultsDir);
     this.taskRunner = new TaskRunner(this.resultsDir);
     
     // Ensure directories exist
     this.ensureDirectories();
+    // Setup error handlers to prevent crashes
+    this.setupErrorHandlers();
+  }
+
+  /**
+   * Handle uncaught exceptions to prevent daemon crashes
+   */
+  private setupErrorHandlers(): void {
+    process.on('uncaughtException', (error) => {
+      log(`❌ [${new Date().toISOString()}] Uncaught Exception: ${error}`, 'error');
+      log(`❌ Stack: ${error.stack}`, 'error');
+      // Don't exit - keep daemon running
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      log(`❌ [${new Date().toISOString()}] Unhandled Rejection at:`, 'error');
+      log(`❌ Promise: ${promise}`, 'error');
+      log(`❌ Reason: ${reason}`, 'error');
+      // Don't exit - keep daemon running
+    });
   }
 
   private ensureDirectories(): void {
@@ -57,7 +80,9 @@ export class ClaudeDaemon {
     log('🤖 Claude Autonomous Test Daemon started');
     log(`📁 Tasks: ${this.tasksDir}`);
     log(`📊 Results: ${this.resultsDir}`);
-    log('🔄 Running tasks sequentially, one at a time');
+    log(`⚙️  Verbose logging: ${config.verbose}`);
+    log(`⏱️  Default timeout: ${config.taskTimeoutMs}ms`);
+    log('🔄 Running tasks sequentially with real-time log streaming');
 
     // Process any existing tasks first
     await this.discoverAndQueueTasks();
@@ -87,7 +112,7 @@ export class ClaudeDaemon {
   private async discoverAndQueueTasks(): Promise<void> {
     try {
       const files = readdirSync(this.tasksDir);
-      const taskFiles = files.filter((f: string) => f.endsWith('.json'));
+      const taskFiles = files.filter((f: string) => this.isValidTaskFile(f));
       
       if (taskFiles.length > 0) {
         log(`📋 Found ${taskFiles.length} existing task(s) to queue`);
@@ -96,6 +121,35 @@ export class ClaudeDaemon {
     } catch (error) {
       log(`❌ Error discovering tasks: ${error}`, 'error');
     }
+  }
+
+  /**
+   * Check if a file is a valid task file to process
+   */
+  private isValidTaskFile(filename: string): boolean {
+    // Must be a JSON file
+    if (!filename.endsWith('.json')) {
+      return false;
+    }
+
+    // Ignore hidden files
+    if (filename.startsWith('.')) {
+      return false;
+    }
+
+    // Ignore configured files
+    if (config.ignoredFiles.includes(filename)) {
+      return false;
+    }
+
+    // Ignore files with ignored extensions
+    const hasIgnoredExt = config.ignoredExtensions.some(ext => 
+      filename.endsWith(ext) || filename.includes(ext + '.'));
+    if (hasIgnoredExt) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -112,7 +166,7 @@ export class ClaudeDaemon {
         this.isProcessing = false;
       } else {
         // Brief sleep to avoid busy waiting
-        await sleep(250);
+        await sleep(config.pollIntervalMs);
       }
     }
   }
@@ -127,7 +181,7 @@ export class ClaudeDaemon {
       for await (const event of watcher) {
         if (!this.isRunning) break;
         
-        if (event.eventType === 'rename' && event.filename?.endsWith('.json')) {
+        if (event.eventType === 'rename' && event.filename && this.isValidTaskFile(event.filename)) {
           const taskPath = join(this.tasksDir, event.filename);
           
           // Wait a moment for file to be fully written
@@ -148,57 +202,104 @@ export class ClaudeDaemon {
    * Process a single task file
    */
   private async processTask(taskPath: string): Promise<void> {
+    const startTime = new Date().toISOString();
+    let task: any = null;
+    
     try {
-      log(`🔄 Processing: ${taskPath}`);
+      log(`🔄 [${startTime}] Processing task: ${taskPath}`);
       
-      // Read and parse task
-      const taskData = readFileSync(taskPath, 'utf-8');
-      const task: ClaudeTask = JSON.parse(taskData);
-      
-      // Validate task
-      if (!this.isValidTask(task)) {
-        log(`❌ Invalid task format in ${taskPath}`, 'error');
-        await this.writeErrorResult(task, 'Invalid task format');
-        this.cleanupTaskFile(taskPath);
+      // Read and parse task with error handling
+      try {
+        const taskData = readFileSync(taskPath, 'utf-8');
+        task = JSON.parse(taskData);
+        log(`📋 [${new Date().toISOString()}] Task JSON parsed successfully`);
+      } catch (parseError) {
+        log(`❌ [${new Date().toISOString()}] Failed to parse JSON in ${taskPath}: ${parseError}`, 'error');
+        await this.writeErrorResult(
+          { id: `invalid-${Date.now()}`, cmd: '', type: 'run-command' },
+          `JSON parse error: ${parseError}`
+        );
         return;
+      }
+      
+      // Validate and normalize task
+      if (!this.isValidTask(task)) {
+        const taskId = task?.id || task?.taskId || `invalid-${Date.now()}`;
+        log(`❌ [${new Date().toISOString()}] Invalid task format in ${taskPath}`, 'error');
+        log(`📋 Task data: ${JSON.stringify(task, null, 2)}`);
+        await this.writeErrorResult(
+          { id: taskId, cmd: task?.cmd || '', type: 'run-command' },
+          'Invalid task format - missing required fields: id, cmd'
+        );
+        return;
+      }
+
+      log(`📋 [${new Date().toISOString()}] Task loaded: ${task.id}`);
+      if (config.verbose) {
+        log(`💻 Command: ${task.cmd}`);
+        log(`⏱️  Timeout: ${task.timeout || config.taskTimeoutMs}ms`);
       }
 
       // Security check
       if (!this.isSafeCommand(task.cmd)) {
-        log(`🚫 Unsafe command blocked: ${task.cmd}`, 'warn');
+        log(`🚫 [${new Date().toISOString()}] Unsafe command blocked: ${task.cmd}`, 'warn');
         await this.writeErrorResult(task, 'Command blocked for security reasons');
-        this.cleanupTaskFile(taskPath);
         return;
       }
 
+      log(`🚀 [${new Date().toISOString()}] Starting task execution: ${task.id}`);
+      
       // Execute task
       const result = await this.taskRunner.run(task);
       
-      // Clean up task file on completion
-      this.cleanupTaskFile(taskPath);
+      const endTime = new Date().toISOString();
+      log(`✅ [${endTime}] Task completed: ${task.id} (${result.status})`);
       
-    } catch (error) {
-      log(`❌ Error processing task ${taskPath}: ${error}`, 'error');
-      
-      try {
-        // Try to read task for error result
-        const taskData = readFileSync(taskPath, 'utf-8');
-        const task: ClaudeTask = JSON.parse(taskData);
-        await this.writeErrorResult(task, `Processing error: ${error}`);
-      } catch (cleanupError) {
-        log(`❌ Error during cleanup: ${cleanupError}`, 'error');
+      // Clean up task file only on successful completion
+      if (result.status === 'success') {
+        this.cleanupTaskFile(taskPath);
+        log(`🗑️  [${endTime}] Task file cleaned up: ${taskPath}`);
+      } else {
+        log(`⚠️  [${endTime}] Task file preserved for inspection: ${taskPath}`);
       }
       
-      this.cleanupTaskFile(taskPath);
+    } catch (error) {
+      const errorTime = new Date().toISOString();
+      log(`❌ [${errorTime}] Error processing task ${taskPath}: ${error}`, 'error');
+      
+      try {
+        // Use task if we have it, otherwise create fallback
+        const fallbackTask = task || { id: `error-${Date.now()}`, cmd: '', type: 'run-command' };
+        await this.writeErrorResult(fallbackTask, `Processing error: ${error}`);
+        log(`📝 [${errorTime}] Error result written for task: ${fallbackTask.id}`);
+      } catch (cleanupError) {
+        log(`❌ [${errorTime}] Error during error handling: ${cleanupError}`, 'error');
+      }
+      
+      // Don't cleanup on error - leave for inspection
+      log(`⚠️  [${errorTime}] Task file preserved for debugging: ${taskPath}`);
     }
   }
 
   /**
-   * Validate task structure
+   * Validate task structure and normalize if needed
    */
   private isValidTask(task: any): task is ClaudeTask {
+    if (typeof task !== 'object' || task === null) {
+      return false;
+    }
+
+    // Normalize taskId to id if needed
+    if (task.taskId && !task.id) {
+      task.id = task.taskId;
+    }
+
+    // Set default type if missing
+    if (!task.type) {
+      task.type = 'run-command';
+    }
+
     return (
-      typeof task === 'object' &&
       typeof task.id === 'string' &&
       task.id.length > 0 &&
       task.type === 'run-command' &&
@@ -264,24 +365,47 @@ export class ClaudeDaemon {
   /**
    * Write error result for failed tasks
    */
-  private async writeErrorResult(task: ClaudeTask, error: string): Promise<void> {
+  private async writeErrorResult(task: { id: string; cmd: string; type?: string }, error: string): Promise<void> {
     try {
+      const timestamp = new Date().toISOString();
       const errorResult: ClaudeResult = {
         id: task.id,
         cmd: task.cmd,
-        startTime: new Date().toISOString(),
+        startTime: timestamp,
+        endTime: timestamp,
         durationMs: 0,
         exitCode: null,
         status: 'error',
         error
       };
 
-      // Use TaskRunner to write consistent result format
-      await this.taskRunner.run({
-        id: task.id,
-        type: 'run-command',
-        cmd: 'echo "Error: Task failed validation"'
-      });
+      // Write meta.json using async writeFile
+      const metaPath = join(this.resultsDir, `${task.id}.meta.json`);
+      const metaContent = JSON.stringify(errorResult, null, 2);
+      try {
+        await writeFile(metaPath, metaContent);
+        log(`📝 [${timestamp}] Meta file written: ${metaPath}`);
+      } catch (metaError) {
+        log(`❌ Failed to write meta file ${metaPath}: ${metaError}`, 'error');
+      }
+      
+      // Write log files using async writeFile
+      const stdoutPath = join(this.resultsDir, `${task.id}.stdout.log`);
+      const stderrPath = join(this.resultsDir, `${task.id}.stderr.log`);
+      
+      try {
+        await writeFile(stdoutPath, `# Task failed during validation\n# Error: ${error}\n`);
+        log(`📝 [${timestamp}] Stdout log written: ${stdoutPath}`);
+      } catch (stdoutError) {
+        log(`❌ Failed to write stdout log ${stdoutPath}: ${stdoutError}`, 'error');
+      }
+      
+      try {
+        await writeFile(stderrPath, `# Validation Error: ${error}\n`);
+        log(`📝 [${timestamp}] Stderr log written: ${stderrPath}`);
+      } catch (stderrError) {
+        log(`❌ Failed to write stderr log ${stderrPath}: ${stderrError}`, 'error');
+      }
       
     } catch (writeError) {
       log(`❌ Failed to write error result: ${writeError}`, 'error');
@@ -350,4 +474,3 @@ if (isMain) {
   });
 }
 
-export { ClaudeDaemon };

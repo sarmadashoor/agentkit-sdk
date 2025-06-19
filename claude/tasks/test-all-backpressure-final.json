@@ -1,0 +1,6 @@
+{
+  "id": "test-all-backpressure-final",
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts --reporter=verbose",
+  "timeout": 180000,
+  "description": "Final comprehensive test run for all transport backpressure tests"
+}

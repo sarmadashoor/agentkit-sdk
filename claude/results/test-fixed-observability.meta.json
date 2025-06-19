@@ -1,0 +1,10 @@
+{
+  "id": "test-fixed-observability",
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/observability/observability-integration.test.ts --reporter=verbose",
+  "startTime": "2025-06-19T17:56:37.203Z",
+  "endTime": "2025-06-19T17:56:38.825Z",
+  "durationMs": 1622,
+  "exitCode": 1,
+  "status": "error",
+  "error": "Process exited with code 1"
+}

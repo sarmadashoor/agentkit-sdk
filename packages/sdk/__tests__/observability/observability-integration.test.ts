@@ -12,6 +12,8 @@ import type { Agent, Transport, AgentContext, SendPayload, AgentKitPlugin } from
 const createMockAgent = (): Agent => ({
   id: 'test-agent',
   name: 'Test Agent',
+  init: vi.fn().mockResolvedValue(undefined),
+  handle: vi.fn().mockResolvedValue({ data: 'mock response' }),
   shutdown: vi.fn().mockResolvedValue(undefined)
 })
 
@@ -20,7 +22,8 @@ const createMockTransport = (): Transport => ({
   name: 'Test Transport',
   config: {},
   init: vi.fn().mockResolvedValue(undefined),
-  send: vi.fn().mockResolvedValue(undefined)
+  send: vi.fn().mockResolvedValue(undefined),
+  canAcceptMore: vi.fn().mockReturnValue(true)
 })
 
 // Test plugins with different behaviors
@@ -63,12 +66,12 @@ const createErrorPlugin = (): AgentKitPlugin => ({
 const createTimeoutPlugin = (): AgentKitPlugin => ({
   name: 'TimeoutPlugin',
   version: '1.0.0',
-  onInit: jest.fn().mockResolvedValue(undefined),
+  onInit: vi.fn().mockResolvedValue(undefined),
   onSend: vi.fn().mockImplementation(async () => {
     // Simulate timeout by waiting longer than hook timeout
     await new Promise(resolve => setTimeout(resolve, 6000))
   }),
-  onShutdown: jest.fn().mockResolvedValue(undefined)
+  onShutdown: vi.fn().mockResolvedValue(undefined)
 })
 
 describe('Observability Integration Tests', () => {

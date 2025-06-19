@@ -1,0 +1,10 @@
+{
+  "id": "test-all-backpressure-fixed",
+  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts --reporter=verbose",
+  "startTime": "2025-06-19T17:56:32.134Z",
+  "endTime": "2025-06-19T17:56:37.202Z",
+  "durationMs": 5068,
+  "exitCode": 1,
+  "status": "error",
+  "error": "Process exited with code 1"
+}
