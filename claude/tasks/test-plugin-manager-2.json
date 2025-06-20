@@ -1,0 +1,5 @@
+{
+  "id": "test-plugin-manager-2",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/plugins/plugin-manager.test.ts -t \"should continue execution if a plugin throws\" --reporter=verbose",
+  "timeout": 30000
+}

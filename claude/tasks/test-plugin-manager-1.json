@@ -1,0 +1,5 @@
+{
+  "id": "test-plugin-manager-1",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/plugins/plugin-manager.test.ts -t \"should execute onInit hooks in order\" --reporter=verbose",
+  "timeout": 30000
+}
