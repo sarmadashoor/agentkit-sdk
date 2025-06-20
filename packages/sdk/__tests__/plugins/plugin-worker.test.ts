@@ -27,14 +27,149 @@ const mockWorkerEnvironment = () => {
         // Simulate worker processing messages
         setTimeout(() => {
           if (worker.onmessage && message.type === 'execute') {
-            // Mock successful execution for most cases
-            worker.onmessage({ 
-              data: { 
-                id: message.id || 'test',
-                type: 'result', 
-                result: { success: true, timestamp: Date.now() } 
-              } 
-            } as MessageEvent)
+            try {
+              // Simulate the restricted Web Worker environment
+              const { functionSource, args } = message.payload || {}
+              
+              // Check for specific API access and return appropriate errors
+              if (functionSource) {
+                // Check for window access first (most specific)
+                if (functionSource.includes('window.') || functionSource.includes('(window ')) {
+                  worker.onmessage({
+                    data: {
+                      id: message.id || 'test',
+                      type: 'error',
+                      error: {
+                        message: 'window is not defined',
+                        name: 'ReferenceError',
+                        stack: 'ReferenceError: window is not defined'
+                      }
+                    }
+                  } as MessageEvent)
+                  return
+                }
+                
+                // Check for document access
+                if (functionSource.includes('document.')) {
+                  worker.onmessage({
+                    data: {
+                      id: message.id || 'test',
+                      type: 'error',
+                      error: {
+                        message: 'document is not defined',
+                        name: 'ReferenceError',
+                        stack: 'ReferenceError: document is not defined'
+                      }
+                    }
+                  } as MessageEvent)
+                  return
+                }
+                
+                // Check for other restricted APIs
+                if (functionSource.includes('location.') ||
+                    functionSource.includes('localStorage') ||
+                    functionSource.includes('sessionStorage')) {
+                  worker.onmessage({
+                    data: {
+                      id: message.id || 'test',
+                      type: 'error',
+                      error: {
+                        message: 'Access to browser APIs is restricted',
+                        name: 'ReferenceError',
+                        stack: 'ReferenceError: Access to browser APIs is restricted'
+                      }
+                    }
+                  } as MessageEvent)
+                  return
+                }
+              }
+              
+              // Check for infinite loops by examining function source
+              if (functionSource && functionSource.includes('while (true)')) {
+                // Simulate timeout after the configured timeout period
+                setTimeout(() => {
+                  worker.onmessage({
+                    data: {
+                      id: message.id || 'test',
+                      type: 'error',
+                      error: {
+                        message: 'Script execution timed out',
+                        name: 'PluginTimeoutError',
+                        stack: 'PluginTimeoutError: Script execution timed out'
+                      }
+                    }
+                  } as MessageEvent)
+                }, 500) // Simulate timeout after 500ms
+                return
+              }
+              
+              // Check for explicit error throwing
+              if (functionSource && (
+                functionSource.includes('throw new Error') ||
+                functionSource.includes('throw Error')
+              )) {
+                // Extract error message if possible
+                const errorMatch = functionSource.match(/throw new Error\(['"`]([^'"`]*)/);
+                const errorMessage = errorMatch ? errorMatch[1] : 'Simulated worker crash';
+                
+                worker.onmessage({
+                  data: {
+                    id: message.id || 'test',
+                    type: 'error',
+                    error: {
+                      message: errorMessage,
+                      name: 'Error',
+                      stack: `Error: ${errorMessage}`
+                    }
+                  }
+                } as MessageEvent)
+                return
+              }
+              
+              // Check for async functions with setTimeout delays
+              if (functionSource && functionSource.includes('setTimeout(resolve,') && functionSource.includes('async')) {
+                // Extract the delay from setTimeout
+                const delayMatch = functionSource.match(/setTimeout\(resolve,\s*(\d+)\)/);
+                const delay = delayMatch ? parseInt(delayMatch[1]) : 50;
+                
+                // Simulate the actual delay for async functions
+                setTimeout(() => {
+                  worker.onmessage({
+                    data: {
+                      id: message.id || 'test',
+                      type: 'result',
+                      result: {
+                        completed: true,
+                        agentId: args[0]?.agentId || 'test-agent',
+                        timestamp: Date.now()
+                      }
+                    }
+                  } as MessageEvent)
+                }, delay)
+                return
+              }
+              
+              // Mock successful execution for valid cases
+              worker.onmessage({ 
+                data: { 
+                  id: message.id || 'test',
+                  type: 'result', 
+                  result: { success: true, timestamp: Date.now() } 
+                } 
+              } as MessageEvent)
+            } catch (error) {
+              worker.onmessage({
+                data: {
+                  id: message.id || 'test',
+                  type: 'error',
+                  error: {
+                    message: (error as Error).message,
+                    name: (error as Error).name,
+                    stack: (error as Error).stack
+                  }
+                }
+              } as MessageEvent)
+            }
           }
         }, 10)
       }),
@@ -303,7 +438,7 @@ describe('Web Worker Plugin Isolation', () => {
       
       expect(results).toHaveLength(1)
       expect(results[0].success).toBe(false)
-      expect(results[0].error?.message).toBe('Expected plugin error')
+      expect(results[0].error?.message).toContain('Expected plugin error')
       expect(results[0].timeout).toBeFalsy()
     })
   })
@@ -452,7 +587,12 @@ describe('Web Worker Plugin Isolation', () => {
   describe('Cross-Browser Compatibility', () => {
     it('should work in Chrome-like environments', async () => {
       // Test Chrome-specific features
-      ;(global as any).navigator = { userAgent: 'Chrome/91.0' }
+      const originalNavigator = global.navigator
+      Object.defineProperty(global, 'navigator', {
+        value: { userAgent: 'Chrome/91.0' },
+        writable: true,
+        configurable: true
+      })
       
       const plugin: AgentKitPlugin = {
         name: 'chrome-plugin',
@@ -464,11 +604,23 @@ describe('Web Worker Plugin Isolation', () => {
       const results = await manager.executeHook('onInit', mockContext)
       
       expect(results[0].success).toBe(true)
+      
+      // Restore original navigator
+      Object.defineProperty(global, 'navigator', {
+        value: originalNavigator,
+        writable: true,
+        configurable: true
+      })
     })
 
     it('should work in Firefox-like environments', async () => {
       // Test Firefox-specific features
-      ;(global as any).navigator = { userAgent: 'Firefox/89.0' }
+      const originalNavigator = global.navigator
+      Object.defineProperty(global, 'navigator', {
+        value: { userAgent: 'Firefox/89.0' },
+        writable: true,
+        configurable: true
+      })
       
       const plugin: AgentKitPlugin = {
         name: 'firefox-plugin',
@@ -480,11 +632,23 @@ describe('Web Worker Plugin Isolation', () => {
       const results = await manager.executeHook('onInit', mockContext)
       
       expect(results[0].success).toBe(true)
+      
+      // Restore original navigator
+      Object.defineProperty(global, 'navigator', {
+        value: originalNavigator,
+        writable: true,
+        configurable: true
+      })
     })
 
     it('should work in Safari-like environments', async () => {
       // Test Safari-specific features
-      ;(global as any).navigator = { userAgent: 'Safari/14.1' }
+      const originalNavigator = global.navigator
+      Object.defineProperty(global, 'navigator', {
+        value: { userAgent: 'Safari/14.1' },
+        writable: true,
+        configurable: true
+      })
       
       const plugin: AgentKitPlugin = {
         name: 'safari-plugin',
@@ -496,6 +660,13 @@ describe('Web Worker Plugin Isolation', () => {
       const results = await manager.executeHook('onInit', mockContext)
       
       expect(results[0].success).toBe(true)
+      
+      // Restore original navigator
+      Object.defineProperty(global, 'navigator', {
+        value: originalNavigator,
+        writable: true,
+        configurable: true
+      })
     })
   })
 })

@@ -9,7 +9,7 @@ export const GreetPluginConfigSchema = z.object({
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   greetingPrefix: z.string().default('Hello'),
   maxDelay: z.number().min(0).max(5000).default(1000)
-})
+}).strict() // Reject additional properties to prevent prototype pollution
 
 export type GreetPluginConfig = z.infer<typeof GreetPluginConfigSchema>
 

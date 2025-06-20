@@ -1,0 +1,5 @@
+{
+  "id": "run-dev-test",
+  "cmd": "tsx scripts/dev.ts test",
+  "timeout": 300000
+}

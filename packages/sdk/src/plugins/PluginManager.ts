@@ -62,6 +62,7 @@ export class PluginManager {
       workerPool: this.workerPool,
       observabilityHooks: this.options.observabilityHooks,
       debug: this.options.debug,
+      sandbox: this.options.sandbox,
       sandboxTimeout: this.options.sandboxTimeout,
       allowedGlobals: this.options.allowedGlobals,
       enableDebugMode: this.options.enableDebugMode
@@ -89,6 +90,11 @@ export class PluginManager {
       hasWorkerPool: !!this.workerPool,
       supportsSandboxing: this.platformEnv.supportsSandboxing()
     }, this.options.debug)
+
+    // Warn if sandboxing is disabled in debug/development mode
+    if (!this.options.sandbox && (this.options.debug || this.options.enableDebugMode)) {
+      console.warn('Plugin sandboxing disabled. This should only be used in development or trusted environments.')
+    }
   }
 
   /**

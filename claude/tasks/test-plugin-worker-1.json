@@ -1,0 +1,5 @@
+{
+  "id": "test-plugin-worker-1",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/plugins/plugin-worker.test.ts -t \"should prevent DOM manipulation in Web Worker\" --reporter=verbose",
+  "timeout": 60000
+}

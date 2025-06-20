@@ -1,0 +1,5 @@
+{
+  "id": "test-plugin-worker-initial",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/plugins/plugin-worker.test.ts --reporter=verbose",
+  "timeout": 120000
+}

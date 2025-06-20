@@ -1,0 +1,6 @@
+{
+  "type": "run-command",
+  "cmd": "scripts/dev.ts test",
+  "description": "Run all tests via dev wrapper with chunked logging",
+  "timeout": 300000
+}

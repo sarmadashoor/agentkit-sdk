@@ -15,6 +15,7 @@ export class PluginExecutor {
   private workerPool?: WorkerPool
   private observabilityHooks?: PluginManagerObservabilityHooks
   private debug: boolean
+  private sandbox: boolean
   private sandboxTimeout: number
   private allowedGlobals: string[]
   private enableDebugMode: boolean
@@ -25,6 +26,7 @@ export class PluginExecutor {
     workerPool?: WorkerPool
     observabilityHooks?: PluginManagerObservabilityHooks
     debug?: boolean
+    sandbox?: boolean
     sandboxTimeout?: number
     allowedGlobals?: string[]
     enableDebugMode?: boolean
@@ -34,6 +36,7 @@ export class PluginExecutor {
     this.workerPool = options.workerPool
     this.observabilityHooks = options.observabilityHooks
     this.debug = options.debug ?? false
+    this.sandbox = options.sandbox ?? true
     this.sandboxTimeout = options.sandboxTimeout ?? 500
     this.allowedGlobals = options.allowedGlobals ?? ['Math', 'Date', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean']
     this.enableDebugMode = options.enableDebugMode ?? false
@@ -71,6 +74,11 @@ export class PluginExecutor {
    * Get execution strategy based on platform capabilities
    */
   private getExecutionStrategy(): 'vm' | 'worker' | 'direct' {
+    // If sandboxing is disabled, always use direct execution
+    if (!this.sandbox) {
+      return 'direct'
+    }
+    
     const capabilities = this.platformEnv.getCapabilities()
     
     if (capabilities.isNodeJS && capabilities.supportsVM) {

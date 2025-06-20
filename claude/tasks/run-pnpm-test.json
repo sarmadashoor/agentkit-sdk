@@ -1,0 +1,5 @@
+{
+  "id": "run-pnpm-test",
+  "cmd": "pnpm test",
+  "timeout": 300000
+}

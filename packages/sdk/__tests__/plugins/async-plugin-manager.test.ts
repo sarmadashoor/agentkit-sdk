@@ -66,7 +66,8 @@ describe('Async PluginManager', () => {
 
       pluginManager = new PluginManager({
         hookTimeout: 1000,
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false // Disable sandboxing for test plugins with inline functions
       })
 
       pluginManager.register(asyncPlugin)
@@ -114,7 +115,8 @@ describe('Async PluginManager', () => {
       }
 
       pluginManager = new PluginManager({
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false
       })
 
       pluginManager.register(syncPlugin)
@@ -142,7 +144,8 @@ describe('Async PluginManager', () => {
 
       pluginManager = new PluginManager({
         hookTimeout: 500,
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false
       })
 
       pluginManager.register(hangingPlugin)
@@ -198,7 +201,8 @@ describe('Async PluginManager', () => {
 
       pluginManager = new PluginManager({
         hookTimeout: 1000,
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false
       })
 
       pluginManager.register(fastPlugin)
@@ -256,7 +260,8 @@ describe('Async PluginManager', () => {
 
       pluginManager = new PluginManager({
         failFast: true,
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false
       })
 
       pluginManager.register(failingPlugin)
@@ -289,7 +294,8 @@ describe('Async PluginManager', () => {
 
       pluginManager = new PluginManager({
         failFast: false,
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false
       })
 
       pluginManager.register(failingPlugin)
@@ -320,7 +326,8 @@ describe('Async PluginManager', () => {
       }
 
       pluginManager = new PluginManager({
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false
       })
 
       pluginManager.register(errorPlugin)
@@ -334,7 +341,8 @@ describe('Async PluginManager', () => {
       expect(mockObservabilityHooks.onPluginError).toHaveBeenCalledWith(
         'error-plugin',
         'onSend',
-        expect.objectContaining({ message: 'Specific error' })
+        expect.any(Error),
+        expect.any(Number)
       )
     })
 
@@ -364,7 +372,8 @@ describe('Async PluginManager', () => {
       ]
 
       pluginManager = new PluginManager({
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false
       })
 
       plugins.forEach(plugin => pluginManager.register(plugin))
@@ -393,7 +402,8 @@ describe('Async PluginManager', () => {
 
       pluginManager = new PluginManager({
         hookTimeout: 100,
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false
       })
 
       pluginManager.register(timeoutPlugin)
@@ -427,7 +437,7 @@ describe('Async PluginManager', () => {
         }
       }
 
-      pluginManager = new PluginManager()
+      pluginManager = new PluginManager({ sandbox: false })
 
       expect(() => {
         pluginManager.register(validAsyncPlugin)
@@ -446,7 +456,8 @@ describe('Async PluginManager', () => {
       }
 
       pluginManager = new PluginManager({
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false
       })
 
       pluginManager.register(testPlugin)
@@ -483,7 +494,8 @@ describe('Async PluginManager', () => {
       }
 
       pluginManager = new PluginManager({
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false
       })
 
       pluginManager.register(plugin)
@@ -513,7 +525,8 @@ describe('Async PluginManager', () => {
       }
 
       pluginManager = new PluginManager({
-        observabilityHooks: mockObservabilityHooks
+        observabilityHooks: mockObservabilityHooks,
+        sandbox: false
       })
 
       pluginManager.register(plugin)

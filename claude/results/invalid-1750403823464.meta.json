@@ -1,0 +1,10 @@
+{
+  "id": "invalid-1750403823464",
+  "cmd": "scripts/dev.ts test",
+  "startTime": "2025-06-20T07:17:03.464Z",
+  "endTime": "2025-06-20T07:17:03.464Z",
+  "durationMs": 0,
+  "exitCode": null,
+  "status": "error",
+  "error": "Invalid task format - missing required fields: id, cmd"
+}
