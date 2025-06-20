@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { PluginManager } from '../../src/plugins/PluginManager'
 import { AgentKitPlugin, AgentContext, SendPayload } from '../../src/plugins/types'
-import { AgentKitError } from '../../src/plugins/../errors'
+import { AgentKitError } from '../../src/errors'
 import { z } from 'zod'
 
 describe('PluginManager', () => {

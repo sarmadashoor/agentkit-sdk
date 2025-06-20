@@ -53,12 +53,9 @@ describe('CircuitBreaker Transport Integration', () => {
 
   afterEach(async () => {
     console.time('circuit-breaker-transport-integration-cleanup')
-    vi.useRealTimers()
     consoleSpy.mockRestore()
     vi.restoreAllMocks()
-    
-    // Ensure any pending async operations complete
-    await new Promise(resolve => setTimeout(resolve, 50))
+    vi.useRealTimers()
     console.timeEnd('circuit-breaker-transport-integration-cleanup')
   })
 
@@ -165,8 +162,8 @@ describe('CircuitBreaker Transport Integration', () => {
       // Circuit should be open now
       await expect(handle.send({ id: 7 })).rejects.toThrow(CircuitBreakerError)
 
-      // Advance time past timeout
-      vi.advanceTimersByTime(600)
+      // Advance time past timeout to allow circuit to transition to half-open
+      await vi.advanceTimersByTimeAsync(600)
       
       // Next request should succeed (circuit in half-open, then closes on success)
       await expect(handle.send({ id: 8 })).resolves.not.toThrow()

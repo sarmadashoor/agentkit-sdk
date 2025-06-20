@@ -1,0 +1,9 @@
+{
+  "id": "test-secure-plugin-async-error",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/plugins/SecurePluginManager.test.ts -t \"should handle async plugin errors\" --reporter=verbose",
+  "startTime": "2025-06-19T21:40:48.902Z",
+  "endTime": "2025-06-19T21:40:51.815Z",
+  "durationMs": 2913,
+  "exitCode": 0,
+  "status": "success"
+}

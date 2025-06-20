@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { PluginManager } from '../../src/plugins/PluginManager'
 import type { AgentKitPlugin, AgentContext, SendPayload } from '@agentkit/types'
-import { PluginTimeoutError, PluginSandboxError } from '../../src/plugins/../errors'
+import { PluginTimeoutError, PluginSandboxError } from '../../src/errors'
 
 // Mock Web Worker environment for testing
 const mockWorkerEnvironment = () => {

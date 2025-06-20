@@ -33,7 +33,7 @@ export interface PluginRunnerConfig {
 export interface PluginObservabilityHooks {
   onPluginStart?: (pluginName: string, hookName: string) => void
   onPluginSuccess?: (pluginName: string, hookName: string, duration: number) => void
-  onPluginError?: (pluginName: string, hookName: string, error: Error) => void
+  onPluginError?: (pluginName: string, hookName: string, error: Error, duration: number) => void
   onPluginTimeout?: (pluginName: string, hookName: string, timeout: number) => void
 }
 
@@ -84,8 +84,8 @@ export class PluginRunner {
             logPluginSuccess(pluginName, hookName, duration)
           }
         },
-        onPluginError: (pluginName: string, hookName: string, error: Error) => {
-          this.observabilityHooks.onPluginError?.(pluginName, hookName, error)
+        onPluginError: (pluginName: string, hookName: string, error: Error, duration: number) => {
+          this.observabilityHooks.onPluginError?.(pluginName, hookName, error, duration)
           // Log visual trace output
           if (this.config.debugModeEnabled) {
             logPluginError(pluginName, hookName, error.message, Date.now())

@@ -1,0 +1,10 @@
+{
+  "id": "test-plugin-reliability-debug",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability/plugin-reliability.test.ts -t \"should track plugin timeouts in timeline and metrics\"",
+  "startTime": "2025-06-19T20:31:08.308Z",
+  "endTime": "2025-06-19T20:31:12.459Z",
+  "durationMs": 4151,
+  "exitCode": 1,
+  "status": "error",
+  "error": "Process exited with code 1"
+}

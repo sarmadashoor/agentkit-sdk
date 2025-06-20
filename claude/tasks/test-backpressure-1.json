@@ -1,0 +1,7 @@
+{
+  "id": "test-backpressure-1",
+  "type": "run-command",
+  "cmd": "pnpm test packages/sdk/__tests__/transport-backpressure.test.ts -t \"should respect transport backpressure when queue is full\"",
+  "description": "Run first test: 'should respect transport backpressure when queue is full'",
+  "timeout": 30000
+}

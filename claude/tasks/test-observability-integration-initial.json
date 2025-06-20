@@ -1,6 +1,0 @@
-{
-  "id": "test-observability-integration-initial",
-  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/observability/observability-integration.test.ts --reporter=verbose",
-  "timeout": 120000,
-  "description": "Initial run of observability-integration.test.ts to analyze failures"
-}

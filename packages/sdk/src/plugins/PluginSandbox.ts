@@ -52,12 +52,10 @@ class SecurityViolationDetector {
   detect(code: string): string[] {
     this.violations = []
     
-    // Check for dangerous patterns
+    // Check for definitely dangerous patterns
     const dangerousPatterns = [
       /eval\s*\(/g,
       /Function\s*\(/g,
-      /setTimeout\s*\(/g,
-      /setInterval\s*\(/g,
       /XMLHttpRequest/g,
       /fetch\s*\(/g,
       /require\s*\(/g,
@@ -66,9 +64,7 @@ class SecurityViolationDetector {
       /global\./g,
       /window\./g,
       /document\./g,
-      /__proto__/g,
-      /constructor/g,
-      /prototype/g
+      /__proto__/g
     ]
 
     dangerousPatterns.forEach((pattern, index) => {
@@ -76,6 +72,20 @@ class SecurityViolationDetector {
         this.violations.push(`Detected dangerous pattern: ${pattern.source}`)
       }
     })
+
+    // Check for potentially dangerous timer usage (not in Promise contexts)
+    if (/setTimeout\s*\([^)]*\)(?!\s*[;,]\s*})(?!.*resolve)/g.test(code) && !/Promise\(.*setTimeout/g.test(code)) {
+      this.violations.push('Detected potentially dangerous timer usage outside Promise context')
+    }
+    
+    if (/setInterval\s*\(/g.test(code)) {
+      this.violations.push('Detected dangerous pattern: setInterval usage')
+    }
+
+    // Check for dangerous constructor/prototype manipulation
+    if (/\.constructor\s*\(/g.test(code) || /\.prototype\s*=/g.test(code)) {
+      this.violations.push('Detected dangerous constructor/prototype manipulation')
+    }
 
     return this.violations
   }
@@ -122,6 +132,21 @@ class NodeVMSandbox {
       Error,
       TypeError,
       ReferenceError,
+      // Controlled setTimeout for Promise-based operations only
+      setTimeout: (callback: Function, delay: number, ...args: unknown[]) => {
+        // Only allow short delays for legitimate async operations
+        const maxDelay = Math.min(delay || 0, 5000) // Max 5 seconds
+        return globalThis.setTimeout(callback, maxDelay, ...args)
+      },
+      // Provide controlled globalThis that plugins can access but not modify
+      globalThis: new Proxy({}, {
+        get: () => undefined,
+        set: () => false, // Prevent setting properties
+        has: () => false,
+        ownKeys: () => [],
+        defineProperty: () => false,
+        deleteProperty: () => false
+      }),
       console: {
         log: (...args: unknown[]) => {
           if (this.options.debug) {

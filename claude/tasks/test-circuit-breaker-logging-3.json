@@ -1,0 +1,5 @@
+{
+  "id": "test-circuit-breaker-logging-3",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/circuit-breaker-metrics.test.ts -t \"should not log when debug is disabled\" --reporter=verbose",
+  "timeout": 60000
+}

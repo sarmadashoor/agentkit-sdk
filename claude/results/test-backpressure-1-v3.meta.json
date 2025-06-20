@@ -1,0 +1,9 @@
+{
+  "id": "test-backpressure-1-v3",
+  "cmd": "pnpm --filter=@agentkit/sdk test __tests__/transport-backpressure.test.ts -t \"should respect transport backpressure when queue is full\"",
+  "startTime": "2025-06-19T20:04:11.010Z",
+  "endTime": "2025-06-19T20:04:12.873Z",
+  "durationMs": 1863,
+  "exitCode": 0,
+  "status": "success"
+}

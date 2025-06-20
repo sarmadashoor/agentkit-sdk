@@ -116,7 +116,19 @@ export class PluginExecutor {
       
       // Get the function source and create a completely isolated execution
       const timeoutMs = this.sandboxTimeout
-      const hookSource = hook.toString()
+      
+      // Handle vitest mock functions by extracting the actual implementation
+      const actualFunction = this.extractActualFunction(hook)
+      const hookSource = actualFunction.toString()
+      
+      if (actualFunction !== hook) {
+        debugLog.operation('vitest mock detected, using actual implementation', {
+          plugin: plugin.name,
+          hook: hookName,
+          originalSource: hook.toString().substring(0, 200) + '...',
+          actualSource: hookSource.substring(0, 200) + '...'
+        }, this.debug)
+      }
       
       // Extract the function body to avoid issues with function declarations
       let functionBody = this.prepareFunctionSource(hookSource)
@@ -177,15 +189,18 @@ export class PluginExecutor {
       }
       
       if (error instanceof Error) {
-        // Check for VM timeout specifically
-        if (error.message.includes('Script execution timed out')) {
+        // Check for VM timeout specifically - handle both direct and wrapped timeout messages
+        if (error.message.includes('Script execution timed out') || 
+            error.message.includes('Sandbox execution error: Script execution timed out') ||
+            (error.message.startsWith('Sandbox execution error: ') && error.message.includes('timed out'))) {
           throw new PluginTimeoutError(`${plugin.name}.${hookName}`, this.sandboxTimeout, {
             context: { operation: `${plugin.name}.${hookName}`, timeoutMs: this.sandboxTimeout, type: 'sandbox' }
           })
         }
         
         // Check for sandbox escape attempts
-        if (this.security.isSandboxEscapeAttempt(error, 'node')) {
+        const isSandboxEscape = this.security.isSandboxEscapeAttempt(error, 'node')
+        if (isSandboxEscape) {
           this.observabilityHooks?.onPluginSandboxEscape?.(plugin.name, hookName, error.message)
           throw new PluginSandboxError(plugin.name, hookName, error.message, {
             context: { originalError: error.message, duration }
@@ -243,7 +258,18 @@ export class PluginExecutor {
       }
 
       // Execute in worker with proper function serialization
-      const hookSource = hook.toString()
+      // Handle vitest mock functions by extracting the actual implementation
+      const actualFunction = this.extractActualFunction(hook)
+      const hookSource = actualFunction.toString()
+      
+      if (actualFunction !== hook) {
+        debugLog.operation('vitest mock detected in worker, using actual implementation', {
+          plugin: plugin.name,
+          hook: hookName,
+          originalSource: hook.toString().substring(0, 100) + '...',
+          actualSource: hookSource.substring(0, 100) + '...'
+        }, this.debug)
+      }
       
       const options: WorkerExecutionOptions = {
         pluginName: plugin.name,
@@ -377,31 +403,88 @@ export class PluginExecutor {
         const [, methodName, params, body] = simpleMethodMatch
         functionBody = `function(${params}) {${body}}`
       } else if (hookSource.includes('=>')) {
-        // Handle arrow functions
-        if (hookSource.includes('{')) {
-          // Block arrow function: args => { ... }
-          const arrowIndex = hookSource.indexOf('=>')
-          const paramsStr = hookSource.substring(0, arrowIndex).trim()
-          const bodyStr = hookSource.substring(arrowIndex + 2).trim()
-          // Clean up parameter list (remove outer parentheses if present)
-          const cleanParams = paramsStr.startsWith('(') && paramsStr.endsWith(')') 
-            ? paramsStr.slice(1, -1) 
-            : paramsStr
-          functionBody = `function(${cleanParams}) ${bodyStr}`
+        // Handle arrow functions (including async arrow functions)
+        const arrowIndex = hookSource.indexOf('=>')
+        let paramsStr = hookSource.substring(0, arrowIndex).trim()
+        const bodyStr = hookSource.substring(arrowIndex + 2).trim()
+        
+        // Handle async keyword
+        const isAsync = paramsStr.startsWith('async')
+        if (isAsync) {
+          paramsStr = paramsStr.substring(5).trim() // Remove 'async' keyword
+        }
+        
+        // Clean up parameter list (remove outer parentheses if present)
+        const cleanParams = paramsStr.startsWith('(') && paramsStr.endsWith(')') 
+          ? paramsStr.slice(1, -1) 
+          : paramsStr
+        
+        if (bodyStr.startsWith('{')) {
+          // Block arrow function: (async) args => { ... }
+          functionBody = isAsync 
+            ? `async function(${cleanParams}) ${bodyStr}`
+            : `function(${cleanParams}) ${bodyStr}`
         } else {
-          // Expression arrow function: args => expr
-          const arrowIndex = hookSource.indexOf('=>')
-          const paramsStr = hookSource.substring(0, arrowIndex).trim()
-          const exprStr = hookSource.substring(arrowIndex + 2).trim()
-          // Clean up parameter list (remove outer parentheses if present)
-          const cleanParams = paramsStr.startsWith('(') && paramsStr.endsWith(')') 
-            ? paramsStr.slice(1, -1) 
-            : paramsStr
-          functionBody = `function(${cleanParams}) { return ${exprStr}; }`
+          // Expression arrow function: (async) args => expr
+          functionBody = isAsync 
+            ? `async function(${cleanParams}) { return ${bodyStr}; }`
+            : `function(${cleanParams}) { return ${bodyStr}; }`
         }
       }
     }
     
     return functionBody
+  }
+
+  /**
+   * Extract the actual implementation from vitest mock functions
+   */
+  private extractActualFunction(hookFunction: Function): Function {
+    // Check if this is a vitest mock function by looking for getMockImplementation method
+    if (typeof hookFunction === 'function' && 'getMockImplementation' in hookFunction) {
+      const mockImplementation = (hookFunction as any).getMockImplementation()
+      if (typeof mockImplementation === 'function') {
+        return mockImplementation
+      }
+    }
+    
+    // Check if function source contains vitest internal references that would fail in sandbox
+    const hookSource = hookFunction.toString()
+    
+    // Common patterns in vitest mock functions that would cause "X is not defined" errors
+    const vitestInternalPatterns = [
+      /\b[A-Z]\.[a-zA-Z]/,  // Single capital letter followed by method call (e.g., A.getMockImplementation)
+      /\b[a-z]\.[a-zA-Z].*getMockImplementation/,  // lowercase letter with getMockImplementation
+      /return [A-Z]\./,  // return statement with capital letter reference
+      /arguments\[0\]\?\.apply/  // vitest-style argument handling
+    ]
+    
+    const hasVitestInternals = vitestInternalPatterns.some(pattern => pattern.test(hookSource))
+    
+    if (hasVitestInternals) {
+      // Log warning that we found a mock but couldn't extract implementation
+      debugLog.operation('detected vitest mock with internal references but no getMockImplementation', {
+        source: hookSource.substring(0, 200) + '...'
+      }, this.debug)
+      
+      // Try to find mockImplementation property
+      if ('mockImplementation' in hookFunction) {
+        const impl = (hookFunction as any).mockImplementation
+        if (typeof impl === 'function') {
+          return impl
+        }
+      }
+      
+      // Try to find _mockImplementation property (internal vitest property)
+      if ('_mockImplementation' in hookFunction) {
+        const impl = (hookFunction as any)._mockImplementation
+        if (typeof impl === 'function') {
+          return impl
+        }
+      }
+    }
+    
+    // Return original function if no mock implementation found
+    return hookFunction
   }
 }

@@ -1,0 +1,10 @@
+{
+  "id": "test-all-backpressure-verbose",
+  "cmd": "pnpm --filter=@agentkit/sdk test __tests__/transport-backpressure.test.ts --verbose",
+  "startTime": "2025-06-19T20:06:36.602Z",
+  "endTime": "2025-06-19T20:06:37.061Z",
+  "durationMs": 459,
+  "exitCode": 1,
+  "status": "error",
+  "error": "Process exited with code 1"
+}

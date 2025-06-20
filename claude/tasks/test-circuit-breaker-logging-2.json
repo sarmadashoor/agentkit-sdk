@@ -1,0 +1,5 @@
+{
+  "id": "test-circuit-breaker-logging-2",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/circuit-breaker-metrics.test.ts -t \"should log half-open and recovery transitions\" --reporter=verbose",
+  "timeout": 60000
+}

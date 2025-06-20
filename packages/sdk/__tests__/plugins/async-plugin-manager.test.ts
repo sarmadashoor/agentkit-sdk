@@ -12,7 +12,7 @@ import {
   PluginExecutionResult,
   PluginManagerObservabilityHooks
 } from '../../src/plugins/types'
-import { PluginTimeoutError, PluginSignatureError } from '../../src/plugins/../errors'
+import { PluginTimeoutError, PluginSignatureError } from '../../src/errors'
 
 describe('Async PluginManager', () => {
   let pluginManager: PluginManager

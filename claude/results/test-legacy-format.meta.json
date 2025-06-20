@@ -1,9 +1,0 @@
-{
-  "id": "test-legacy-format",
-  "cmd": "echo 'Testing backward compatibility with taskId field'",
-  "startTime": "2025-06-19T14:09:30.876Z",
-  "endTime": "2025-06-19T14:09:30.879Z",
-  "durationMs": 3,
-  "exitCode": 0,
-  "status": "success"
-}

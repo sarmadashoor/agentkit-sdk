@@ -1,0 +1,10 @@
+{
+  "id": "test-plugin-reliability-direct",
+  "cmd": "cd /home/s/dev/agentkit-sdk/packages/sdk && npx vitest run __tests__/observability/plugin-reliability.test.ts -t \"should track plugin timeouts in timeline and metrics\"",
+  "startTime": "2025-06-19T20:29:07.468Z",
+  "endTime": "2025-06-19T20:29:07.468Z",
+  "durationMs": 0,
+  "exitCode": null,
+  "status": "error",
+  "error": "Command blocked for security reasons"
+}

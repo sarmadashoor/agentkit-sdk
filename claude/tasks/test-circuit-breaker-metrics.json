@@ -1,0 +1,5 @@
+{
+  "id": "test-circuit-breaker-metrics",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/circuit-breaker-metrics.test.ts --reporter=verbose",
+  "timeout": 120000
+}

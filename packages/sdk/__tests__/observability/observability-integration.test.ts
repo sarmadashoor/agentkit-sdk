@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { AgentManager } from '../../src/observability/../AgentManager'
+import { AgentManager } from '../../src/AgentManager'
 import { MetricsCollector } from '../../src/observability/MetricsCollector'
 import { PluginExecutionTimeline } from '../../src/observability/PluginExecutionTimeline'
 import type { Agent, Transport, AgentContext, SendPayload, AgentKitPlugin } from '@agentkit/types'

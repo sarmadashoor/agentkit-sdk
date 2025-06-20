@@ -1,0 +1,6 @@
+{
+  "id": "test-plugin-reliability-file-only",
+  "type": "run-command",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability/plugin-reliability.test.ts --reporter=verbose",
+  "timeout": 120000
+}

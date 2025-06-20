@@ -1,0 +1,10 @@
+{
+  "id": "test-plugin-reliability-01",
+  "cmd": "pnpm --filter=@agentkit/sdk test __tests__/observability/plugin-reliability.test.ts -t \"should track plugin timeouts in timeline and metrics\"",
+  "startTime": "2025-06-19T20:23:52.483Z",
+  "endTime": "2025-06-19T20:23:56.483Z",
+  "durationMs": 4000,
+  "exitCode": 1,
+  "status": "error",
+  "error": "Process exited with code 1"
+}

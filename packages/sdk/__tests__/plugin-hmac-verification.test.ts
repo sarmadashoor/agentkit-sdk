@@ -272,7 +272,7 @@ describe('Plugin HMAC Verification System (TDD)', () => {
   describe('TDD: CLI Signing Command', () => {
     it('should generate consistent HMAC signatures for the same plugin', async () => {
       // FAILING TEST - This should fail until we implement CLI signing
-      const { signPlugin } = await import('../security/plugin-signer') // Module doesn't exist yet
+      const { signPlugin } = await import('../src/security/plugin-signer') // Module doesn't exist yet
       
       const testPlugin = createTestPlugin('consistent-plugin')
       
@@ -284,7 +284,7 @@ describe('Plugin HMAC Verification System (TDD)', () => {
 
     it('should generate different signatures for different secrets', async () => {
       // FAILING TEST - This should fail until we implement CLI signing
-      const { signPlugin } = await import('../security/plugin-signer')
+      const { signPlugin } = await import('../src/security/plugin-signer')
       
       const testPlugin = createTestPlugin('secret-test-plugin')
       
@@ -337,7 +337,7 @@ describe('Plugin HMAC Verification System (TDD)', () => {
       global.crypto = { subtle: mockSubtleCrypto } as any
       global.window = {} as any
       
-      const { verifyPluginInBrowser } = await import('../security/browser-verifier') // Module doesn't exist yet
+      const { verifyPluginInBrowser } = await import('../src/security/browser-verifier') // Module doesn't exist yet
       
       const testPlugin = createTestPlugin('browser-plugin', {
         signature: 'browser-signature'
@@ -354,7 +354,7 @@ describe('Plugin HMAC Verification System (TDD)', () => {
       // FAILING TEST - This should fail until we implement fallback
       delete global.crypto
       
-      const { verifyPluginWithPolyfill } = await import('../security/crypto-polyfill') // Module doesn't exist yet
+      const { verifyPluginWithPolyfill } = await import('../src/security/crypto-polyfill') // Module doesn't exist yet
       
       const testPlugin = createTestPlugin('polyfill-plugin', {
         signature: 'polyfill-signature'

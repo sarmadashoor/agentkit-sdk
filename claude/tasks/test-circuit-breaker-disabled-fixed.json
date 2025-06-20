@@ -1,0 +1,5 @@
+{
+  "id": "test-circuit-breaker-disabled-fixed",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/circuit-breaker-transport-integration.test.ts -t \"should not use circuit breaker when feature flag is disabled\" --reporter=verbose",
+  "timeout": 60000
+}

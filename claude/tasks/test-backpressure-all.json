@@ -1,0 +1,7 @@
+{
+  "id": "test-backpressure-all",
+  "type": "run-command",
+  "cmd": "pnpm --filter=@agentkit/sdk test __tests__/transport-backpressure.test.ts",
+  "description": "Run all tests in backpressure file to see actual failures",
+  "timeout": 30000
+}

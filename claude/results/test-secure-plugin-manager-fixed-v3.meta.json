@@ -1,0 +1,10 @@
+{
+  "id": "test-secure-plugin-manager-fixed-v3",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/plugins/SecurePluginManager.test.ts --reporter=verbose",
+  "startTime": "2025-06-19T21:44:05.088Z",
+  "endTime": "2025-06-19T21:44:07.291Z",
+  "durationMs": 2203,
+  "exitCode": 1,
+  "status": "error",
+  "error": "Process exited with code 1"
+}

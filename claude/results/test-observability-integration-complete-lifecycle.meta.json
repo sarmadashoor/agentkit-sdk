@@ -1,0 +1,9 @@
+{
+  "id": "test-observability-integration-complete-lifecycle",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability-integration.test.ts -t \"should demonstrate complete observability lifecycle\" --reporter=verbose",
+  "startTime": "2025-06-19T21:50:14.980Z",
+  "endTime": "2025-06-19T21:50:17.229Z",
+  "durationMs": 2249,
+  "exitCode": 0,
+  "status": "success"
+}

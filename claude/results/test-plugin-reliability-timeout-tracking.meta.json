@@ -1,0 +1,9 @@
+{
+  "id": "test-plugin-reliability-timeout-tracking",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability/plugin-reliability.test.ts -t \"should track plugin timeouts in timeline and metrics\" --reporter=verbose",
+  "startTime": "2025-06-19T20:51:28.874Z",
+  "endTime": "2025-06-19T20:51:32.724Z",
+  "durationMs": 3850,
+  "exitCode": 0,
+  "status": "success"
+}

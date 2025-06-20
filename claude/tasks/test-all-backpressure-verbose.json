@@ -1,0 +1,7 @@
+{
+  "id": "test-all-backpressure-verbose",
+  "type": "run-command",
+  "cmd": "pnpm --filter=@agentkit/sdk test __tests__/transport-backpressure.test.ts --verbose",
+  "description": "Run all tests with verbose output to see exact names",
+  "timeout": 30000
+}

@@ -1,9 +1,0 @@
-{
-  "id": "test-queue-size-info-retry",
-  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts -t \"should provide accurate queue size information\" --reporter=verbose",
-  "startTime": "2025-06-19T14:19:45.569Z",
-  "endTime": "2025-06-19T14:19:47.225Z",
-  "durationMs": 1656,
-  "exitCode": 0,
-  "status": "success"
-}

@@ -27,7 +27,7 @@ export interface PluginManagerObservabilityHooks {
   /** Called when a plugin times out */
   onPluginTimeout?(pluginName: string, hookName: PluginHookName, timeoutMs: number): void
   /** Called when a plugin throws an error */
-  onPluginError?(pluginName: string, hookName: PluginHookName, error: Error): void
+  onPluginError?(pluginName: string, hookName: PluginHookName, error: Error, duration: number): void
   /** Called when a plugin executes successfully */
   onPluginSuccess?(pluginName: string, hookName: PluginHookName, duration: number): void
   /** Called before plugin execution starts */

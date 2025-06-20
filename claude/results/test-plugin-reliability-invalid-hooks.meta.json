@@ -1,0 +1,9 @@
+{
+  "id": "test-plugin-reliability-invalid-hooks",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability/plugin-reliability.test.ts -t \"should handle plugins with invalid hook implementations\" --reporter=verbose",
+  "startTime": "2025-06-19T21:54:51.276Z",
+  "endTime": "2025-06-19T21:54:53.577Z",
+  "durationMs": 2301,
+  "exitCode": 0,
+  "status": "success"
+}

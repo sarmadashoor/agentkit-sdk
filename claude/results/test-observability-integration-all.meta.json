@@ -1,0 +1,9 @@
+{
+  "id": "test-observability-integration-all",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability-integration.test.ts --reporter=verbose",
+  "startTime": "2025-06-19T21:51:07.957Z",
+  "endTime": "2025-06-19T21:51:10.096Z",
+  "durationMs": 2139,
+  "exitCode": 0,
+  "status": "success"
+}

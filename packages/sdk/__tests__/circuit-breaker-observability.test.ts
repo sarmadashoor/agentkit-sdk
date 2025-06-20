@@ -168,7 +168,8 @@ describe('CircuitBreaker Observability and State Transitions', () => {
       })
 
       const executePromise = circuitBreaker.execute(slowSuccess)
-      vi.advanceTimersByTime(100)
+      // Use async timer advancement to ensure proper resolution
+      await vi.advanceTimersByTimeAsync(100)
       await executePromise
 
       expect(mockObservabilityHooks.onRequestSuccess).toHaveBeenCalledWith(

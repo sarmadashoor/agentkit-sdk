@@ -1,9 +1,0 @@
-{
-  "id": "test-high-load-graceful",
-  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts -t \"should handle backpressure errors gracefully during high load\" --reporter=verbose",
-  "startTime": "2025-06-19T17:34:55.093Z",
-  "endTime": "2025-06-19T17:34:56.714Z",
-  "durationMs": 1621,
-  "exitCode": 0,
-  "status": "success"
-}

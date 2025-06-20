@@ -1,4 +1,0 @@
-{
-  "name": "test-remaining-fixes",
-  "command": "pnpm --filter @agentkit/sdk exec vitest run __tests__/observability/plugin-reliability.test.ts __tests__/plugins/SecurePluginManager.test.ts __tests__/observability/observability-integration.test.ts --reporter=verbose"
-}

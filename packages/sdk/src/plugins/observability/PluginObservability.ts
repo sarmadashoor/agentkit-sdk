@@ -128,13 +128,18 @@ export class PluginObservability {
       
     } catch (error) {
       const duration = Date.now() - startTime
-      const isTimeout = error instanceof PluginTimeoutError
+      const isTimeout = error instanceof PluginTimeoutError ||
+                        (error instanceof Error && (
+                          error.message.includes('Script execution timed out') ||
+                          error.message.includes('timed out after') ||
+                          error.message.includes('sandbox violation: Error: Script execution timed out')
+                        ))
       
       // Notify observability hooks
       if (isTimeout) {
         this.observabilityHooks?.onPluginTimeout?.(plugin.name, hookName, this.hookTimeout)
       } else {
-        this.observabilityHooks?.onPluginError?.(plugin.name, hookName, error as Error)
+        this.observabilityHooks?.onPluginError?.(plugin.name, hookName, error as Error, duration)
       }
       
       // Log error

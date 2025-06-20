@@ -246,7 +246,7 @@ export class AgentManager {
     // Initialize plugin runner with observability hooks
     const pluginObservabilityHooks: PluginObservabilityHooks = {
       onPluginStart: (pluginName: string, hookName: string) => {
-        this.observability.timelineInstance?.startExecution(hookName, pluginName)
+        // Timeline tracking handled by completion hooks (onPluginSuccess/onPluginError)
         if (this.observability.isDebugModeEnabled) {
           // Debug logging handled by PluginRunner
         }
@@ -255,8 +255,7 @@ export class AgentManager {
         this.observability.timelineInstance?.addExecution(hookName, pluginName, duration, 'success')
         this.observability.metricsCollectorInstance?.recordPluginExecution(pluginName, hookName, duration, true)
       },
-      onPluginError: (pluginName: string, hookName: string, error: Error) => {
-        const duration = Date.now() // Fallback duration
+      onPluginError: (pluginName: string, hookName: string, error: Error, duration: number) => {
         this.observability.timelineInstance?.addExecution(hookName, pluginName, duration, 'error', error.message)
         this.observability.metricsCollectorInstance?.recordPluginExecution(pluginName, hookName, duration, false)
       },
@@ -284,8 +283,15 @@ export class AgentManager {
       onShutdown: options.onShutdown,
       onError: options.onError,
       onCleanup: options.onCleanup,
-      onPluginHook: (hookName: string, ...args: any[]) => 
-        this.pluginRunner.callPluginHook(hookName as any, ...args),
+      onPluginHook: async (hookName: string, ...args: any[]) => {
+        if (hookName === 'onInit' || hookName === 'onShutdown') {
+          return this.pluginRunner.callPluginHook(hookName as any, args[0])
+        } else if (hookName === 'onSend' || hookName === 'onError') {
+          return this.pluginRunner.callPluginHook(hookName as any, args[0], args[1])
+        } else {
+          return this.pluginRunner.callPluginHook(hookName as any, ...args)
+        }
+      },
       onExposeTimeline: () => this.observability.exposeTimelineGlobally()
     }
 
@@ -310,8 +316,15 @@ export class AgentManager {
 
     // Initialize sandboxed executor
     const executorCallbacks: ExecutorCallbacks = {
-      onPluginHook: (hookName: string, ...args: any[]) => 
-        this.pluginRunner.callPluginHook(hookName as any, ...args),
+      onPluginHook: async (hookName: string, ...args: any[]) => {
+        if (hookName === 'onInit' || hookName === 'onShutdown') {
+          return this.pluginRunner.callPluginHook(hookName as any, args[0])
+        } else if (hookName === 'onSend' || hookName === 'onError') {
+          return this.pluginRunner.callPluginHook(hookName as any, args[0], args[1])
+        } else {
+          return this.pluginRunner.callPluginHook(hookName as any, ...args)
+        }
+      },
       onError: (error: Error) => options.onError?.(error),
       onOutput: options.onOutput
     }

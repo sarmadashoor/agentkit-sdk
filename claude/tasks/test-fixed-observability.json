@@ -1,6 +1,0 @@
-{
-  "id": "test-fixed-observability",
-  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/observability/observability-integration.test.ts --reporter=verbose",
-  "timeout": 120000,
-  "description": "Test fixed observability-integration.test.ts"
-}

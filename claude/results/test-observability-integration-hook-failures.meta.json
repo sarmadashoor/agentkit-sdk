@@ -1,0 +1,9 @@
+{
+  "id": "test-observability-integration-hook-failures",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability-integration.test.ts -t \"should handle hook failures gracefully\" --reporter=verbose",
+  "startTime": "2025-06-19T21:50:27.138Z",
+  "endTime": "2025-06-19T21:50:29.162Z",
+  "durationMs": 2024,
+  "exitCode": 0,
+  "status": "success"
+}

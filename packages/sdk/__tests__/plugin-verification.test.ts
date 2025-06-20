@@ -27,7 +27,7 @@ import {
 } from '../src/errors'
 
 // Mock the crypto utilities
-vi.mock('../security/crypto-utils', () => ({
+vi.mock('../src/security/crypto-utils', () => ({
   hashFile: vi.fn().mockResolvedValue('mock-hash'),
   verifySignature: vi.fn().mockResolvedValue(true),
   findTrustedKey: vi.fn().mockResolvedValue({
@@ -146,7 +146,7 @@ describe('Plugin Verification System', () => {
       }
 
       // Mock verifyPluginFile to return success
-      const { verifyPluginFile } = await import('../security/plugin-verification')
+      const { verifyPluginFile } = await import('../src/security/plugin-verification')
       vi.mocked(verifyPluginFile).mockResolvedValue({
         verified: true,
         warnings: [],
@@ -167,7 +167,7 @@ describe('Plugin Verification System', () => {
       }
 
       // Mock verifyPluginFile to throw error
-      const { verifyPluginFile } = await import('../security/plugin-verification')
+      const { verifyPluginFile } = await import('../src/security/plugin-verification')
       vi.mocked(verifyPluginFile).mockRejectedValue(new Error('Signature verification failed'))
 
       const options: PluginVerificationOptions = {
@@ -269,7 +269,7 @@ describe('Plugin Verification System', () => {
       vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockSignature))
 
       // Mock findTrustedKey to return null (untrusted)
-      const { findTrustedKey } = await import('../security/crypto-utils')
+      const { findTrustedKey } = await import('../src/security/crypto-utils')
       vi.mocked(findTrustedKey).mockResolvedValue(null)
 
       await expect(verifyPluginFile(mockPluginPath))
@@ -290,7 +290,7 @@ describe('Plugin Verification System', () => {
       vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockSignature))
 
       // Mock verifySignature to return false
-      const { verifySignature } = await import('../security/crypto-utils')
+      const { verifySignature } = await import('../src/security/crypto-utils')
       vi.mocked(verifySignature).mockResolvedValue(false)
 
       await expect(verifyPluginFile(mockPluginPath))
@@ -303,7 +303,7 @@ describe('Plugin Verification System', () => {
       const filePath = '/path/to/plugin.ts'
       
       // Mock successful file verification
-      const { verifyPluginFile } = await import('../security/plugin-verification')
+      const { verifyPluginFile } = await import('../src/security/plugin-verification')
       vi.mocked(verifyPluginFile).mockResolvedValue({
         verified: true,
         warnings: [],
@@ -384,7 +384,7 @@ describe('Plugin Verification System', () => {
       vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockSignature))
 
       // Mock trusted key as development type
-      const { findTrustedKey } = await import('../security/crypto-utils')
+      const { findTrustedKey } = await import('../src/security/crypto-utils')
       vi.mocked(findTrustedKey).mockResolvedValue({
         name: 'dev-key',
         pubkey: 'mock-pubkey',

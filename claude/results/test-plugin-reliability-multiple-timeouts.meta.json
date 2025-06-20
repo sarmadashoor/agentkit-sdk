@@ -1,0 +1,9 @@
+{
+  "id": "test-plugin-reliability-multiple-timeouts",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability/plugin-reliability.test.ts -t \"should handle multiple plugin timeouts\" --reporter=verbose",
+  "startTime": "2025-06-19T21:54:12.037Z",
+  "endTime": "2025-06-19T21:54:14.984Z",
+  "durationMs": 2947,
+  "exitCode": 0,
+  "status": "success"
+}

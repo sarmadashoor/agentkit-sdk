@@ -1,0 +1,9 @@
+{
+  "id": "test-plugin-reliability-resource-leaks",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability/plugin-reliability.test.ts -t \"should not leak resources from malformed plugins\" --reporter=verbose",
+  "startTime": "2025-06-19T21:56:35.696Z",
+  "endTime": "2025-06-19T21:56:37.691Z",
+  "durationMs": 1995,
+  "exitCode": 0,
+  "status": "success"
+}

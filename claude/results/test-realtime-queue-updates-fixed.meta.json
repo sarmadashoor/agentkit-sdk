@@ -1,9 +1,0 @@
-{
-  "id": "test-realtime-queue-updates-fixed",
-  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts -t \"should provide real-time queue size updates\" --reporter=verbose",
-  "startTime": "2025-06-19T17:34:13.354Z",
-  "endTime": "2025-06-19T17:34:15.045Z",
-  "durationMs": 1691,
-  "exitCode": 0,
-  "status": "success"
-}

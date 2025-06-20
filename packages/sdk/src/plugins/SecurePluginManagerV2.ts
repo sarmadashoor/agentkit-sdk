@@ -293,7 +293,7 @@ export class SecurePluginManagerV2 extends EventEmitter {
         } else if (sandboxResult.timeout) {
           this.options.observabilityHooks?.onPluginTimeout?.(plugin.name, hookName, this.options.hookTimeout)
         } else {
-          this.options.observabilityHooks?.onPluginError?.(plugin.name, hookName, sandboxResult.error!)
+          this.options.observabilityHooks?.onPluginError?.(plugin.name, hookName, sandboxResult.error!, sandboxResult.duration)
         }
 
         // Log execution details

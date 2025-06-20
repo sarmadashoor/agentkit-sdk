@@ -1,0 +1,9 @@
+{
+  "id": "test-observability-integration-capture-errors",
+  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability-integration.test.ts -t \"should capture errors in observability hooks\" --reporter=verbose",
+  "startTime": "2025-06-19T21:50:21.485Z",
+  "endTime": "2025-06-19T21:50:25.135Z",
+  "durationMs": 3650,
+  "exitCode": 0,
+  "status": "success"
+}

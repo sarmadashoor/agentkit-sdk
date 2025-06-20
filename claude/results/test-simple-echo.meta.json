@@ -1,9 +1,0 @@
-{
-  "id": "test-simple-echo",
-  "cmd": "echo 'Testing fixed daemon system'",
-  "startTime": "2025-06-19T14:09:10.524Z",
-  "endTime": "2025-06-19T14:09:10.530Z",
-  "durationMs": 6,
-  "exitCode": 0,
-  "status": "success"
-}

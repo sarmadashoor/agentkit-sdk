@@ -766,7 +766,7 @@ export class PluginManager {
       if (isTimeout) {
         this.options.observabilityHooks?.onPluginTimeout?.(plugin.name, hookName, this.options.hookTimeout)
       } else {
-        this.options.observabilityHooks?.onPluginError?.(plugin.name, hookName, error as Error)
+        this.options.observabilityHooks?.onPluginError?.(plugin.name, hookName, error as Error, duration)
       }
       
       // Log error

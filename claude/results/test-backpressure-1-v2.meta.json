@@ -1,0 +1,10 @@
+{
+  "id": "test-backpressure-1-v2",
+  "cmd": "cd /home/s/dev/agentkit-sdk/packages/sdk && pnpm test __tests__/transport-backpressure.test.ts -t 'should respect transport backpressure when queue is full'",
+  "startTime": "2025-06-19T20:03:42.474Z",
+  "endTime": "2025-06-19T20:03:42.477Z",
+  "durationMs": 3,
+  "exitCode": null,
+  "status": "error",
+  "error": "Process failed to execute"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "test-backpressure-1-fixed",
+  "cmd": "pnpm test packages/sdk/__tests__/transport-backpressure.test.ts -t \"should respect transport backpressure when queue is full\"",
+  "startTime": "2025-06-19T20:03:11.702Z",
+  "endTime": "2025-06-19T20:03:12.939Z",
+  "durationMs": 1237,
+  "exitCode": 1,
+  "status": "error",
+  "error": "Process exited with code 1"
+}

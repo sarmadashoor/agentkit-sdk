@@ -571,7 +571,7 @@ export class SecurePluginManager {
     // Report to observability hooks
     if (failedPlugins.length > 0) {
       failedPlugins.forEach(failure => {
-        this.options.observabilityHooks?.onPluginError?.(failure.name, hookName, failure.error)
+        this.options.observabilityHooks?.onPluginError?.(failure.name, hookName, failure.error, failure.executionTime)
       })
     }
 

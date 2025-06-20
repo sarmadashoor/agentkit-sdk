@@ -1,9 +1,0 @@
-{
-  "id": "test-07-bounded-executor",
-  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts -t \"should work together with bounded executor limits\"",
-  "startTime": "2025-06-19T13:57:40.851Z",
-  "endTime": "2025-06-19T13:57:42.558Z",
-  "durationMs": 1707,
-  "exitCode": 0,
-  "status": "success"
-}

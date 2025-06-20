@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SecurePluginManager } from '../../src/plugins/SecurePluginManager'
 import type { AgentKitPlugin, AgentContext, SendPayload } from '@agentkit/types'
-import { PluginValidationError, PluginCompatibilityError } from '../../src/plugins/../errors'
+import { PluginValidationError, PluginCompatibilityError } from '../../src/errors'
 
 describe('SecurePluginManager - Security and Sandboxing', () => {
   let manager: SecurePluginManager

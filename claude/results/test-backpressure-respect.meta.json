@@ -1,9 +1,0 @@
-{
-  "id": "test-backpressure-respect",
-  "cmd": "pnpm --filter @agentkit/sdk exec vitest run __tests__/transport-backpressure.test.ts -t \"should respect transport backpressure when queue is full\" --reporter=verbose",
-  "startTime": "2025-06-19T17:34:29.807Z",
-  "endTime": "2025-06-19T17:34:31.602Z",
-  "durationMs": 1795,
-  "exitCode": 0,
-  "status": "success"
-}
