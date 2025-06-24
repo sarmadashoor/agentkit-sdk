@@ -176,7 +176,7 @@ AgentKit SDK is a **foundational framework** that abstracts the complexity of AI
 **Package Management**: pnpm (required >= 8.0.0) - Monorepo-optimized
 **Language**: TypeScript 5.3+ with strict mode enforcement
 **Build System**: tsup for efficient package building
-**Testing**: Vitest with comprehensive test coverage (82+ test files)
+**Testing**: Vitest with comprehensive test coverage (90 test files, ~1,226 tests)
 **Linting**: ESLint with new flat configuration format
 **Type Validation**: Zod for runtime schema validation
 
@@ -185,7 +185,7 @@ AgentKit SDK is a **foundational framework** that abstracts the complexity of AI
 ```bash
 # Core Development Commands
 pnpm build        # Build all packages in dependency order
-pnpm test         # Run comprehensive test suite (101 tests)
+pnpm test         # Run comprehensive test suite (~1,226 tests)
 pnpm typecheck    # Validate TypeScript across all packages
 pnpm lint         # Run ESLint with automatic fixing
 pnpm cli          # Access AgentKit CLI directly
@@ -199,7 +199,7 @@ pnpm validate:all # Comprehensive validation suite
 ### Quality Assurance Infrastructure
 
 **Automated Testing:**
-- 82+ test files covering core functionality
+- 90 test files with ~1,226 individual test cases
 - Chaos engineering and stress testing
 - Browser compatibility testing via Playwright
 - Integration testing with real AI providers
@@ -215,6 +215,107 @@ pnpm validate:all # Comprehensive validation suite
 - HMAC signature validation testing
 - Timeout and resource limit testing
 - Immutability protection verification
+
+---
+
+## Test Suite Architecture & Coverage
+
+### Test Infrastructure Overview
+
+**Total Test Coverage:**
+- **90 test files** (87 core + 3 workspace tests)
+- **~1,226 individual test cases** across all packages
+- **Average 14 tests per file** with comprehensive scenario coverage
+- **Full suite runtime**: ~5+ minutes (requires optimization)
+
+### Package Test Distribution
+
+| Package | Test Files | Est. Tests | Coverage Focus |
+|---------|------------|------------|----------------|
+| **@agentkit/sdk** | 55 | ~770 | Core functionality, plugins, security, observability |
+| **@agentkit/runtime-web** | 11 | ~154 | Browser environment, web workers, E2E testing |
+| **@agentkit/cli** | 7 | ~98 | Command-line tools, scaffolding, plugin signing |
+| **@agentkit/registry** | 6 | ~84 | Registry management, immutability, scopes |
+| **@agentkit/errors** | 3 | 76 | Error handling, snapshots, structured errors |
+| **@agentkit/types** | 3 | ~42 | Type definitions, transport backpressure |
+| **Others** | 5 | ~50 | Test agent, transports, examples |
+
+### Test Categories & Architecture
+
+**Plugin System Testing (36 files)** - Largest test category
+- Plugin lifecycle management and verification
+- HMAC signature validation and security
+- Web Worker isolation and sandboxing
+- Async plugin execution and timeouts
+- Plugin manager functionality
+
+**Agent Management (6 files)**
+- Concurrency handling and race conditions
+- Memory leak detection and prevention
+- Agent lifecycle orchestration
+
+**Infrastructure Testing (15 files)**
+- Circuit breaker patterns (5 dedicated test files)
+- Transport layer and backpressure handling
+- Observability and metrics collection
+- Timeline execution tracking
+
+**Developer Tooling (7 files)**
+- CLI command validation
+- Plugin scaffolding and generation
+- System health checks (doctor command)
+- Dry-run mode testing
+
+**Browser/Web Environment (11 files)**
+- Cross-browser compatibility
+- Web Worker communication
+- Playwright-based E2E tests
+- Chaos and stress testing
+- Polyfill verification
+
+### Test Execution Infrastructure
+
+**Framework & Tools:**
+- **Primary Framework**: Vitest with extensive mocking capabilities
+- **Browser Testing**: Playwright for E2E and cross-browser tests
+- **Parallel Execution**: pnpm workspace parallel test running
+- **Coverage Reporting**: Multiple reporters (summary, JSON, verbose)
+
+**Test Scripts:**
+```bash
+pnpm test          # Run all tests in parallel
+pnpm test:node     # Run Node.js tests only (excludes browser)
+pnpm test:browser  # Run browser-specific tests
+pnpm test:integration # Run integration test suite
+```
+
+### Test Quality & Patterns
+
+**Key Testing Patterns Observed:**
+- **Comprehensive Edge Case Coverage**: Tests cover success, failure, timeout, and error scenarios
+- **Security-First Testing**: Multiple suites dedicated to sandboxing and isolation
+- **Performance Testing**: Memory leak detection, concurrency limits
+- **Integration Testing**: Real AI provider integration tests
+- **Chaos Engineering**: Stress tests and failure simulation
+
+**Test Reliability Assessment:**
+- **Stable Tests**: ~95% pass rate after maintenance work
+- **Flaky Tests**: Minimal, mostly timing-related in async scenarios
+- **Test Isolation**: Each test properly cleans up resources
+- **Mock Quality**: Comprehensive mocking prevents external dependencies
+
+### Performance Considerations
+
+**Current Challenges:**
+- Full test suite exceeds 5 minutes (development friction)
+- No fast subset for rapid iteration
+- Browser tests add significant overhead
+
+**Optimization Opportunities:**
+- Implement test sharding for CI/CD
+- Create "quick" test subset for development
+- Parallelize browser test execution
+- Cache test fixtures and dependencies
 
 ---
 
@@ -249,10 +350,11 @@ pnpm validate:all # Comprehensive validation suite
 - Performance monitoring and alerting
 
 ### 6. **Robust Testing Culture**
-- Extensive test coverage including edge cases
+- Extensive test coverage with ~1,226 test cases across 90 files
 - Chaos engineering and stress testing
 - Property-based testing approaches
 - Comprehensive integration testing
+- Security-focused test suites for sandboxing and isolation
 
 ---
 

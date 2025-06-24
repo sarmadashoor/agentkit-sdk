@@ -1,9 +1,0 @@
-{
-  "id": "test-plugin-reliability-self-modifying",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability/plugin-reliability.test.ts -t \"should handle plugins that modify their own execution context\" --reporter=verbose",
-  "startTime": "2025-06-19T21:57:18.247Z",
-  "endTime": "2025-06-19T21:57:20.578Z",
-  "durationMs": 2331,
-  "exitCode": 0,
-  "status": "success"
-}
