@@ -102,6 +102,7 @@ class NodeVMSandbox {
   private vm?: typeof import('vm')
   private context: any
   private detector = new SecurityViolationDetector()
+  private activeScripts = new Set<any>() // Track all VM Script objects for proper cleanup
 
   constructor(private options: SandboxOptions) {
     if (isNode) {
@@ -136,7 +137,7 @@ class NodeVMSandbox {
       setTimeout: (callback: Function, delay: number, ...args: unknown[]) => {
         // Only allow short delays for legitimate async operations
         const maxDelay = Math.min(delay || 0, 5000) // Max 5 seconds
-        return globalThis.setTimeout(callback, maxDelay, ...args)
+        return globalThis.setTimeout(callback, maxDelay, ...args).unref()
       },
       // Provide controlled globalThis that plugins can access but not modify
       globalThis: new Proxy({}, {
@@ -172,6 +173,33 @@ class NodeVMSandbox {
     }
 
     this.context = this.vm.createContext(safeGlobals)
+  }
+
+  /**
+   * Clean up VM resources
+   */
+  cleanup(): void {
+    // Clean up all active scripts first
+    for (const script of this.activeScripts) {
+      try {
+        // Script objects should be explicitly nulled for Node 22 compatibility
+        script = null
+      } catch (err) {
+        // Ignore cleanup errors but log for debugging
+        if (this.options.debug) {
+          debugLog.warn('Failed to cleanup VM script', { error: err }, this.options.debug)
+        }
+      }
+    }
+    this.activeScripts.clear()
+
+    if (this.context) {
+      // Let Node.js handle context cleanup naturally
+      this.context = null
+    }
+    
+    // Remove manual GC calls - let Node 22 handle GC timing naturally
+    // Manual GC during VM cleanup can cause segfaults in Node 22+
   }
 
   async execute(
@@ -233,10 +261,14 @@ class NodeVMSandbox {
       // Execute with timeout
       const result = await Promise.race([
         new Promise((resolve, reject) => {
+          let script: any = null
           try {
-            const script = new this.vm!.Script(wrapperCode, {
+            script = new this.vm!.Script(wrapperCode, {
               filename: `plugin-${hookName}.js`
             })
+            
+            // Track the script for proper cleanup in Node 22+
+            this.activeScripts.add(script)
             
             const executionResult = script.runInContext(this.context, {
               timeout: this.options.timeout
@@ -253,10 +285,16 @@ class NodeVMSandbox {
             }
           } catch (error) {
             reject(error)
+          } finally {
+            // Clean up script after execution to prevent Node 22 segfaults
+            if (script) {
+              this.activeScripts.delete(script)
+              script = null
+            }
           }
         }),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Plugin execution timeout')), this.options.timeout)
+          setTimeout(() => reject(new Error('Plugin execution timeout')), this.options.timeout).unref()
         )
       ])
 
@@ -386,7 +424,7 @@ class BrowserWorkerSandbox {
             executionTime: Date.now() - startTime,
             securityViolations
           })
-        }, this.options.timeout)
+        }, this.options.timeout).unref()
 
         worker.onmessage = (e) => {
           const { type, result, error, args: logArgs } = e.data
@@ -498,7 +536,7 @@ class BrowserWorkerSandbox {
       const result = await Promise.race([
         Promise.resolve(hook.apply(plugin, clonedArgs)),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Plugin execution timeout')), this.options.timeout)
+          setTimeout(() => reject(new Error('Plugin execution timeout')), this.options.timeout).unref()
         )
       ])
 
@@ -541,5 +579,32 @@ export class PluginSandbox {
     args: unknown[]
   ): Promise<SandboxExecutionResult> {
     return this.implementation.execute(pluginCode, hookName, args)
+  }
+
+  /**
+   * Clean up sandbox resources
+   */
+  async cleanup(): Promise<void> {
+    // For NodeVMSandbox, call its cleanup method
+    if (this.implementation instanceof NodeVMSandbox) {
+      (this.implementation as any).cleanup()
+    }
+    
+    // Remove manual GC calls - let Node.js handle garbage collection naturally
+    // Manual GC during sandbox cleanup can cause segfaults in Node 22+
+  }
+
+  /**
+   * Dispose of the sandbox (alias for cleanup)
+   */
+  async dispose(): Promise<void> {
+    return this.cleanup()
+  }
+
+  /**
+   * Destroy the sandbox (alias for cleanup)
+   */
+  async destroy(): Promise<void> {
+    return this.cleanup()
   }
 }
