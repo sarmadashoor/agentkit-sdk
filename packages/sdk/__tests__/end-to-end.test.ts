@@ -1,11 +1,104 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+/**
+ * End-to-End Test Suite - Resource Cleanup and Leak Prevention
+ * 
+ * This test suite includes comprehensive resource tracking and cleanup to prevent:
+ * - Memory leaks from unclosed agents and transports
+ * - Process handle leaks from worker threads and message ports
+ * - Cross-test contamination from persistent registry state
+ * 
+ * Cleanup includes:
+ * - Agent handle shutdown and disposal
+ * - Transport cleanup and disposal
+ * - Registry state clearing
+ * - Worker thread termination
+ * - Process handle monitoring
+ */
+
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest'
 import { connectAgent, AgentRegistry } from '../src/index'
 import { DummyAgent } from '@agentkit/test-agent'
 import { DummyTransport } from '@agentkit/transports-dummy'
+import { registerAgent, registerTransport, registerCleanup, cleanupAllResources } from './test-utils'
+
+// Leak detection constants
+const BASELINE_HANDLE_COUNT = 3
+const BASELINE_REQUEST_COUNT = 0
 
 describe('End-to-End AgentKit SDK Test', () => {
+  let agentHandles: any[] = []
+  let transportInstances: any[] = []
+  let initialHandleCount: number
+  let initialRequestCount: number
+
   beforeEach(() => {
+    // Track initial resource state
+    initialHandleCount = process._getActiveHandles().length
+    initialRequestCount = process._getActiveRequests().length
+    
+    // Clear registry state
     AgentRegistry.clear()
+    
+    // Reset tracking arrays
+    agentHandles = []
+    transportInstances = []
+  })
+
+  afterEach, afterAll(async () => {
+    // Clean up all agent handles
+    for (const handle of agentHandles) {
+      try {
+        if (handle && handle.shutdown) {
+          await handle.shutdown()
+        }
+      } catch (error) {
+        console.warn('Error shutting down agent handle:', error)
+      }
+    }
+    agentHandles = []
+    
+    // Clean up transport instances
+    for (const transport of transportInstances) {
+      try {
+        if (transport && transport.dispose) {
+          await transport.dispose()
+        } else if (transport && transport.shutdown) {
+          await transport.shutdown()
+        }
+      } catch (error) {
+        console.warn('Error disposing transport:', error)
+      }
+    }
+    transportInstances = []
+    
+    // Clear registry again
+    AgentRegistry.clear()
+    
+    // Clean up all resources
+    await cleanupAllResources()
+    
+    // Verify no resource leaks
+    const finalHandleCount = process._getActiveHandles().length
+    const finalRequestCount = process._getActiveRequests().length
+    
+    const handleLeak = finalHandleCount - initialHandleCount
+    const requestLeak = finalRequestCount - initialRequestCount
+    
+    if (handleLeak > BASELINE_HANDLE_COUNT) {
+      console.warn(`[E2E TEST] Handle leak detected: ${handleLeak} handles remaining`)
+    }
+    
+    if (requestLeak > BASELINE_REQUEST_COUNT) {
+      console.warn(`[E2E TEST] Request leak detected: ${requestLeak} requests remaining`)
+    }
+    
+    // Remove manual GC calls for Node 22+ compatibility
+    // Let Node.js handle garbage collection naturally
+    // if (global.gc) {
+    //   global.gc()
+    // }
+    
+    // Final cleanup delay
+    await new Promise(resolve => setTimeout(resolve, 10))
   })
 
   it('should complete full agent lifecycle with all features', async () => {
@@ -21,11 +114,13 @@ describe('End-to-End AgentKit SDK Test', () => {
       factory: () => new DummyAgent()
     })
 
-    AgentRegistry.registerTransport(new DummyTransport({
+    const transport = new DummyTransport({
       debug: true,
       logMessages: true,
       responseDelay: 10
-    }))
+    })
+    transportInstances.push(transport)
+    AgentRegistry.registerTransport(transport)
 
     // Verify registry state
     expect(AgentRegistry.listAgents()).toContain('e2e-test-agent')
@@ -70,6 +165,7 @@ describe('End-to-End AgentKit SDK Test', () => {
         outputs.push(message)
       }
     })
+    agentHandles.push(handle)
 
     // Step 4: Verify Connection Metadata
     console.log('📊 Verifying metadata...')
@@ -236,7 +332,9 @@ describe('End-to-End AgentKit SDK Test', () => {
       factory: () => new ThrowingAgent()
     })
 
-    AgentRegistry.registerTransport(new DummyTransport())
+    const transport = new DummyTransport()
+    transportInstances.push(transport)
+    AgentRegistry.registerTransport(transport)
 
     let errorCaught = false
     let errorFromHook: Error | null = null
@@ -248,6 +346,7 @@ describe('End-to-End AgentKit SDK Test', () => {
         errorFromHook = error
       }
     })
+    agentHandles.push(handle)
 
     try {
       await handle.send({ message: 'This will trigger an error' })
@@ -273,7 +372,9 @@ describe('End-to-End AgentKit SDK Test', () => {
       factory: () => new DummyAgent()
     })
 
-    AgentRegistry.registerTransport(new DummyTransport())
+    const transport = new DummyTransport()
+    transportInstances.push(transport)
+    AgentRegistry.registerTransport(transport)
 
     // Request scopes beyond what's supported
     const handle = await connectAgent({
@@ -282,6 +383,7 @@ describe('End-to-End AgentKit SDK Test', () => {
       scope: ['read', 'write', 'admin', 'super-admin'], // Way more than supported
       debug: true // Enable debug logging to see scope mismatch warnings
     })
+    agentHandles.push(handle)
 
     expect(handle.metadata.registeredScopes).toEqual(['read'])
     expect(handle.metadata.requestedScopes).toEqual(['read', 'write', 'admin', 'super-admin'])
@@ -290,4 +392,10 @@ describe('End-to-End AgentKit SDK Test', () => {
     await handle.send({ message: 'Test with scope mismatch' })
     await handle.shutdown()
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

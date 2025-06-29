@@ -78,6 +78,7 @@ export class PerformanceObservabilityCollector {
   // System monitoring
   private gcEventCount = 0
   private lastMemoryUsage = 0
+  private memoryMonitorInterval?: NodeJS.Timeout
   
   constructor(
     metricsCollector: MetricsCollector,
@@ -98,17 +99,18 @@ export class PerformanceObservabilityCollector {
   }
   
   private setupSystemMonitoring(): void {
-    // Monitor GC events if available
-    if (typeof global !== 'undefined' && global.gc) {
-      const originalGC = global.gc
-      global.gc = async () => {
-        this.gcEventCount++
-        return originalGC()
-      }
-    }
+    // Disable GC monitoring for Node 22+ compatibility
+    // Wrapping global.gc can interfere with Node 22's stricter GC behavior
+    // if (typeof global !== 'undefined' && global.gc) {
+    //   const originalGC = global.gc
+    //   global.gc = async () => {
+    //     this.gcEventCount++
+    //     return originalGC()
+    //   }
+    // }
     
     // Track memory usage
-    setInterval(() => {
+    this.memoryMonitorInterval = setInterval(() => {
       this.lastMemoryUsage = process.memoryUsage().heapUsed
     }, 1000)
   }
@@ -337,5 +339,15 @@ ${metrics.performance.retry ? `🔄 Retry Health:
   Avg Health Score: ${metrics.performance.retry.avgHealthScore.toFixed(1)}/100
   Retry Rate: ${(metrics.performance.retry.retryRate * 100).toFixed(1)}%` : ''}
 `
+  }
+
+  /**
+   * Shutdown and cleanup monitoring intervals
+   */
+  shutdown(): void {
+    if (this.memoryMonitorInterval) {
+      clearInterval(this.memoryMonitorInterval)
+      this.memoryMonitorInterval = undefined
+    }
   }
 }

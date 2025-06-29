@@ -1,4 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest'
+/**
+ * Debug Mode Test Suite - Resource Cleanup and Leak Prevention
+ * 
+ * This test suite includes comprehensive resource tracking and cleanup to prevent:
+ * - Memory leaks from unclosed resources
+ * - Process handle leaks
+ * - Cross-test contamination
+ * 
+ * Cleanup includes:
+ * - Console spy restoration
+ * - Environment variable restoration
+ * - Process handle monitoring
+ * - Date.now mock cleanup
+ */
+
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi, Mock } from 'vitest'
 import { 
   TraceOutputFormatter, 
   getTraceFormatter,
@@ -9,30 +24,81 @@ import {
   logPluginTimeout
 } from '../src/debug-tools/TraceOutputFormatter'
 import type { LifecycleTimelineEntry } from '../src/debug-tools/types'
+import { registerCleanup, cleanupAllResources } from './test-utils'
+
+// Leak detection constants
+const BASELINE_HANDLE_COUNT = 3
+const BASELINE_REQUEST_COUNT = 0
 
 describe('Debug Mode Trace Output', () => {
   let consoleLogSpy: Mock
   let originalEnv: NodeJS.ProcessEnv
   let formatter: TraceOutputFormatter
+  let mockNowSpy: any
+  let initialHandleCount: number
+  let initialRequestCount: number
 
   beforeEach(() => {
+    // Track initial resource state
+    initialHandleCount = process._getActiveHandles().length
+    initialRequestCount = process._getActiveRequests().length
+    
     // Save original environment
     originalEnv = { ...process.env }
     
     // Setup console spy
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    registerCleanup(async () => {
+      consoleLogSpy.mockRestore()
+    })
     
     // Create formatter with no colors for testing
     formatter = new TraceOutputFormatter({ colors: false })
     formatter.resetTimer()
+    
+    // Clear any existing Date.now mocks
+    mockNowSpy = null
   })
 
-  afterEach(() => {
+  afterEach, afterAll(async () => {
     // Restore environment
     process.env = originalEnv
     
-    // Restore console
-    consoleLogSpy.mockRestore()
+    // Clean up Date.now mocks
+    if (mockNowSpy) {
+      mockNowSpy.mockRestore()
+      mockNowSpy = null
+    }
+    
+    // Restore all spies
+    vi.restoreAllMocks()
+    
+    // Clean up all resources
+    await cleanupAllResources()
+    
+    // Verify no resource leaks
+    const finalHandleCount = process._getActiveHandles().length
+    const finalRequestCount = process._getActiveRequests().length
+    
+    const handleLeak = finalHandleCount - initialHandleCount
+    const requestLeak = finalRequestCount - initialRequestCount
+    
+    if (handleLeak > BASELINE_HANDLE_COUNT) {
+      console.warn(`[DEBUG-MODE TEST] Handle leak detected: ${handleLeak} handles remaining`)
+    }
+    
+    if (requestLeak > BASELINE_REQUEST_COUNT) {
+      console.warn(`[DEBUG-MODE TEST] Request leak detected: ${requestLeak} requests remaining`)
+    }
+    
+    // Remove manual GC calls for Node 22+ compatibility
+    // Let Node.js handle garbage collection naturally
+    // if (global.gc) {
+    //   global.gc()
+    // }
+    
+    // Final cleanup delay
+    await new Promise(resolve => setTimeout(resolve, 10))
   })
 
   describe('test:debug(trace): lifecycle timeline accuracy', () => {
@@ -97,18 +163,16 @@ describe('Debug Mode Trace Output', () => {
       const baseTime = Date.now()
       
       // Mock Date.now to return predictable values
-      const mockNow = vi.spyOn(Date, 'now')
-      mockNow.mockReturnValueOnce(baseTime) // Reset timer call
-      mockNow.mockReturnValueOnce(baseTime + 100) // First event
-      mockNow.mockReturnValueOnce(baseTime + 250) // Second event
+      mockNowSpy = vi.spyOn(Date, 'now')
+      mockNowSpy.mockReturnValueOnce(baseTime) // Reset timer call
+      mockNowSpy.mockReturnValueOnce(baseTime + 100) // First event
+      mockNowSpy.mockReturnValueOnce(baseTime + 250) // Second event
       
       const start = formatter.formatStart('Plugin1', 'onInit', baseTime + 100)
       const success = formatter.formatSuccess('Plugin1', 'onInit', 25, baseTime + 250)
       
       expect(start).toContain('(t=100ms)')
       expect(success).toContain('(t=250ms)')
-      
-      mockNow.mockRestore()
     })
   })
 
@@ -339,4 +403,10 @@ describe('Debug Mode Trace Output', () => {
       expect(start).toContain('(t=0ms)')
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })
