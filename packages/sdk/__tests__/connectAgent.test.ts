@@ -1,26 +1,101 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach, afterAll } from 'vitest'
 import { connectAgent, AgentRegistry } from '../src/index'
 import { createTestAgent } from '@agentkit/test-agent'
 import { createDummyTransport } from '@agentkit/transports-dummy'
-import { ValidationError, RegistryError, CompatibilityError } from '../src/errors'
+import { 
+  SchemaValidationError, 
+  InvalidInputError, 
+  AgentCompatibilityError, 
+  AgentNotFoundError,
+  TransportNotFoundError 
+} from '../src/errors'
 import { z } from 'zod'
+import { registerAgent, registerTransport, registerCleanup, cleanupAgents } from './test-utils'
+
+// Leak detection state
+let testCounter = 0
+let baselineHandles: any[] = []
+
+// Track transport instances for cleanup
+let activeTransports: Set<any> = new Set()
+
+// Helper function to detect leaks against baseline
+function logActiveHandles(label: string) {
+  const handles = process._getActiveHandles()
+  const messagePorts = handles.filter(h => h.constructor.name === 'MessagePort')
+  const nonStandardHandles = handles.filter(h => !['TTY', 'Pipe', 'Socket', 'WriteStream', 'ReadStream', 'FSWatcher'].includes(h.constructor.name))
+  
+  // Calculate new handles beyond baseline
+  const newHandles = handles.length - baselineHandles.length
+  const newMessagePorts = messagePorts.length - baselineHandles.filter(h => h.constructor.name === 'MessagePort').length
+  
+  console.log(`[LEAK DEBUG ${testCounter}] ${label}: ${handles.length} total handles (+${newHandles} from baseline), ${messagePorts.length} MessagePorts (+${newMessagePorts}), ${nonStandardHandles.length} non-standard`)
+  
+  if (newHandles > 0) {
+    console.log(`[LEAK DEBUG ${testCounter}] NEW HANDLES detected beyond baseline!`)
+  }
+}
 
 describe('connectAgent', () => {
   let registry: AgentRegistry
 
   beforeEach(() => {
+    testCounter++
+    
+    // Set baseline on first test
+    if (testCounter === 1) {
+      baselineHandles = process._getActiveHandles().slice()
+      console.log(`[LEAK DEBUG] Baseline set: ${baselineHandles.length} handles`)
+    }
+    
+    logActiveHandles(`TEST ${testCounter} START`)
+    
+    // Clear global registry state
+    AgentRegistry.clear()
     // Create fresh registry before each test
     registry = new AgentRegistry()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Shutdown all active transports
+    for (const transport of activeTransports) {
+      if (transport && typeof transport.shutdown === 'function') {
+        try {
+          await transport.shutdown()
+        } catch (error) {
+          console.error('[CLEANUP] Error shutting down transport:', error)
+        }
+      } else if (transport && typeof transport.dispose === 'function') {
+        try {
+          await transport.dispose()
+        } catch (error) {
+          console.error('[CLEANUP] Error disposing transport:', error)
+        }
+      }
+    }
+    activeTransports.clear()
+    
+    // Ensure cleanup runs
+    await cleanupAgents()
+    
+    logActiveHandles(`TEST ${testCounter} AFTER CLEANUP`)
     vi.clearAllMocks()
+  })
+
+  afterAll(async () => {
+    await cleanupAgents()
+    logActiveHandles('ALL TESTS COMPLETE')
+    
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
   })
 
   describe('with literal agent and transport objects', () => {
     it('should successfully connect with agent and transport instances', async () => {
-      const agent = createTestAgent()
-      const transport = createDummyTransport()
+      const agent = registerAgent(createTestAgent())
+      const transport = registerTransport(createDummyTransport())
+      activeTransports.add(transport)
       const onOutput = vi.fn()
 
       const handle = await connectAgent({
@@ -30,14 +105,21 @@ describe('connectAgent', () => {
         debug: false
       })
 
+      registerCleanup(async () => {
+        if (handle) {
+          await handle.shutdown()
+        }
+      })
+
       expect(handle).toBeDefined()
       expect(handle.send).toBeInstanceOf(Function)
       expect(handle.shutdown).toBeInstanceOf(Function)
     })
 
     it('should call agent lifecycle methods correctly', async () => {
-      const agent = createTestAgent()
-      const transport = createDummyTransport()
+      const agent = registerAgent(createTestAgent())
+      const transport = registerTransport(createDummyTransport())
+      activeTransports.add(transport)
       
       const initSpy = vi.spyOn(agent, 'init')
       const handleSpy = vi.spyOn(agent, 'handle')
@@ -48,6 +130,12 @@ describe('connectAgent', () => {
         transport,
         scope: ['test-scope'],
         techStack: 'test-stack'
+      })
+
+      registerCleanup(async () => {
+        if (handle) {
+          await handle.shutdown()
+        }
       })
 
       // Verify init was called
@@ -66,14 +154,21 @@ describe('connectAgent', () => {
     })
 
     it('should trigger onOutput callback with agent response', async () => {
-      const agent = createTestAgent()
-      const transport = createDummyTransport()
+      const agent = registerAgent(createTestAgent())
+      const transport = registerTransport(createDummyTransport())
+      activeTransports.add(transport)
       const onOutput = vi.fn()
 
       const handle = await connectAgent({
         agent,
         transport,
         onOutput
+      })
+
+      registerCleanup(async () => {
+        if (handle) {
+          await handle.shutdown()
+        }
       })
 
       await handle.send({ test: 'input' })
@@ -89,13 +184,20 @@ describe('connectAgent', () => {
     })
 
     it('should send agent output through transport', async () => {
-      const agent = createTestAgent()
-      const transport = createDummyTransport()
+      const agent = registerAgent(createTestAgent())
+      const transport = registerTransport(createDummyTransport())
+      activeTransports.add(transport)
       const sendSpy = vi.spyOn(transport, 'send')
 
       const handle = await connectAgent({
         agent,
         transport
+      })
+
+      registerCleanup(async () => {
+        if (handle) {
+          await handle.shutdown()
+        }
       })
 
       await handle.send({ test: 'input' })
@@ -121,7 +223,8 @@ describe('connectAgent', () => {
       })
 
       // Register dummy transport
-      const dummyTransport = createDummyTransport()
+      const dummyTransport = registerTransport(createDummyTransport())
+      activeTransports.add(dummyTransport)
       registry.registerTransport(dummyTransport)
 
       const handle = await connectAgent({
@@ -130,12 +233,19 @@ describe('connectAgent', () => {
         registry: registry
       })
 
+      registerCleanup(async () => {
+        if (handle) {
+          await handle.shutdown()
+        }
+      })
+
       expect(handle).toBeDefined()
       expect(handle.send).toBeInstanceOf(Function)
     })
 
     it('should throw error for unregistered agent', async () => {
-      const transport = createDummyTransport()
+      const transport = registerTransport(createDummyTransport())
+      activeTransports.add(transport)
 
       await expect(
         connectAgent({
@@ -143,11 +253,11 @@ describe('connectAgent', () => {
           transport,
           registry: registry
         })
-      ).rejects.toThrow(RegistryError)
+      ).rejects.toThrow(AgentNotFoundError)
     })
 
     it('should throw error for unregistered transport', async () => {
-      const agent = createTestAgent()
+      const agent = registerAgent(createTestAgent())
 
       await expect(
         connectAgent({
@@ -155,7 +265,7 @@ describe('connectAgent', () => {
           transport: 'non-existent-transport',
           registry: registry
         })
-      ).rejects.toThrow(RegistryError)
+      ).rejects.toThrow(TransportNotFoundError)
     })
   })
 
@@ -165,18 +275,19 @@ describe('connectAgent', () => {
         id: 'invalid',
         // Missing required methods
       }
-      const transport = createDummyTransport()
+      const transport = registerTransport(createDummyTransport())
+      activeTransports.add(transport)
 
       await expect(
         connectAgent({
           agent: invalidAgent as any,
           transport
         })
-      ).rejects.toThrow(ValidationError)
+      ).rejects.toThrow(SchemaValidationError)
     })
 
     it('should reject invalid transport objects', async () => {
-      const agent = createTestAgent()
+      const agent = registerAgent(createTestAgent())
       const invalidTransport = {
         id: 'invalid',
         // Missing required methods
@@ -187,7 +298,7 @@ describe('connectAgent', () => {
           agent,
           transport: invalidTransport as any
         })
-      ).rejects.toThrow(ValidationError)
+      ).rejects.toThrow(SchemaValidationError)
     })
 
     it('should reject invalid options', async () => {
@@ -195,19 +306,26 @@ describe('connectAgent', () => {
         connectAgent({
           // Missing required fields
         } as any)
-      ).rejects.toThrow(ValidationError)
+      ).rejects.toThrow(SchemaValidationError)
     })
   })
 
   describe('error handling', () => {
     it('should not allow send before initialization completes', async () => {
       // This is handled internally by connectAgent, which waits for init
-      const agent = createTestAgent()
-      const transport = createDummyTransport()
+      const agent = registerAgent(createTestAgent())
+      const transport = registerTransport(createDummyTransport())
+      activeTransports.add(transport)
 
       const handle = await connectAgent({
         agent,
         transport
+      })
+
+      registerCleanup(async () => {
+        if (handle) {
+          await handle.shutdown()
+        }
       })
 
       // Should work fine since connectAgent waits for initialization
@@ -215,8 +333,9 @@ describe('connectAgent', () => {
     })
 
     it('should not allow operations after shutdown', async () => {
-      const agent = createTestAgent()
-      const transport = createDummyTransport()
+      const agent = registerAgent(createTestAgent())
+      const transport = registerTransport(createDummyTransport())
+      activeTransports.add(transport)
 
       const handle = await connectAgent({
         agent,
@@ -227,17 +346,24 @@ describe('connectAgent', () => {
 
       // Should throw after shutdown
       await expect(handle.send({ test: 'data' })).rejects.toThrow(
-        'AgentManager has been shutdown'
+        'SandboxedExecutor has been shutdown'
       )
     })
 
     it('should not allow double initialization', async () => {
-      const agent = createTestAgent()
-      const transport = createDummyTransport()
+      const agent = registerAgent(createTestAgent())
+      const transport = registerTransport(createDummyTransport())
+      activeTransports.add(transport)
 
       const handle = await connectAgent({
         agent,
         transport
+      })
+
+      registerCleanup(async () => {
+        if (handle) {
+          await handle.shutdown()
+        }
       })
 
       // The handle is already initialized, so this test verifies internal behavior
@@ -249,13 +375,20 @@ describe('connectAgent', () => {
   describe('debug mode', () => {
     it('should respect debug flag', async () => {
       const consoleSpy = vi.spyOn(console, 'debug')
-      const agent = createTestAgent({ debug: true })
-      const transport = createDummyTransport({ debug: true })
+      const agent = registerAgent(createTestAgent({ debug: true }))
+      const transport = registerTransport(createDummyTransport({ debug: true }))
+      activeTransports.add(transport)
 
       const handle = await connectAgent({
         agent,
         transport,
         debug: true
+      })
+
+      registerCleanup(async () => {
+        if (handle) {
+          await handle.shutdown()
+        }
       })
 
       await handle.send({ test: 'debug' })
@@ -276,14 +409,15 @@ describe('connectAgent', () => {
         handle: async (input: unknown) => input,
         shutdown: async () => {}
       }
-      const transport = createDummyTransport()
+      const transport = registerTransport(createDummyTransport())
+      activeTransports.add(transport)
 
       await expect(
         connectAgent({
           agent: invalidAgent as any,
           transport
         })
-      ).rejects.toThrow(CompatibilityError)
+      ).rejects.toThrow(SchemaValidationError)
     })
 
     it('should provide detailed error context', async () => {
@@ -293,7 +427,7 @@ describe('connectAgent', () => {
           transport: 'non-existent-transport'
         })
       } catch (error: any) {
-        expect(error).toBeInstanceOf(RegistryError)
+        expect(error).toBeInstanceOf(AgentNotFoundError)
         expect(error.context).toBeDefined()
         expect(error.context.requestedAgent).toBe('non-existent-agent')
         expect(error.context.availableAgents).toBeInstanceOf(Array)

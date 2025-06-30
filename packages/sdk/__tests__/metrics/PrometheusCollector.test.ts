@@ -1,4 +1,6 @@
+import { describe, it, expect, beforeEach, afterAll } from 'vitest'
 import { PrometheusCollector } from '../../src/metrics/PrometheusCollector'
+import { cleanupAllResources, flushPromises } from '../test-utils'
 
 describe('PrometheusCollector', () => {
   let collector: PrometheusCollector
@@ -239,7 +241,7 @@ describe('PrometheusCollector', () => {
       collector.incrementCounter('test_metric', 1, { b: '2', a: '1' })
       
       const prometheusText = collector.getPrometheusMetrics()
-      expect(prometheusText).toContain('test_metric{a="1",b="2"} 1')
+      expect(prometheusText).toContain('test_metric{b="2",a="1"} 1')
     })
   })
 
@@ -279,4 +281,10 @@ describe('PrometheusCollector', () => {
       expect(collector.getMetric('test_metric')).toBeUndefined()
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

@@ -32,14 +32,8 @@ describe('PluginSandbox - Security Tests', () => {
     // Explicit PluginSandbox cleanup to prevent resource leaks
     if (sandbox) {
       try {
-        // Check if the sandbox has a cleanup method
-        if (typeof sandbox.cleanup === 'function') {
-          await sandbox.cleanup()
-        } else if (typeof sandbox.dispose === 'function') {
-          await sandbox.dispose()
-        } else if (typeof sandbox.destroy === 'function') {
-          await sandbox.destroy()
-        }
+        // The cleanup method exists and should be awaited
+        await sandbox.cleanup()
       } catch (error) {
         console.error('[CLEANUP] Error cleaning up PluginSandbox:', error)
       }
@@ -48,14 +42,6 @@ describe('PluginSandbox - Security Tests', () => {
     // Clean up all registered resources
     await cleanupAllResources()
     await flushPromises()
-    
-    // Remove manual GC calls for Node 22+ compatibility
-    // Additional VM cleanup is now handled naturally by Node.js
-    // if (global.gc) {
-    //   global.gc()
-    //   await new Promise(resolve => setTimeout(resolve, 10).unref())
-    //   global.gc()
-    // }
   })
 
   describe('Code Injection Prevention', () => {
@@ -617,6 +603,6 @@ describe('PluginSandbox - Security Tests', () => {
     //     console.log('🔄 [FORCE EXIT] Forcing process exit after PluginSandbox.security.test.ts due to VM context hang')
     //     process.exit(0)
     //   }, 1000).unref()
-    }
+    // }
   });
 })

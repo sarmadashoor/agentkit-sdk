@@ -8,7 +8,7 @@
  * - Integration with connectAgent
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { mkdtemp, writeFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -48,6 +48,12 @@ vi.mock('fs/promises', async () => {
     access: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn().mockResolvedValue('{"mock": "signature"}')
   }
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })
 
 describe('Plugin Verification System', () => {
@@ -470,4 +476,10 @@ describe('Plugin Verification System', () => {
         .rejects.toThrow(PluginVerificationError)
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

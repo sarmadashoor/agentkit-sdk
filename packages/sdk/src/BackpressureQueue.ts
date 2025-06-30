@@ -184,6 +184,7 @@ export class BackpressureQueue<T = any> {
       const delay = Math.max(0, nextRetryTime - now)
       
       this.processingTimer = setTimeout(() => this.processQueue(), delay)
+      if (this.processingTimer.unref) this.processingTimer.unref()
     } else {
       // Queue is empty
       this.isProcessing = false
@@ -383,17 +384,25 @@ export class BackpressureQueue<T = any> {
 
     // Wait for all current items to be processed or failed
     while (this.queue.length > 0 && !this.isShutdown) {
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise(resolve => {
+        const timer = setTimeout(resolve, 10)
+        if (timer.unref) timer.unref()
+      })
     }
   }
 
   /**
    * Shutdown the queue and reject all pending items
    */
-  shutdown(): void {
+  async shutdown(): Promise<void> {
     if (this.isShutdown) {
       return
     }
+
+    debugLog.lifecycle('shutdown start', 'BackpressureQueue', {
+      queueSize: this.queue.length,
+      stats: this.getStats()
+    }, this.options.debug)
 
     this.isShutdown = true
     this.isProcessing = false
@@ -414,7 +423,7 @@ export class BackpressureQueue<T = any> {
     // Clear queue
     this.queue.length = 0
 
-    debugLog.operation('backpressure queue shutdown', {
+    debugLog.lifecycle('shutdown complete', 'BackpressureQueue', {
       totalEnqueued: this.totalEnqueued,
       totalProcessed: this.totalProcessed,
       totalFailed: this.totalFailed

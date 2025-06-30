@@ -4,9 +4,20 @@
  * all plugin-related types come from the shared types package.
  */
 
-import { describe, test, expect } from 'vitest'
+import { describe, test, expect, afterEach, afterAll } from 'vitest'
 import type { AgentKitPlugin, AgentContext, SendPayload } from '@agentkit/types'
 import { PluginManager } from '../src/plugins/PluginManager'
+import { cleanupAllResources, flushPromises } from './test-utils'
+
+let pluginManager: PluginManager | null = null
+
+afterEach(() => {
+  if (pluginManager) {
+    pluginManager.clear()
+    pluginManager.shutdown()
+    pluginManager = null
+  }
+})
 
 describe('Plugin Type Imports', () => {
   test('should import AgentKitPlugin from @agentkit/types', () => {
@@ -37,7 +48,7 @@ describe('Plugin Type Imports', () => {
   })
 
   test('should use imported types in PluginManager', () => {
-    const pluginManager = new PluginManager()
+    pluginManager = new PluginManager()
     
     const testPlugin: AgentKitPlugin = {
       name: 'manager-test-plugin',
@@ -54,20 +65,27 @@ describe('Plugin Type Imports', () => {
   })
 
   test('should correctly type async plugin hooks', async () => {
-    const asyncPlugin: AgentKitPlugin = {
-      name: 'async-test-plugin',
-      version: '1.0.0',
+    class AsyncTestPlugin implements AgentKitPlugin {
+      public readonly name = 'async-test-plugin'
+      public readonly version = '1.0.0'
+      
       async onInit(context: AgentContext): Promise<void> {
         // Async hook with proper typing
         expect(context.agentId).toBeDefined()
-      },
+      }
+      
       async onSend(payload: SendPayload, context: AgentContext): Promise<void> {
         // Async hook with proper typing
         expect(payload.input).toBeDefined()
       }
     }
+    
+    const asyncPlugin = new AsyncTestPlugin()
 
-    const pluginManager = new PluginManager()
+    pluginManager = new PluginManager({ 
+      debug: true,
+      sandbox: false // Disable sandbox to test plugin execution without VM issues
+    })
     pluginManager.register(asyncPlugin)
 
     const context: AgentContext = {
@@ -91,4 +109,10 @@ describe('Plugin Type Imports', () => {
     expect(results2).toHaveLength(1)
     expect(results2[0].success).toBe(true)
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

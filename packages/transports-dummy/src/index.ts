@@ -23,6 +23,9 @@ export class DummyTransport implements Transport {
   private processingQueue: unknown[] = [] // Track messages being processed for backpressure
   private initialized = false
   private callbacks: ((msg: unknown) => void)[] = []
+  private activeTimeouts = new Set<NodeJS.Timeout>()
+  private messageChannels: MessageChannel[] = [] // Track MessageChannels for cleanup
+  private messagePorts: { port1?: MessagePort; port2?: MessagePort }[] = [] // Track individual ports
 
   constructor(config?: DummyTransportConfig) {
     this.config = DummyTransportConfigSchema.parse(config || {})
@@ -82,7 +85,8 @@ export class DummyTransport implements Transport {
     this.sentMessages.push(message)
     
     // Simulate async processing
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
+      this.activeTimeouts.delete(timeoutId)
       // If fixedResponse is configured, add it to queue
       if (this.config.fixedResponse !== undefined) {
         this.messageQueue.push(this.config.fixedResponse)
@@ -129,9 +133,16 @@ export class DummyTransport implements Transport {
         this.callbacks.forEach(cb => cb(msg))
       }
     }, this.config.responseDelay ?? 5)
+    this.activeTimeouts.add(timeoutId)
     
     // Simulate async send delay (but don't block - processing happens in background)
-    await new Promise<void>(resolve => setTimeout(resolve, Math.min(this.config.responseDelay ?? 5, 1)))
+    await new Promise<void>(resolve => {
+      const timeoutId = setTimeout(() => {
+        this.activeTimeouts.delete(timeoutId)
+        resolve()
+      }, Math.min(this.config.responseDelay ?? 5, 1))
+      this.activeTimeouts.add(timeoutId)
+    })
   }
 
   async receive(): Promise<TransportMessage> {
@@ -144,7 +155,13 @@ export class DummyTransport implements Transport {
     }
     
     // Simulate async receive
-    await new Promise<void>(resolve => setTimeout(resolve, this.config.responseDelay ?? 5))
+    await new Promise<void>(resolve => {
+      const timeoutId = setTimeout(() => {
+        this.activeTimeouts.delete(timeoutId)
+        resolve()
+      }, this.config.responseDelay ?? 5)
+      this.activeTimeouts.add(timeoutId)
+    })
     
     const message = this.messageQueue.shift()
     if (!message) {
@@ -215,6 +232,132 @@ export class DummyTransport implements Transport {
         'Transport not initialized'
     }
   }
+
+  async shutdown(): Promise<void> {
+    if (this.config.debug) {
+      console.log('[DummyTransport] Shutting down')
+    }
+    
+    // Clear all active timeouts
+    for (const timeout of this.activeTimeouts) {
+      clearTimeout(timeout)
+    }
+    this.activeTimeouts.clear()
+    
+    // Close all MessageChannels and their ports explicitly
+    for (const channel of this.messageChannels) {
+      try {
+        // Close both ports of the channel
+        if (channel.port1) {
+          channel.port1.close()
+          if (this.config.debug) {
+            console.log('[DummyTransport] Closed MessageChannel port1')
+          }
+        }
+        if (channel.port2) {
+          channel.port2.close()
+          if (this.config.debug) {
+            console.log('[DummyTransport] Closed MessageChannel port2')
+          }
+        }
+      } catch (error) {
+        if (this.config.debug) {
+          console.warn('[DummyTransport] Error closing MessageChannel ports:', error)
+        }
+      }
+    }
+    this.messageChannels.length = 0
+    
+    // Close any individually tracked ports
+    for (const portPair of this.messagePorts) {
+      try {
+        if (portPair.port1 && typeof portPair.port1.close === 'function') {
+          portPair.port1.close()
+          ;(portPair as any).port1 = undefined
+          if (this.config.debug) {
+            console.log('[DummyTransport] Closed individual port1')
+          }
+        }
+        if (portPair.port2 && typeof portPair.port2.close === 'function') {
+          portPair.port2.close()
+          ;(portPair as any).port2 = undefined
+          if (this.config.debug) {
+            console.log('[DummyTransport] Closed individual port2')
+          }
+        }
+      } catch (error) {
+        if (this.config.debug) {
+          console.warn('[DummyTransport] Error closing individual ports:', error)
+        }
+      }
+    }
+    this.messagePorts.length = 0
+    
+    this.initialized = false
+    this.messageQueue.length = 0
+    this.sentMessages.length = 0
+    this.processingQueue.length = 0
+    this.callbacks.length = 0
+    
+    // Simulate async shutdown
+    await new Promise(resolve => setTimeout(resolve, 5))
+  }
+  
+  /**
+   * Register MessagePorts for tracking and cleanup
+   */
+  private registerMessagePorts(port1: MessagePort, port2: MessagePort): void {
+    const portPair = { port1, port2 }
+    this.messagePorts.push(portPair)
+    
+    // Auto-remove when ports are closed externally
+    port1.addEventListener('close', () => {
+      (portPair as any).port1 = undefined
+    })
+    port2.addEventListener('close', () => {
+      (portPair as any).port2 = undefined
+    })
+  }
+  
+  /**
+   * Create a MessageChannel and register for cleanup
+   * Use this method instead of creating MessageChannel directly
+   */
+  createMessageChannel(): { port1: MessagePort; port2: MessagePort; close: () => void } {
+    const channel = new MessageChannel()
+    
+    // Track the channel itself
+    this.messageChannels.push(channel)
+    
+    // Also register individual ports for cleanup
+    this.registerMessagePorts(channel.port1, channel.port2)
+    
+    return {
+      port1: channel.port1,
+      port2: channel.port2,
+      close: () => {
+        try {
+          channel.port1.close()
+          channel.port2.close()
+          
+          // Remove from tracking
+          const channelIndex = this.messageChannels.indexOf(channel)
+          if (channelIndex > -1) {
+            this.messageChannels.splice(channelIndex, 1)
+          }
+        } catch (error) {
+          if (this.config.debug) {
+            console.warn('[DummyTransport] Error in manual close:', error)
+          }
+        }
+      }
+    }
+  }
+  
+  // Add idempotent dispose method for backward compatibility
+  async dispose(): Promise<void> {
+    await this.shutdown()
+  }
 }
 
 // Keep the original for backward compatibility
@@ -224,6 +367,9 @@ export class LegacyDummyTransport implements Transport {
   config?: TransportConfig
   private messageQueue: unknown[] = []
   private debug: boolean = false
+  private activeTimeouts = new Set<NodeJS.Timeout>()
+  private messageChannels: MessageChannel[] = [] // Track MessageChannels for cleanup
+  private messagePorts: { port1?: MessagePort; port2?: MessagePort }[] = [] // Track individual ports
 
   constructor(config?: { debug?: boolean }) {
     this.config = config
@@ -235,7 +381,13 @@ export class LegacyDummyTransport implements Transport {
       console.log('[DummyTransport] Initializing with config:', config)
     }
     // Simulate async initialization
-    await new Promise(resolve => setTimeout(resolve, 10))
+    await new Promise(resolve => {
+      const timeoutId = setTimeout(() => {
+        this.activeTimeouts.delete(timeoutId)
+        resolve(undefined)
+      }, 10)
+      this.activeTimeouts.add(timeoutId)
+    })
   }
 
   async send(message: unknown): Promise<void> {
@@ -244,7 +396,13 @@ export class LegacyDummyTransport implements Transport {
     }
     this.messageQueue.push(message)
     // Simulate async send
-    await new Promise(resolve => setTimeout(resolve, 5))
+    await new Promise(resolve => {
+      const timeoutId = setTimeout(() => {
+        this.activeTimeouts.delete(timeoutId)
+        resolve(undefined)
+      }, 5)
+      this.activeTimeouts.add(timeoutId)
+    })
   }
 
   async receive(): Promise<TransportMessage> {
@@ -252,7 +410,13 @@ export class LegacyDummyTransport implements Transport {
       console.log('[DummyTransport] Receiving message')
     }
     // Simulate async receive
-    await new Promise<void>(resolve => setTimeout(resolve, 5))
+    await new Promise<void>(resolve => {
+      const timeoutId = setTimeout(() => {
+        this.activeTimeouts.delete(timeoutId)
+        resolve()
+      }, 5)
+      this.activeTimeouts.add(timeoutId)
+    })
     const message = this.messageQueue.shift()
     return { content: message || null, metadata: { transportId: this.id, timestamp: new Date().toISOString() } }
   }
@@ -265,6 +429,128 @@ export class LegacyDummyTransport implements Transport {
   // Required by Transport interface - legacy transport always accepts messages
   canAcceptMore(): boolean {
     return true
+  }
+
+  async shutdown(): Promise<void> {
+    if (this.debug) {
+      console.log('[LegacyDummyTransport] Shutting down')
+    }
+    
+    // Clear all active timeouts
+    for (const timeout of this.activeTimeouts) {
+      clearTimeout(timeout)
+    }
+    this.activeTimeouts.clear()
+    
+    // Close all MessageChannels and their ports explicitly
+    for (const channel of this.messageChannels) {
+      try {
+        // Close both ports of the channel
+        if (channel.port1) {
+          channel.port1.close()
+          if (this.debug) {
+            console.log('[LegacyDummyTransport] Closed MessageChannel port1')
+          }
+        }
+        if (channel.port2) {
+          channel.port2.close()
+          if (this.debug) {
+            console.log('[LegacyDummyTransport] Closed MessageChannel port2')
+          }
+        }
+      } catch (error) {
+        if (this.debug) {
+          console.warn('[LegacyDummyTransport] Error closing MessageChannel ports:', error)
+        }
+      }
+    }
+    this.messageChannels.length = 0
+    
+    // Close any individually tracked ports
+    for (const portPair of this.messagePorts) {
+      try {
+        if (portPair.port1 && typeof portPair.port1.close === 'function') {
+          portPair.port1.close()
+          ;(portPair as any).port1 = undefined
+          if (this.debug) {
+            console.log('[LegacyDummyTransport] Closed individual port1')
+          }
+        }
+        if (portPair.port2 && typeof portPair.port2.close === 'function') {
+          portPair.port2.close()
+          ;(portPair as any).port2 = undefined
+          if (this.debug) {
+            console.log('[LegacyDummyTransport] Closed individual port2')
+          }
+        }
+      } catch (error) {
+        if (this.debug) {
+          console.warn('[LegacyDummyTransport] Error closing individual ports:', error)
+        }
+      }
+    }
+    this.messagePorts.length = 0
+    
+    this.messageQueue.length = 0
+    
+    // Simulate async shutdown
+    await new Promise(resolve => setTimeout(resolve, 5))
+  }
+  
+  /**
+   * Register MessagePorts for tracking and cleanup
+   */
+  private registerMessagePorts(port1: MessagePort, port2: MessagePort): void {
+    const portPair = { port1, port2 }
+    this.messagePorts.push(portPair)
+    
+    // Auto-remove when ports are closed externally
+    port1.addEventListener('close', () => {
+      (portPair as any).port1 = undefined
+    })
+    port2.addEventListener('close', () => {
+      (portPair as any).port2 = undefined
+    })
+  }
+  
+  /**
+   * Create a MessageChannel and register for cleanup
+   * Use this method instead of creating MessageChannel directly
+   */
+  createMessageChannel(): { port1: MessagePort; port2: MessagePort; close: () => void } {
+    const channel = new MessageChannel()
+    
+    // Track the channel itself
+    this.messageChannels.push(channel)
+    
+    // Also register individual ports for cleanup
+    this.registerMessagePorts(channel.port1, channel.port2)
+    
+    return {
+      port1: channel.port1,
+      port2: channel.port2,
+      close: () => {
+        try {
+          channel.port1.close()
+          channel.port2.close()
+          
+          // Remove from tracking
+          const channelIndex = this.messageChannels.indexOf(channel)
+          if (channelIndex > -1) {
+            this.messageChannels.splice(channelIndex, 1)
+          }
+        } catch (error) {
+          if (this.debug) {
+            console.warn('[LegacyDummyTransport] Error in manual close:', error)
+          }
+        }
+      }
+    }
+  }
+  
+  // Add idempotent dispose method for backward compatibility
+  async dispose(): Promise<void> {
+    await this.shutdown()
   }
 }
 

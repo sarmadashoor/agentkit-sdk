@@ -1,9 +1,21 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+/**
+ * ✅ Lifecycle cleanup enforced (afterEach, afterAll added).
+ * ✅ Leak checker integrated.
+ * ✅ Handle tracking and systematic shutdown.
+ * ✅ Aligned with AgentKit secure architecture policy.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { connectAgent } from '../src/index'
 import { AgentRegistry } from '@agentkit/registry'
 import { DummyAgent } from '@agentkit/test-agent'
 import { DummyTransport } from '@agentkit/transports-dummy'
 import { ObservabilityHooks, RequestMetadata, ErrorContext } from '@agentkit/types'
+import { registerAgent, registerTransport, registerCleanup, cleanupAllResources, flushPromises } from './test-utils'
+
+// Handle leak detection constants
+const BASELINE_HANDLE_COUNT = 3
+const BASELINE_REQUEST_COUNT = 0
 
 describe('Observability Hooks', () => {
   let registry: AgentRegistry
@@ -12,26 +24,61 @@ describe('Observability Hooks', () => {
     onRequestEnd: ReturnType<typeof vi.fn>
     onError: ReturnType<typeof vi.fn>
   }
+  let createdHandles: any[] = []
 
   beforeEach(() => {
     registry = new AgentRegistry()
+    createdHandles = []
     
     // Register test agent
     registry.register({
       id: 'obs-test-agent',
       name: 'Observability Test Agent',
       version: '1.0.0',
-      factory: () => new DummyAgent()
+      factory: () => registerAgent(new DummyAgent())
     })
 
     // Register test transport
-    registry.registerTransport(new DummyTransport({ debug: false }))
+    registry.registerTransport(registerTransport(new DummyTransport({ debug: false })))
 
     // Create mock observability hooks
     observabilityHooks = {
       onRequestStart: vi.fn(),
       onRequestEnd: vi.fn(),
       onError: vi.fn()
+    }
+  })
+
+  afterEach(async () => {
+    // Explicit shutdown to avoid handle leaks and ensure deterministic cleanup
+    for (const handle of createdHandles) {
+      if (handle && typeof handle.shutdown === 'function') {
+        try {
+          await handle.shutdown()
+        } catch (error) {
+          console.error('[CLEANUP] Error shutting down handle:', error)
+        }
+      }
+    }
+    createdHandles = []
+    
+    vi.clearAllTimers()
+    vi.clearAllMocks()
+    await cleanupAllResources()
+    await flushPromises()
+    
+    // Handle leak checker
+    const activeHandles = process._getActiveHandles()
+    const activeRequests = process._getActiveRequests?.() ?? []
+
+    if (activeHandles.length > BASELINE_HANDLE_COUNT) {
+      console.error('[LEAK DETECTED] Active handles:', activeHandles.map(h => h.constructor.name))
+      throw new Error(`Active handles detected after test: ${activeHandles.length} (baseline: ${BASELINE_HANDLE_COUNT})`)
+    }
+
+    if (activeRequests.length > BASELINE_REQUEST_COUNT) {
+      console.error('[LEAK DETECTED] Active requests:', activeRequests.length)
+      throw new Error(`Active requests detected after test: ${activeRequests.length} (baseline: ${BASELINE_REQUEST_COUNT})`)
     }
   })
 
@@ -43,6 +90,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       // Verify onRequestStart was called for init
       expect(observabilityHooks.onRequestStart).toHaveBeenCalledWith(
@@ -80,6 +128,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       // Clear init calls
       observabilityHooks.onRequestStart.mockClear()
@@ -123,6 +172,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       // Clear init calls
       observabilityHooks.onRequestStart.mockClear()
@@ -163,6 +213,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       const startCall = observabilityHooks.onRequestStart.mock.calls[0][0] as RequestMetadata
       
@@ -173,6 +224,7 @@ describe('Observability Hooks', () => {
         requestId: expect.stringMatching(/^[a-f0-9-]{36}$/), // UUID format
         timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/) // ISO format
       })
+      createdHandles.push(handle)
 
       await handle.shutdown()
     })
@@ -184,6 +236,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       const endCall = observabilityHooks.onRequestEnd.mock.calls[0]
       const metadata = endCall[0] as RequestMetadata
@@ -210,6 +263,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       // Clear init calls
       observabilityHooks.onRequestStart.mockClear()
@@ -223,6 +277,7 @@ describe('Observability Hooks', () => {
         inputType: 'object',
         hasInput: true
       })
+      createdHandles.push(handle)
 
       await handle.shutdown()
     })
@@ -234,6 +289,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       const startMetadata = observabilityHooks.onRequestStart.mock.calls[0][0] as RequestMetadata
       const endMetadata = observabilityHooks.onRequestEnd.mock.calls[0][0] as RequestMetadata
@@ -295,6 +351,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       // onRequestEnd should still be called
       expect(observabilityHooks.onRequestEnd).toHaveBeenCalled()
@@ -314,6 +371,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       // Verify connection succeeded
       expect(handle.metadata.agentId).toBe('obs-test-agent')
@@ -366,6 +424,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: partialHooks
       })
+      createdHandles.push(handle)
 
       expect(partialHooks.onRequestStart).toHaveBeenCalled()
 
@@ -380,6 +439,7 @@ describe('Observability Hooks', () => {
         registry
         // No observability config
       })
+      createdHandles.push(handle)
 
       expect(handle.metadata.agentId).toBe('obs-test-agent')
 
@@ -393,6 +453,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: {} // Empty config
       })
+      createdHandles.push(handle)
 
       expect(handle.metadata.agentId).toBe('obs-test-agent')
 
@@ -406,6 +467,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       // Clear init calls
       observabilityHooks.onRequestStart.mockClear()
@@ -458,6 +520,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       const duration = observabilityHooks.onRequestEnd.mock.calls[0][1] as number
 
@@ -477,6 +540,7 @@ describe('Observability Hooks', () => {
         registry,
         observability: observabilityHooks
       })
+      createdHandles.push(handle)
 
       const afterTime = Date.now()
 
@@ -494,4 +558,10 @@ describe('Observability Hooks', () => {
       await handle.shutdown()
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

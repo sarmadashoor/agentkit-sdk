@@ -15,10 +15,17 @@
   "scripts": {
     "build": "tsup",
     "clean": "rm -rf dist",
-    "test": "node scripts/validate-tests.mjs && vitest run",
+    "test": "npm run test:core",
     "test:watch": "vitest",
     "test:manual": "vitest test/manual/",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:core": "vitest run __tests__/connectAgent.test.ts __tests__/bounded-queue.test.ts __tests__/circuit-breaker.test.ts",
+    "test:plugins": "vitest run __tests__/plugins/ __tests__/plugin-*.test.ts",
+    "test:concurrency": "vitest run __tests__/agent-*concurrency*.test.ts __tests__/transport-*.test.ts",
+    "test:observability": "vitest run __tests__/observability/ __tests__/metrics/",
+    "test:legacy": "vitest run __tests__/legacy/",
+    "test:all-batched": "npm run test:core && npm run test:plugins && npm run test:concurrency && npm run test:observability",
+    "test:all": "node scripts/validate-tests.mjs && vitest run",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },

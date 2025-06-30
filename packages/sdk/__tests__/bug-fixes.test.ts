@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest'
 import { connectAgent } from '../src/index'
 import { AgentRegistry } from '@agentkit/registry'
 import { DummyAgent } from '@agentkit/test-agent'
 import { DummyTransport } from '@agentkit/transports-dummy'
+import { cleanupAllResources, flushPromises } from './test-utils'
 
 describe('Bug fixes for Phase 6', () => {
   let registry: AgentRegistry
@@ -15,6 +16,12 @@ describe('Bug fixes for Phase 6', () => {
       debug: false,
       logMessages: false
     }))
+  })
+
+  afterEach(async () => {
+    // Clean up all registered resources
+    await cleanupAllResources()
+    await flushPromises()
   })
 
   describe('Bug 1: supportedScopes preservation in registry', () => {
@@ -264,4 +271,14 @@ describe('Bug fixes for Phase 6', () => {
       await handle.shutdown()
     })
   })
+
+  afterAll(async () => {
+    // Final cleanup
+    await cleanupAllResources()
+    await flushPromises()
+    
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

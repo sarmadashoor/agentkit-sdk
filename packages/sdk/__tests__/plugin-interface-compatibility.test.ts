@@ -4,7 +4,7 @@
  * is fully compatible with SDK PluginManager implementation
  */
 
-import { describe, test, expect, beforeEach } from 'vitest'
+import { describe, test, expect, beforeEach, afterEach, afterAll } from 'vitest'
 import type { AgentKitPlugin, AgentContext, SendPayload } from '@agentkit/types'
 import { PluginManager } from '../src/plugins/PluginManager'
 
@@ -12,7 +12,17 @@ describe('Plugin Interface Compatibility', () => {
   let pluginManager: PluginManager
 
   beforeEach(() => {
-    pluginManager = new PluginManager()
+    pluginManager = new PluginManager({ 
+      debug: true,
+      sandbox: false // Disable sandbox to test plugin execution without VM issues
+    })
+  })
+
+  afterEach(() => {
+    if (pluginManager) {
+      pluginManager.clear()
+      pluginManager.shutdown()
+    }
   })
 
   test('should accept plugin with all hooks from @agentkit/types', () => {
@@ -46,26 +56,32 @@ describe('Plugin Interface Compatibility', () => {
   })
 
   test('should accept plugin with async hooks from @agentkit/types', async () => {
-    const asyncPlugin: AgentKitPlugin = {
-      name: 'async-test-plugin',
-      version: '2.0.0',
+    class AsyncTestPlugin implements AgentKitPlugin {
+      public readonly name = 'async-test-plugin'
+      public readonly version = '2.0.0'
+      
       async onInit(context: AgentContext): Promise<void> {
         await Promise.resolve()
         expect(context.timestamp).toBeTypeOf('number')
-      },
+      }
+      
       async onSend(payload: SendPayload, context: AgentContext): Promise<void> {
         await Promise.resolve()
         expect(payload.metadata).toBeDefined()
-      },
+      }
+      
       async onError(error: Error, context: AgentContext): Promise<void> {
         await Promise.resolve()
         expect(error.message).toBeDefined()
-      },
+      }
+      
       async onShutdown(context: AgentContext): Promise<void> {
         await Promise.resolve()
         expect(context.requestId).toBeDefined()
       }
     }
+    
+    const asyncPlugin = new AsyncTestPlugin()
 
     pluginManager.register(asyncPlugin)
 
@@ -215,4 +231,10 @@ describe('Plugin Interface Compatibility', () => {
     pluginManager.register(typeSafetyPlugin)
     expect(pluginManager.getPlugins()).toHaveLength(1)
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

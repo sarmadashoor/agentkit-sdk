@@ -1,23 +1,20 @@
 import { defineConfig } from 'vitest/config'
+import path from 'path'
 
 export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    // Ensure tests run in isolation and don't affect each other
     isolate: true,
-    // Use threads for better isolation (but avoid process.chdir issues)
-    threads: true,
-    // Timeout for tests that might run CLI commands
-    testTimeout: 120000,
-    // Timeout for individual hooks
-    hookTimeout: 30000,
+    testTimeout: 120_000,
+    hookTimeout: 30_000,
     include: [
       '__tests__/**/*.test.ts',
       '__tests__/**/*.spec.ts',
       'test/**/*.test.ts',
       'test/**/*.spec.ts'
     ],
+    setupFiles: [path.resolve(__dirname, './vitest.setup.ts')],
     coverage: {
       reporter: ['text', 'html', 'json'],
       exclude: [
@@ -28,8 +25,6 @@ export default defineConfig({
         '**/*.spec.ts',
         '__tests__/helpers/**'
       ]
-    },
-    // Mock configuration to prevent process.chdir usage
-    setupFiles: ['__tests__/setup.ts']
+    }
   }
 })

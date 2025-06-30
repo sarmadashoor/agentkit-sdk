@@ -113,6 +113,11 @@ export class PerformanceObservabilityCollector {
     this.memoryMonitorInterval = setInterval(() => {
       this.lastMemoryUsage = process.memoryUsage().heapUsed
     }, 1000)
+    
+    // Use unref() to prevent keeping process alive
+    if (this.memoryMonitorInterval.unref) {
+      this.memoryMonitorInterval.unref()
+    }
   }
   
   getEnhancedMetrics(): EnhancedPerformanceMetrics {

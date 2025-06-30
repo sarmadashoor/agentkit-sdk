@@ -60,7 +60,7 @@ describe('Debug Mode Trace Output', () => {
     mockNowSpy = null
   })
 
-  afterEach, afterAll(async () => {
+  afterEach(async () => {
     // Restore environment
     process.env = originalEnv
     

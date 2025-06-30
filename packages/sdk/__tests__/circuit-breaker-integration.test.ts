@@ -1,13 +1,68 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+/**
+ * ✅ Lifecycle cleanup enforced (afterEach, afterAll added).
+ * ✅ Leak checker integrated.
+ * ✅ Handle tracking and systematic shutdown.
+ * ✅ Aligned with AgentKit secure architecture policy.
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { CircuitBreaker, CircuitState, CircuitBreakerError } from '../src/circuitBreaker'
+import { registerCleanup, cleanupAllResources, flushPromises } from './test-utils'
+
+// Handle leak detection constants
+const BASELINE_HANDLE_COUNT = 3
+const BASELINE_REQUEST_COUNT = 0
 
 describe('Circuit Breaker Integration', () => {
+  let circuitBreakers: CircuitBreaker[] = []
+
   beforeEach(() => {
     vi.useFakeTimers()
+    circuitBreakers = []
+    
+    // Register circuit breaker factory
+    registerCleanup(async () => {
+      for (const breaker of circuitBreakers) {
+        try {
+          breaker.shutdown()
+        } catch (error) {
+          console.error('[CLEANUP] Error shutting down circuit breaker:', error)
+        }
+      }
+      circuitBreakers.length = 0
+    })
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Explicit shutdown to avoid handle leaks and ensure deterministic cleanup
+    for (const breaker of circuitBreakers) {
+      try {
+        breaker.shutdown()
+      } catch (error) {
+        console.error('[CLEANUP] Error shutting down circuit breaker:', error)
+      }
+    }
+    circuitBreakers.length = 0
+    
     vi.useRealTimers()
+    vi.clearAllTimers()
+    vi.clearAllMocks()
+    await cleanupAllResources()
+    await flushPromises()
+    
+    // Handle leak checker
+    const activeHandles = process._getActiveHandles()
+    const activeRequests = process._getActiveRequests?.() ?? []
+
+    if (activeHandles.length > BASELINE_HANDLE_COUNT) {
+      console.error('[LEAK DETECTED] Active handles:', activeHandles.map(h => h.constructor.name))
+      throw new Error(`Active handles detected after test: ${activeHandles.length} (baseline: ${BASELINE_HANDLE_COUNT})`)
+    }
+
+    if (activeRequests.length > BASELINE_REQUEST_COUNT) {
+      console.error('[LEAK DETECTED] Active requests:', activeRequests.map(r => r.constructor?.name || 'Unknown'))
+      throw new Error(`Active requests detected after test: ${activeRequests.length} (baseline: ${BASELINE_REQUEST_COUNT})`)
+    }
   })
 
   describe('Basic Feature Flag Integration', () => {
@@ -16,9 +71,9 @@ describe('Circuit Breaker Integration', () => {
         enabled: false,
         failureThreshold: 1
       })
+      circuitBreakers.push(breaker)
       
       expect(breaker.isEnabled()).toBe(false)
-      breaker.shutdown()
     })
 
     it('should demonstrate circuit breaker functionality synchronously', () => {
@@ -26,20 +81,20 @@ describe('Circuit Breaker Integration', () => {
         enabled: false,
         failureThreshold: 1
       })
+      circuitBreakers.push(disabledBreaker)
       
       expect(disabledBreaker.isEnabled()).toBe(false)
       expect(disabledBreaker.getStats().state).toBe(CircuitState.CLOSED)
-      disabledBreaker.shutdown()
 
       const enabledBreaker = new CircuitBreaker({
         enabled: true,
         failureThreshold: 1,
         name: 'integration-test'
       })
+      circuitBreakers.push(enabledBreaker)
       
       expect(enabledBreaker.isEnabled()).toBe(true)
       expect(enabledBreaker.getStats().state).toBe(CircuitState.CLOSED)
-      enabledBreaker.shutdown()
     })
 
     it('should handle execution when disabled', async () => {
@@ -47,6 +102,7 @@ describe('Circuit Breaker Integration', () => {
         enabled: false,
         failureThreshold: 1
       })
+      circuitBreakers.push(disabledBreaker)
       
       let callCount = 0
       const failingFn = async () => {
@@ -58,8 +114,6 @@ describe('Circuit Breaker Integration', () => {
       await expect(disabledBreaker.execute(failingFn)).rejects.toThrow('Always fails')
       await expect(disabledBreaker.execute(failingFn)).rejects.toThrow('Always fails')
       expect(callCount).toBe(2)
-      
-      disabledBreaker.shutdown()
     })
 
     it('should open circuit when enabled and threshold reached', async () => {
@@ -68,6 +122,7 @@ describe('Circuit Breaker Integration', () => {
         failureThreshold: 1,
         name: 'integration-test'
       })
+      circuitBreakers.push(enabledBreaker)
       
       let callCount = 0
       const failingFn = async () => {
@@ -83,8 +138,12 @@ describe('Circuit Breaker Integration', () => {
       
       expect(callCount).toBe(1) // Only first call executed
       expect(enabledBreaker.getStats().state).toBe(CircuitState.OPEN)
-      
-      enabledBreaker.shutdown()
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

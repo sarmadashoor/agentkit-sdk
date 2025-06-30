@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterAll } from 'vitest'
 import { PluginExecutionTimeline } from '../../src/observability/PluginExecutionTimeline'
+import { cleanupAllResources, flushPromises } from '../test-utils'
 
 /**
  * Observability Timeline Test Suite
@@ -446,4 +447,10 @@ describe('Observability Timeline Validation', () => {
       expect(() => timeline.getTimeline()).not.toThrow()
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

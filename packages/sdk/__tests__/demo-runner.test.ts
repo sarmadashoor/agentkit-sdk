@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterAll } from 'vitest'
 import { 
   runLifecycleSimulation, 
   runChaosSimulation, 
@@ -29,4 +29,10 @@ describe('Plugin Lifecycle Simulation Demo', () => {
     
     console.log('\n🏁 Demo completed successfully!')
   }, 30000) // 30 second timeout for comprehensive demo
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

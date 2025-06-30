@@ -28,6 +28,9 @@ export class BrowserTransport implements Transport {
   private activeRequests = new Set<AbortController>()
   // Memory leak prevention - track active timeouts
   private activeTimeouts = new Set<NodeJS.Timeout>()
+  // Track MessageChannels and ports for cleanup
+  private messageChannels: MessageChannel[] = []
+  private messagePorts: { port1?: MessagePort; port2?: MessagePort }[] = []
 
   constructor(config: BrowserTransportConfig) {
     // Validate required config
@@ -132,6 +135,93 @@ export class BrowserTransport implements Transport {
       }
     }
     this.activeRequests.clear()
+
+    // Close all MessageChannels and their ports explicitly
+    for (const channel of this.messageChannels) {
+      try {
+        // Close both ports of the channel
+        if (channel.port1) {
+          channel.port1.close()
+        }
+        if (channel.port2) {
+          channel.port2.close()
+        }
+      } catch {
+        // Ignore errors during port closure
+      }
+    }
+    this.messageChannels.length = 0
+    
+    // Close any individually tracked ports
+    for (const portPair of this.messagePorts) {
+      try {
+        if (portPair.port1 && typeof portPair.port1.close === 'function') {
+          portPair.port1.close()
+          ;(portPair as any).port1 = undefined
+        }
+        if (portPair.port2 && typeof portPair.port2.close === 'function') {
+          portPair.port2.close()
+          ;(portPair as any).port2 = undefined
+        }
+      } catch {
+        // Ignore errors during port closure
+      }
+    }
+    this.messagePorts.length = 0
+  }
+
+  /**
+   * Register MessagePorts for tracking and cleanup
+   */
+  private registerMessagePorts(port1: MessagePort, port2: MessagePort): void {
+    const portPair = { port1, port2 }
+    this.messagePorts.push(portPair)
+    
+    // Auto-remove when ports are closed externally
+    port1.addEventListener('close', () => {
+      (portPair as any).port1 = undefined
+    })
+    port2.addEventListener('close', () => {
+      (portPair as any).port2 = undefined
+    })
+  }
+
+  /**
+   * Create a MessageChannel and register for cleanup
+   * Use this method instead of creating MessageChannel directly
+   */
+  createMessageChannel(): { port1: MessagePort; port2: MessagePort; close: () => void } {
+    const channel = new MessageChannel()
+    
+    // Track the channel itself
+    this.messageChannels.push(channel)
+    
+    // Also register individual ports for cleanup
+    this.registerMessagePorts(channel.port1, channel.port2)
+    
+    return {
+      port1: channel.port1,
+      port2: channel.port2,
+      close: () => {
+        try {
+          channel.port1.close()
+          channel.port2.close()
+          
+          // Remove from tracking
+          const channelIndex = this.messageChannels.indexOf(channel)
+          if (channelIndex > -1) {
+            this.messageChannels.splice(channelIndex, 1)
+          }
+        } catch {
+          // Ignore errors during manual close
+        }
+      }
+    }
+  }
+
+  // Add dispose alias for consistency
+  async dispose(): Promise<void> {
+    await this.shutdown()
   }
 
   private async makeRequest(method: string, body?: unknown): Promise<unknown> {

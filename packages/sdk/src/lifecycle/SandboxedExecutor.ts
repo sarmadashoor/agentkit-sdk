@@ -91,32 +91,29 @@ export class SandboxedExecutor {
     // Guard against recursive plugin calls
     guardAgainstRecursivePluginCalls('SandboxedExecutor.send')
     
-    // Use shared AsyncLock to prevent race conditions with shutdown
-    return this.stateLock.lock(async () => {
-      // Check state under lock to prevent race conditions
-      if (this.state === ExecutorState.SHUTTING_DOWN || this.state === ExecutorState.TERMINATED) {
-        throw new AgentShutdownError('SandboxedExecutor has been shutdown', {
-          context: { 
-            agentId: this.config.agentId, 
-            transportId: this.config.transportId, 
-            currentState: this.state 
-          }
-        })
-      }
+    // Check state first without holding lock (fast path)
+    if (this.state === ExecutorState.SHUTTING_DOWN || this.state === ExecutorState.TERMINATED) {
+      throw new AgentShutdownError('SandboxedExecutor has been shutdown', {
+        context: { 
+          agentId: this.config.agentId, 
+          transportId: this.config.transportId, 
+          currentState: this.state 
+        }
+      })
+    }
 
-      if (this.state !== ExecutorState.ACTIVE) {
-        throw new AgentHandleError('SandboxedExecutor not initialized. Set state to ACTIVE first.', {
-          context: { 
-            agentId: this.config.agentId, 
-            transportId: this.config.transportId, 
-            currentState: this.state 
-          }
-        })
-      }
+    if (this.state !== ExecutorState.ACTIVE) {
+      throw new AgentHandleError('SandboxedExecutor not initialized. Set state to ACTIVE first.', {
+        context: { 
+          agentId: this.config.agentId, 
+          transportId: this.config.transportId, 
+          currentState: this.state 
+        }
+      })
+    }
 
-      // State is safe, proceed with bounded execution
-      return this.executeSendOperation(input)
-    })
+    // Proceed with bounded execution without holding stateLock
+    return this.executeSendOperation(input)
   }
 
   /**
@@ -127,45 +124,48 @@ export class SandboxedExecutor {
     return this.boundedExecutor.execute(
       `send-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       async () => {
-        // Double-check state after waiting in queue
-        if (this.state !== ExecutorState.ACTIVE) {
-          throw new AgentShutdownError('SandboxedExecutor has been shutdown during operation', {
-            context: { 
-              agentId: this.config.agentId, 
-              transportId: this.config.transportId, 
-              currentState: this.state 
-            }
-          })
-        }
+        // Use stateLock for state check after dequeuing to ensure atomicity
+        return this.stateLock.lock(async () => {
+          // Double-check state after waiting in queue
+          if (this.state !== ExecutorState.ACTIVE) {
+            throw new AgentShutdownError('SandboxedExecutor has been shutdown during operation', {
+              context: { 
+                agentId: this.config.agentId, 
+                transportId: this.config.transportId, 
+                currentState: this.state 
+              }
+            })
+          }
 
-        // Wrap with circuit breaker if enabled
-        const operationFn = async () => {
-          const startTime = Date.now()
-          const result = await this.observabilityTracker.trackRequest(
-            'send',
-            this.config.agentId,
-            this.config.transportId,
-            async (requestId) => {
-              await this.processSendOperation(input, requestId)
-            },
-            {
-              inputType: typeof input,
-              hasInput: input !== undefined && input !== null
-            }
-          )
+          // Wrap with circuit breaker if enabled
+          const operationFn = async () => {
+            const startTime = Date.now()
+            const result = await this.observabilityTracker.trackRequest(
+              'send',
+              this.config.agentId,
+              this.config.transportId,
+              async (requestId) => {
+                await this.processSendOperation(input, requestId)
+              },
+              {
+                inputType: typeof input,
+                hasInput: input !== undefined && input !== null
+              }
+            )
+            
+            // Record send metrics
+            const duration = Date.now() - startTime
+            this.metricsCollector?.recordSendLatency(duration)
+            
+            return result
+          }
           
-          // Record send metrics
-          const duration = Date.now() - startTime
-          this.metricsCollector?.recordSendLatency(duration)
+          if (this.circuitBreaker) {
+            return this.circuitBreaker.execute(operationFn)
+          }
           
-          return result
-        }
-        
-        if (this.circuitBreaker) {
-          return this.circuitBreaker.execute(operationFn)
-        }
-        
-        return operationFn()
+          return operationFn()
+        }) // Close stateLock.lock
       },
       input // Pass input as payload for size validation
     )
@@ -251,7 +251,7 @@ export class SandboxedExecutor {
 
     try {
       // Check transport backpressure before sending
-      if (!this.transport.canAcceptMore()) {
+      if (this.transport.canAcceptMore && !this.transport.canAcceptMore()) {
         // Emit backpressure detected event
         this.observabilityTracker.emitBackpressureDetected({
           agentId: this.config.agentId,

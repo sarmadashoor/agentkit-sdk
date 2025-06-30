@@ -319,6 +319,11 @@ export class VMRunner {
           withinLimits = false
           reject(new Error(`Execution timeout: ${this.config.timeoutMs}ms exceeded`))
         }, this.config.timeoutMs)
+        
+        // Use unref() to prevent timeout from keeping process alive
+        if (timeout.unref) {
+          timeout.unref()
+        }
 
         try {
           const vmResult = vm.runInContext(executionScript, vmContext, {
@@ -374,12 +379,45 @@ export class VMRunner {
   destroyContext(pluginId: string): void {
     const context = this.contexts.get(pluginId)
     if (context) {
-      // Clear the context
-      this.contexts.delete(pluginId)
+      // For Node 22+, explicitly clear context properties to aid garbage collection
+      try {
+        const contextObj = context as any
+        // Clear all enumerable properties
+        Object.keys(contextObj).forEach(key => {
+          try {
+            delete contextObj[key]
+          } catch (err) {
+            // Ignore property deletion errors
+          }
+        })
+        
+        // Clear any security metadata
+        if (contextObj.__SECURITY__) {
+          delete contextObj.__SECURITY__
+        }
+      } catch (err) {
+        // Ignore cleanup errors - context will still be removed from map
+      }
       
-      // Note: VM contexts can't be explicitly destroyed, but removing references
-      // allows garbage collection
+      // Remove from map
+      this.contexts.delete(pluginId)
     }
+  }
+
+  /**
+   * Shutdown the VM runner and clean up all contexts
+   */
+  shutdown(): void {
+    // Get all plugin IDs before clearing
+    const pluginIds = Array.from(this.contexts.keys())
+    
+    // Destroy all contexts
+    for (const pluginId of pluginIds) {
+      this.destroyContext(pluginId)
+    }
+    
+    // Ensure map is completely clear
+    this.contexts.clear()
   }
 
   /**

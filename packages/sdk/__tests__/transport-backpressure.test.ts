@@ -1,31 +1,36 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterAll } from 'vitest'
 import { AgentManager } from '../src/AgentManager'
 import { DummyAgent } from '@agentkit/test-agent'
 import { DummyTransport } from '@agentkit/transports-dummy'
 import { TransportSendError } from '../src/errors'
+import { registerAgent, registerManager, registerTransport, cleanupAgents } from './test-utils'
 
 describe('Transport Backpressure API', () => {
   let agent: DummyAgent
   let manager: AgentManager
 
   beforeEach(async () => {
-    agent = new DummyAgent()
+    agent = registerAgent(new DummyAgent())
+  })
+
+  afterAll(async () => {
+    await cleanupAgents()
   })
 
   describe('Backpressure Detection', () => {
     it('should respect transport backpressure when queue is full', async () => {
-      const transport = new DummyTransport({
+      const transport = registerTransport(new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 2,
         debug: true,
         responseDelay: 100 // Increase delay to keep messages in queue longer
-      })
+      }))
 
       // Disable backpressure queue to get immediate errors
-      manager = new AgentManager(agent, transport, { 
+      manager = registerManager(new AgentManager(agent, transport, { 
         debug: true,
         enableBackpressureQueue: false 
-      }, [], 'backpressure-test')
+      }, [], 'backpressure-test'))
       await manager.initialize()
 
       // Send messages without awaiting to fill the queue
@@ -43,12 +48,12 @@ describe('Transport Backpressure API', () => {
     })
 
     it('should allow unlimited messages when backpressure is disabled', async () => {
-      const transport = new DummyTransport({
+      const transport = registerTransport(new DummyTransport({
         enableBackpressure: false,
         maxQueueSize: 2
-      })
+      }))
 
-      manager = new AgentManager(agent, transport, { debug: true }, [], 'no-backpressure-test')
+      manager = registerManager(new AgentManager(agent, transport, { debug: true }, [], 'no-backpressure-test'))
       await manager.initialize()
 
       for (let i = 0; i < 10; i++) {
@@ -62,14 +67,14 @@ describe('Transport Backpressure API', () => {
     })
 
     it('should provide accurate queue size information', async () => {
-      const transport = new DummyTransport({
+      const transport = registerTransport(new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 5,
         responseDelay: 1000, // ✅ Much longer delay to keep messages in queue during test
         logMessages: true
-      })
+      }))
 
-      manager = new AgentManager(agent, transport, { debug: true }, [], 'queue-size-test')
+      manager = registerManager(new AgentManager(agent, transport, { debug: true }, [], 'queue-size-test'))
       await manager.initialize()
 
       let status = manager.getTransportStatus()
@@ -106,14 +111,14 @@ describe('Transport Backpressure API', () => {
 
   describe('Transport Status API', () => {
     it('should provide complete transport status', async () => {
-      const transport = new DummyTransport({
+      const transport = registerTransport(new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 10,
         logMessages: true,
         responseDelay: 5
-      })
+      }))
 
-      manager = new AgentManager(agent, transport, { debug: true }, [], 'status-test')
+      manager = registerManager(new AgentManager(agent, transport, { debug: true }, [], 'status-test'))
       await manager.initialize()
 
       const status = manager.getTransportStatus()
@@ -129,18 +134,22 @@ describe('Transport Backpressure API', () => {
     })
 
     it('should report unhealthy status when transport is not initialized', async () => {
-      const transport = new DummyTransport({
+      const transport = registerTransport(new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 10,
         logMessages: true,
         responseDelay: 5
-      })
+      }))
 
-      manager = new AgentManager(agent, transport, { debug: true }, [], 'unhealthy-test')
+      manager = registerManager(new AgentManager(agent, transport, { debug: true }, [], 'unhealthy-test'))
 
       const status = manager.getTransportStatus()
       expect(status.isHealthy).toBe(false)
       expect(status.healthMessage).toBe('Transport not initialized')
+      
+      // Initialize the manager after the test to allow proper cleanup
+      await manager.initialize()
+      await manager.shutdown()
     })
 
     it('should handle transports without backpressure API gracefully', async () => {
@@ -155,7 +164,7 @@ describe('Transport Backpressure API', () => {
         canAcceptMore: () => true
       }
 
-      manager = new AgentManager(agent, basicTransport as any, { debug: true }, [], 'basic-transport-test')
+      manager = registerManager(new AgentManager(agent, basicTransport as any, { debug: true }, [], 'basic-transport-test'))
       await manager.initialize()
 
       await manager.send({ msg: 'test' })
@@ -172,14 +181,14 @@ describe('Transport Backpressure API', () => {
   describe('Backpressure Integration with BoundedExecutor', () => {
     it('should work together with bounded executor limits', async () => {
       console.time('transport-backpressure-bounded-executor')
-      const transport = new DummyTransport({
+      const transport = registerTransport(new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 3,
         responseDelay: 50,
         logMessages: true
-      })
+      }))
 
-      manager = new AgentManager(
+      manager = registerManager(new AgentManager(
         agent,
         transport,
         {
@@ -193,7 +202,7 @@ describe('Transport Backpressure API', () => {
         },
         [],
         'bounded-backpressure-test'
-      )
+      ))
       await manager.initialize()
 
       const promises = []
@@ -217,20 +226,20 @@ describe('Transport Backpressure API', () => {
 
     it('should handle backpressure errors gracefully during high load', async () => {
       console.time('transport-backpressure-high-load')
-      const transport = new DummyTransport({
+      const transport = registerTransport(new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 1,
         responseDelay: 100, // Increased delay to ensure messages process slower
         logMessages: true
-      })
+      }))
 
       // Use default settings with backpressure queue enabled
-      manager = new AgentManager(agent, transport, { 
+      manager = registerManager(new AgentManager(agent, transport, { 
         debug: true,
         backpressureQueueOptions: {
           maxRetries: 2 // Reduce retries to make test faster
         }
-      }, [], 'high-load-test')
+      }, [], 'high-load-test'))
       await manager.initialize()
 
       const promises = Array.from({ length: 10 }, (_, i) => // Reduced from 20 to 10
@@ -258,18 +267,18 @@ describe('Transport Backpressure API', () => {
   describe('Dynamic Queue Management', () => {
     it('should recover from backpressure when queue drains', async () => {
       // This test verifies that backpressure is enforced when queue is full
-      const transport = new DummyTransport({
+      const transport = registerTransport(new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 2,
         responseDelay: 100, // Increase delay to keep messages in queue
         logMessages: true
-      })
+      }))
 
       // Disable backpressure queue to test immediate transport backpressure
-      manager = new AgentManager(agent, transport, { 
+      manager = registerManager(new AgentManager(agent, transport, { 
         debug: true,
         enableBackpressureQueue: false 
-      }, [], 'recovery-test')
+      }, [], 'recovery-test'))
       await manager.initialize()
 
       // Send messages to fill the queue without awaiting to keep them in processing queue
@@ -292,14 +301,14 @@ describe('Transport Backpressure API', () => {
     })
 
     it('should provide real-time queue size updates', async () => {
-      const transport = new DummyTransport({
+      const transport = registerTransport(new DummyTransport({
         enableBackpressure: true,
         maxQueueSize: 5,
         responseDelay: 500, // ✅ Longer delay to observe queue state changes
         logMessages: true
-      })
+      }))
 
-      manager = new AgentManager(agent, transport, { debug: true }, [], 'realtime-test')
+      manager = registerManager(new AgentManager(agent, transport, { debug: true }, [], 'realtime-test'))
       await manager.initialize()
 
       const queueSizes = []
@@ -334,4 +343,10 @@ describe('Transport Backpressure API', () => {
       await manager.shutdown()
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

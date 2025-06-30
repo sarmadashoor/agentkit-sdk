@@ -2,13 +2,13 @@
  * Vitest Setup File - Leak Gatekeeper
  *
  * - Detects and reports handle leaks across timers, ports, workers, plugins
- * - Enforces forced exit if leaks remain (FORCE_TEST_EXIT)
+ * - Natural process exit for Node 22+ compatibility (no forced exits)
  * - Fails CI or strict environments on leak threshold (STRICT_LEAK_DETECTION)
  */
 
 // Immediate verification that setup file is loaded
 console.log('[SETUP] vitest.setup.ts has been loaded ✅')
-console.log('[SETUP] Environment: FORCE_TEST_EXIT=' + process.env.FORCE_TEST_EXIT + ', DEBUG_HANDLES=' + process.env.DEBUG_HANDLES)
+console.log('[SETUP] Environment: DEBUG_HANDLES=' + process.env.DEBUG_HANDLES + ', STRICT_LEAK_DETECTION=' + process.env.STRICT_LEAK_DETECTION)
 
 // Increase max listeners to prevent EventEmitter memory leak warnings when running many tests
 process.setMaxListeners(50)
@@ -183,6 +183,8 @@ process.on('exit', () => {
 
 // Import vitest functions directly since we're in a setup file
 import { afterAll, afterEach, beforeAll } from 'vitest'
+import { cleanupAllResources } from './__tests__/test-utils/cleanup'
+import { inspect } from 'node:util'
 
 // Global cleanup for PluginManager instances
 const globalPluginManagers: any[] = [];
@@ -223,8 +225,10 @@ afterEach(async () => {
     }
   });
 
-  if (handles.length > 0) {
-    logDanglingResources(handles, 'afterEach');
+  // Only log non-system handles to reduce noise
+  const nonSystemHandles = handles.filter(h => !STANDARD_HANDLES.has(h?.constructor?.name));
+  if (nonSystemHandles.length > 0) {
+    logDanglingResources(nonSystemHandles, 'afterEach');
   }
 });
 
@@ -256,9 +260,73 @@ if (process.env.DEBUG_HANDLES === '1') {
   });
 }
 
+// Observability stream cleanup for Node 22+ compatibility
+const shutdownObservability = async () => {
+  try {
+    // Note: No longer touching stdout/stderr system handles for Node 22+ compatibility
+    // Just ensure any user-created streams are properly handled in the main cleanup
+    
+    // Clear any console-related handles by forcing a small delay
+    await new Promise(resolve => setTimeout(resolve, 10))
+    
+    console.log('[OBSERVABILITY CLEANUP] Observability streams cleanup completed')
+  } catch (error) {
+    console.warn('[OBSERVABILITY CLEANUP] Error during observability cleanup:', error.message)
+  }
+}
+
+// Add aggressive resource cleanup with new cleanupAllResources function
+process.on('exit', async () => {
+  try {
+    await cleanupAllResources();
+  } catch (error) {
+    console.error('[EXIT CLEANUP] Error during final cleanup:', error);
+  }
+});
+
+process.on('uncaughtException', async (err) => {
+  console.error('[UNCAUGHT EXCEPTION] Uncaught Exception:', err);
+  try {
+    await cleanupAllResources();
+  } catch (cleanupError) {
+    console.error('[UNCAUGHT EXCEPTION CLEANUP] Error during cleanup:', cleanupError);
+  }
+});
+
+process.on('unhandledRejection', async (reason) => {
+  // Check if this is an expected plugin timeout
+  if (reason && typeof reason === 'object' && 'code' in reason && reason.code === 'PLUGIN_TIMEOUT') {
+    console.log('[EXPECTED PLUGIN TIMEOUT]', reason.context || reason.message);
+    return;
+  }
+  
+  console.error('[UNHANDLED REJECTION] Unhandled Rejection:', reason);
+  try {
+    await cleanupAllResources();
+  } catch (cleanupError) {
+    console.error('[UNHANDLED REJECTION CLEANUP] Error during cleanup:', cleanupError);
+  }
+});
+
+// Optional: inspect active handles to debug
+if (process.env.DEBUG_HANDLES === '1') {
+  console.log('[AGGRESSIVE CLEANUP] Active handles:', inspect(process._getActiveHandles(), { depth: 2 }));
+}
+
 // Always force exit - the environment variable might not be set properly
 afterAll(async () => {
   console.warn('[AGGRESSIVE CLEANUP] Starting comprehensive cleanup...');
+  
+  // First, run our new comprehensive cleanup
+  try {
+    await cleanupAllResources();
+    console.log('[AGGRESSIVE CLEANUP] cleanupAllResources completed successfully');
+  } catch (error) {
+    console.error('[AGGRESSIVE CLEANUP] Error in cleanupAllResources:', error);
+  }
+  
+  // Then run observability cleanup
+  await shutdownObservability();
   performLeakCheck();
   
   // Get all active handles
@@ -266,12 +334,34 @@ afterAll(async () => {
   
   console.log(`[AGGRESSIVE CLEANUP] Found ${remainingHandles.length} total handles to analyze`);
   
+  // Add detailed handle analysis for debugging
+  console.log('🔎 [HANDLE ANALYSIS] Detailed handle dump:');
+  remainingHandles.forEach((handle, idx) => {
+    const handleType = handle?.constructor?.name || 'Unknown';
+    console.log(`  Handle #${idx}: ${handleType}`);
+    
+    // Check for WriteStream properties
+    if (handleType === 'WriteStream' || handleType === 'Pipe') {
+      console.log(`    - fd: ${handle.fd}`);
+      console.log(`    - path: ${handle.path}`);
+      console.log(`    - bytesWritten: ${handle.bytesWritten}`);
+      console.log(`    - destroyed: ${handle.destroyed}`);
+      console.log(`    - closed: ${handle.closed}`);
+      console.log(`    - _writableState:`, handle._writableState ? {
+        ended: handle._writableState.ended,
+        finished: handle._writableState.finished,
+        destroyed: handle._writableState.destroyed
+      } : 'N/A');
+    }
+  });
+  
   // Categorize handles
   const handleCategories = {
     messagePorts: remainingHandles.filter(h => h?.constructor?.name === 'MessagePort'),
     workers: remainingHandles.filter(h => h?.constructor?.name?.includes('Worker')),
     sockets: remainingHandles.filter(h => h?.constructor?.name === 'Socket'),
     pipes: remainingHandles.filter(h => h?.constructor?.name === 'Pipe'),
+    writeStreams: remainingHandles.filter(h => h?.constructor?.name === 'WriteStream'),
     servers: remainingHandles.filter(h => h?.constructor?.name === 'Server'),
     childProcesses: remainingHandles.filter(h => h?.constructor?.name === 'ChildProcess'),
     timeouts: remainingHandles.filter(h => h?.constructor?.name?.includes('Timeout')),
@@ -292,7 +382,7 @@ afterAll(async () => {
     }
   });
   
-  // Aggressively clean up all handles using multiple methods
+  // Clean up handles with new system handle policy
   const allHandles = Object.values(handleCategories).flat();
   
   for (let i = 0; i < allHandles.length; i++) {
@@ -300,22 +390,16 @@ afterAll(async () => {
     const handleType = handle.constructor.name;
     
     try {
-      // Try unref first (prevents keeping process alive)
+      // System handles (WriteStream, Pipe, Socket) - only log, do not destroy
+      if (handleType === 'WriteStream' || handleType === 'Pipe' || handleType === 'Socket') {
+        console.log(`[SYSTEM HANDLE] ${handleType} #${i} - informational only (not destroyed)`);
+        continue;
+      }
+      
+      // Try unref first (prevents keeping process alive) for non-system handles
       if (typeof handle.unref === 'function') {
         handle.unref();
         console.log(`[AGGRESSIVE CLEANUP] Unreferenced ${handleType} #${i}`);
-      }
-      
-      // For sockets, try to gracefully close first
-      if (handleType === 'Socket') {
-        if (typeof handle.end === 'function' && !handle.destroyed) {
-          handle.end();
-          console.log(`[AGGRESSIVE CLEANUP] Ended socket #${i}`);
-        }
-        if (typeof handle.destroy === 'function' && !handle.destroyed) {
-          handle.destroy();
-          console.log(`[AGGRESSIVE CLEANUP] Destroyed socket #${i}`);
-        }
       }
       
       // For servers
@@ -344,9 +428,9 @@ afterAll(async () => {
         console.log(`[AGGRESSIVE CLEANUP] Terminated worker #${i}`);
       }
       
-      // Generic close for anything else
+      // Generic close for anything else (excluding system handles)
       if (typeof handle.close === 'function' && 
-          !['Socket', 'Server', 'MessagePort'].includes(handleType)) {
+          !['Socket', 'Server', 'MessagePort', 'WriteStream', 'Pipe'].includes(handleType)) {
         handle.close();
         console.log(`[AGGRESSIVE CLEANUP] Closed ${handleType} #${i}`);
       }
@@ -366,8 +450,28 @@ afterAll(async () => {
   if (finalHandles.length > 0) {
     console.warn('[AGGRESSIVE CLEANUP] Remaining handles:', finalHandles.map(h => h.constructor.name));
     
-    // Force unref on everything remaining
-    finalHandles.forEach((handle, idx) => {
+    // Categorize final handles
+    const systemHandles = finalHandles.filter(h => 
+      h.constructor.name === 'WriteStream' || 
+      h.constructor.name === 'Pipe' || 
+      h.constructor.name === 'Socket'
+    );
+    const nonSystemHandles = finalHandles.filter(h => 
+      h.constructor.name !== 'WriteStream' && 
+      h.constructor.name !== 'Pipe' && 
+      h.constructor.name !== 'Socket'
+    );
+    
+    // Only log system handles, don't touch them
+    if (systemHandles.length > 0) {
+      console.log(`[SYSTEM HANDLES] ${systemHandles.length} system handles remaining: informational only`);
+      systemHandles.forEach((handle, idx) => {
+        console.log(`  - ${handle.constructor.name} #${idx}`);
+      });
+    }
+    
+    // Force unref on non-system handles only
+    nonSystemHandles.forEach((handle, idx) => {
       try {
         if (typeof handle.unref === 'function') {
           handle.unref();

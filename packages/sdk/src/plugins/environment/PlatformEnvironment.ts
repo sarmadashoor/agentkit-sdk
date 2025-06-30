@@ -74,6 +74,13 @@ export class PlatformEnvironment {
    * Create a secure sandbox context for plugin execution
    */
   createSandboxContext(allowedGlobals: string[], enableDebugMode: boolean = false): Record<string, any> {
+    // Capture the real console methods to avoid recursion
+    const realConsole = {
+      log: (global as any).console?.log?.bind((global as any).console),
+      error: (global as any).console?.error?.bind((global as any).console),
+      warn: (global as any).console?.warn?.bind((global as any).console)
+    }
+
     const context: Record<string, any> = {
       // Explicitly undefined dangerous globals
       global: undefined,
@@ -86,9 +93,32 @@ export class PlatformEnvironment {
       __filename: undefined,
       Buffer: undefined,
       console: {
-        log: (...args: any[]) => enableDebugMode ? debugLog.operation('sandbox-console', { args }, this.debug) : undefined,
-        error: (...args: any[]) => enableDebugMode ? debugLog.error('sandbox-console-error', new Error(String(args[0])), this.debug) : undefined,
-        warn: (...args: any[]) => enableDebugMode ? debugLog.operation('sandbox-console-warn', { args }, this.debug) : undefined
+        log: (...args: any[]) => {
+          // Always call the real console.log so tests can capture output
+          if (realConsole.log) {
+            realConsole.log(...args)
+          }
+          // Also log to debug if enabled
+          if (enableDebugMode) {
+            debugLog.operation('sandbox-console', { args }, this.debug)
+          }
+        },
+        error: (...args: any[]) => {
+          if (realConsole.error) {
+            realConsole.error(...args)
+          }
+          if (enableDebugMode) {
+            debugLog.error('sandbox-console-error', new Error(String(args[0])), this.debug)
+          }
+        },
+        warn: (...args: any[]) => {
+          if (realConsole.warn) {
+            realConsole.warn(...args)
+          }
+          if (enableDebugMode) {
+            debugLog.operation('sandbox-console-warn', { args }, this.debug)
+          }
+        }
       },
       
       // Block constructor access

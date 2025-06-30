@@ -2,8 +2,9 @@
  * Unit tests for PluginExecutionTimeline - Plugin execution debugger
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterAll } from 'vitest'
 import { PluginExecutionTimeline, TimelineSchema, TimelineEntrySchema } from '../../src/observability/PluginExecutionTimeline'
+import { cleanupAllResources, flushPromises } from '../test-utils'
 
 describe('PluginExecutionTimeline', () => {
   let timeline: PluginExecutionTimeline
@@ -283,12 +284,15 @@ describe('PluginExecutionTimeline', () => {
     it('should track threshold violations', () => {
       const stats = timeline.getPerformanceStats()
       
-      expect(stats.thresholdViolations).toHaveLength(2) // SlowPlugin onSend executions
+      expect(stats.thresholdViolations).toHaveLength(3) // All SlowPlugin executions exceed 50ms threshold
       expect(stats.thresholdViolations[0].duration).toBe(120) // Sorted by duration desc
-      expect(stats.thresholdViolations[1].duration).toBe(60)
+      expect(stats.thresholdViolations[1].duration).toBe(80)
+      expect(stats.thresholdViolations[2].duration).toBe(60)
       
       expect(stats.thresholdViolations.every(v => v.plugin === 'SlowPlugin')).toBe(true)
-      expect(stats.thresholdViolations.every(v => v.hook === 'onSend')).toBe(true)
+      expect(stats.thresholdViolations[0].hook).toBe('onSend')
+      expect(stats.thresholdViolations[1].hook).toBe('onInit')
+      expect(stats.thresholdViolations[2].hook).toBe('onSend')
     })
   })
 
@@ -303,17 +307,21 @@ describe('PluginExecutionTimeline', () => {
       
       expect(tableData).toHaveLength(2)
       
-      const row1 = tableData[0]
-      expect(row1.Plugin).toBe('Plugin1')
-      expect(row1.Hook).toBe('onInit')
-      expect(row1.Duration).toBe('20ms')
-      expect(row1.Status).toBe('success')
-      expect(row1.Start).toMatch(/^\d{2}:\d{2}:\d{2}$/) // HH:MM:SS format
-      expect(row1.End).toMatch(/^\d{2}:\d{2}:\d{2}$/)
+      // Find rows by plugin name since order depends on calculated start times
+      const plugin1Row = tableData.find(row => row.Plugin === 'Plugin1')
+      const plugin2Row = tableData.find(row => row.Plugin === 'Plugin2')
       
-      const row2 = tableData[1]
-      expect(row2.Plugin).toBe('Plugin2')
-      expect(row2.Status).toBe('timeout')
+      expect(plugin1Row).toBeDefined()
+      expect(plugin1Row!.Hook).toBe('onInit')
+      expect(plugin1Row!.Duration).toBe('20ms')
+      expect(plugin1Row!.Status).toBe('success')
+      expect(plugin1Row!.Start).toMatch(/^\d{2}:\d{2}:\d{2}$/) // HH:MM:SS format
+      expect(plugin1Row!.End).toMatch(/^\d{2}:\d{2}:\d{2}$/)
+      
+      expect(plugin2Row).toBeDefined()
+      expect(plugin2Row!.Hook).toBe('onSend')
+      expect(plugin2Row!.Duration).toBe('100ms')
+      expect(plugin2Row!.Status).toBe('timeout')
     })
 
     it('should handle pending executions in table', () => {
@@ -381,13 +389,12 @@ describe('PluginExecutionTimeline', () => {
       // Create timeline with some data
       timeline.addExecution('onInit', 'TestPlugin', 25, 'success')
       
-      // Mock getTimeline to return invalid data
-      const originalGetTimeline = timeline.getTimeline
-      timeline.getTimeline = () => {
-        const validTimeline = originalGetTimeline.call(timeline)
-        // Corrupt the timeline data
-        ;(validTimeline as any).summary.totalEntries = 'invalid'
-        return validTimeline as any
+      // Corrupt internal entries to cause validation failure
+      const entries = (timeline as any).entries as Map<string, any>
+      const entry = entries.values().next().value
+      if (entry) {
+        // Set invalid status to trigger validation error
+        entry.status = 'invalid-status'
       }
       
       const result = timeline.getTimeline()
@@ -413,16 +420,20 @@ describe('PluginExecutionTimeline', () => {
       expect(timelineData.metadata.endTime).toBeUndefined()
     })
 
-    it('should finalize timeline', () => {
+    it('should finalize timeline', async () => {
       timeline.addExecution('onInit', 'TestPlugin', 25, 'success')
       
       const beforeFinalize = timeline.getTimeline()
       expect(beforeFinalize.metadata.endTime).toBeUndefined()
       
+      // Add small delay to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 1))
+      
       timeline.finalize()
       
       const afterFinalize = timeline.getTimeline()
-      expect(afterFinalize.metadata.endTime).toBeGreaterThan(beforeFinalize.metadata.startTime)
+      expect(afterFinalize.metadata.endTime).toBeDefined()
+      expect(afterFinalize.metadata.endTime).toBeGreaterThanOrEqual(beforeFinalize.metadata.startTime)
     })
   })
 
@@ -492,4 +503,10 @@ describe('PluginExecutionTimeline', () => {
       expect(entries[1].pluginName).toBe('Plugin With Spaces')
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

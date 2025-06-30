@@ -1,5 +1,0 @@
-{
-  "id": "test-circuit-breaker-recovery-fixed",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/circuit-breaker-transport-integration.test.ts -t \"should recover circuit breaker after timeout period\" --reporter=verbose",
-  "timeout": 60000
-}

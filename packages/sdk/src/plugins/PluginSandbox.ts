@@ -137,7 +137,12 @@ class NodeVMSandbox {
       setTimeout: (callback: Function, delay: number, ...args: unknown[]) => {
         // Only allow short delays for legitimate async operations
         const maxDelay = Math.min(delay || 0, 5000) // Max 5 seconds
-        return globalThis.setTimeout(callback, maxDelay, ...args).unref()
+        const timer = globalThis.setTimeout(callback, maxDelay, ...args)
+        // Only call unref if we're in Node.js (timer has unref method)
+        if (timer && typeof (timer as any).unref === 'function') {
+          (timer as any).unref()
+        }
+        return timer
       },
       // Provide controlled globalThis that plugins can access but not modify
       globalThis: new Proxy({}, {
@@ -179,11 +184,26 @@ class NodeVMSandbox {
    * Clean up VM resources
    */
   cleanup(): void {
-    // Clean up all active scripts first
+    // Clean up all active scripts for Node 22+ compatibility
     for (const script of this.activeScripts) {
       try {
-        // Script objects should be explicitly nulled for Node 22 compatibility
-        script = null
+        // For Node 22+, more explicit script cleanup
+        if (script && typeof script === 'object') {
+          // Clear source map if present
+          if (typeof script.sourceMapURL === 'string') {
+            script.sourceMapURL = undefined
+          }
+          
+          // Clear any cached compilation data
+          if (script.cachedData) {
+            script.cachedData = null
+          }
+          
+          // Clear filename reference if present
+          if (script.filename) {
+            script.filename = undefined
+          }
+        }
       } catch (err) {
         // Ignore cleanup errors but log for debugging
         if (this.options.debug) {
@@ -194,7 +214,20 @@ class NodeVMSandbox {
     this.activeScripts.clear()
 
     if (this.context) {
-      // Let Node.js handle context cleanup naturally
+      // For Node 22+, explicitly clear context properties before nulling
+      try {
+        const contextObj = this.context as any
+        Object.keys(contextObj).forEach(key => {
+          try {
+            delete contextObj[key]
+          } catch (err) {
+            // Ignore property deletion errors
+          }
+        })
+      } catch (err) {
+        // Ignore context cleanup errors
+      }
+      
       this.context = null
     }
     

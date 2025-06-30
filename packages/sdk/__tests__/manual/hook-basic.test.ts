@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { VMRunner, createVMRunner, secureClone } from '../../src/security/vmRunner'
 import type { AgentContext, SendPayload } from '@agentkit/types'
+import { cleanupAllResources, flushPromises } from '../test-utils'
 
 /**
  * Basic Plugin Lifecycle Hook Test Suite
@@ -634,4 +635,10 @@ describe('Basic Plugin Lifecycle Hooks with VM Context', () => {
       expect(stopResult.securityViolations).toHaveLength(0)
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

@@ -315,6 +315,11 @@ export class PluginDevelopmentWrapper {
       this.reportTimer = setInterval(() => {
         this.generateAndLogReport()
       }, this.config.reportInterval)
+      
+      // Use unref() to prevent keeping process alive
+      if (this.reportTimer && this.reportTimer.unref) {
+        this.reportTimer.unref()
+      }
     }
 
     this.debug.info(`Initialized development wrapper for plugin: ${this.pluginName}`, {
@@ -608,6 +613,16 @@ export class PluginDevelopmentWrapper {
       })
     } catch (error) {
       this.debug.warn(`Failed to generate performance report for ${this.pluginName}`, { error })
+    }
+  }
+
+  /**
+   * Shutdown and cleanup resources
+   */
+  shutdown(): void {
+    if (this.reportTimer) {
+      clearInterval(this.reportTimer)
+      this.reportTimer = undefined
     }
   }
 }

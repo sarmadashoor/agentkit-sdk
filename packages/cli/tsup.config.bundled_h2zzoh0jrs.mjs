@@ -1,0 +1,28 @@
+// tsup.config.ts
+import { defineConfig } from "tsup";
+var tsup_config_default = defineConfig({
+  entry: ["src/index-standalone.ts"],
+  format: ["cjs"],
+  // Only CJS for CLI binary
+  dts: false,
+  // Skip DTS generation for now due to workspace issues
+  splitting: false,
+  sourcemap: false,
+  // Disable sourcemap for simpler bundle
+  clean: true,
+  shims: true,
+  // Bundle all dependencies for standalone CLI
+  noExternal: [/.*/],
+  // Target Node.js environment for CLI
+  target: "node18",
+  // Add banner to make CLI executable
+  banner: {
+    js: "#!/usr/bin/env node"
+  },
+  // Platform for Node.js CLI
+  platform: "node"
+});
+export {
+  tsup_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidHN1cC5jb25maWcudHMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImNvbnN0IF9faW5qZWN0ZWRfZmlsZW5hbWVfXyA9IFwiL2hvbWUvcy9kZXYvYWdlbnRraXQtc2RrL3BhY2thZ2VzL2NsaS90c3VwLmNvbmZpZy50c1wiO2NvbnN0IF9faW5qZWN0ZWRfZGlybmFtZV9fID0gXCIvaG9tZS9zL2Rldi9hZ2VudGtpdC1zZGsvcGFja2FnZXMvY2xpXCI7Y29uc3QgX19pbmplY3RlZF9pbXBvcnRfbWV0YV91cmxfXyA9IFwiZmlsZTovLy9ob21lL3MvZGV2L2FnZW50a2l0LXNkay9wYWNrYWdlcy9jbGkvdHN1cC5jb25maWcudHNcIjtpbXBvcnQgeyBkZWZpbmVDb25maWcgfSBmcm9tICd0c3VwJ1xuXG5leHBvcnQgZGVmYXVsdCBkZWZpbmVDb25maWcoe1xuICBlbnRyeTogWydzcmMvaW5kZXgtc3RhbmRhbG9uZS50cyddLFxuICBmb3JtYXQ6IFsnY2pzJ10sIC8vIE9ubHkgQ0pTIGZvciBDTEkgYmluYXJ5XG4gIGR0czogZmFsc2UsIC8vIFNraXAgRFRTIGdlbmVyYXRpb24gZm9yIG5vdyBkdWUgdG8gd29ya3NwYWNlIGlzc3Vlc1xuICBzcGxpdHRpbmc6IGZhbHNlLFxuICBzb3VyY2VtYXA6IGZhbHNlLCAvLyBEaXNhYmxlIHNvdXJjZW1hcCBmb3Igc2ltcGxlciBidW5kbGVcbiAgY2xlYW46IHRydWUsXG4gIHNoaW1zOiB0cnVlLFxuICAvLyBCdW5kbGUgYWxsIGRlcGVuZGVuY2llcyBmb3Igc3RhbmRhbG9uZSBDTElcbiAgbm9FeHRlcm5hbDogWy8uKi9dLFxuICAvLyBUYXJnZXQgTm9kZS5qcyBlbnZpcm9ubWVudCBmb3IgQ0xJXG4gIHRhcmdldDogJ25vZGUxOCcsXG4gIC8vIEFkZCBiYW5uZXIgdG8gbWFrZSBDTEkgZXhlY3V0YWJsZVxuICBiYW5uZXI6IHtcbiAgICBqczogJyMhL3Vzci9iaW4vZW52IG5vZGUnXG4gIH0sXG4gIC8vIFBsYXRmb3JtIGZvciBOb2RlLmpzIENMSVxuICBwbGF0Zm9ybTogJ25vZGUnXG59KSJdLAogICJtYXBwaW5ncyI6ICI7QUFBNlAsU0FBUyxvQkFBb0I7QUFFMVIsSUFBTyxzQkFBUSxhQUFhO0FBQUEsRUFDMUIsT0FBTyxDQUFDLHlCQUF5QjtBQUFBLEVBQ2pDLFFBQVEsQ0FBQyxLQUFLO0FBQUE7QUFBQSxFQUNkLEtBQUs7QUFBQTtBQUFBLEVBQ0wsV0FBVztBQUFBLEVBQ1gsV0FBVztBQUFBO0FBQUEsRUFDWCxPQUFPO0FBQUEsRUFDUCxPQUFPO0FBQUE7QUFBQSxFQUVQLFlBQVksQ0FBQyxJQUFJO0FBQUE7QUFBQSxFQUVqQixRQUFRO0FBQUE7QUFBQSxFQUVSLFFBQVE7QUFBQSxJQUNOLElBQUk7QUFBQSxFQUNOO0FBQUE7QUFBQSxFQUVBLFVBQVU7QUFDWixDQUFDOyIsCiAgIm5hbWVzIjogW10KfQo=

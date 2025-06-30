@@ -2,9 +2,10 @@
  * Test for vitest mock function handling in sandbox execution
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { AgentManager } from '../src/AgentManager'
 import type { Agent, Transport, AgentKitPlugin } from '@agentkit/types'
+import { registerAgent, registerManager, registerTransport, cleanupAllResources, flushPromises } from './test-utils'
 
 // Mock implementations
 const createMockAgent = (): Agent => ({
@@ -30,8 +31,14 @@ describe('Vitest Mock Function Handling', () => {
   let transport: Transport
 
   beforeEach(() => {
-    agent = createMockAgent()
-    transport = createMockTransport()
+    agent = registerAgent(createMockAgent())
+    transport = registerTransport(createMockTransport())
+  })
+
+  afterEach(async () => {
+    // Clean up all registered resources
+    await cleanupAllResources()
+    await flushPromises()
   })
 
   it('should handle vitest mocked functions in sandbox execution', async () => {
@@ -47,7 +54,7 @@ describe('Vitest Mock Function Handling', () => {
       onShutdown: vi.fn().mockResolvedValue(undefined)
     }
 
-    const agentManager = new AgentManager(agent, transport, {
+    const agentManager = registerManager(new AgentManager(agent, transport, {
       plugins: [mockedPlugin],
       observabilityConfig: {
         enableTimelineDebug: true,
@@ -55,11 +62,10 @@ describe('Vitest Mock Function Handling', () => {
         enableConsoleWarnings: false
       },
       debug: false
-    }, [], 'vitest-mock-test')
+    }, [], 'vitest-mock-test'))
 
     await agentManager.initialize()
     await agentManager.send({ content: 'test message' })
-    await agentManager.shutdown()
 
     const timeline = agentManager.getDebugTimeline()
     const metrics = agentManager.getMetrics()
@@ -96,17 +102,16 @@ describe('Vitest Mock Function Handling', () => {
       })
     }
 
-    const agentManager = new AgentManager(agent, transport, {
+    const agentManager = registerManager(new AgentManager(agent, transport, {
       plugins: [arrowFunctionPlugin],
       observabilityConfig: {
         enableTimelineDebug: true
       },
       debug: false
-    }, [], 'arrow-function-test')
+    }, [], 'arrow-function-test'))
 
     await agentManager.initialize()
     await agentManager.send({ content: 'test message' })
-    await agentManager.shutdown()
 
     const timeline = agentManager.getDebugTimeline()
     
@@ -135,17 +140,16 @@ describe('Vitest Mock Function Handling', () => {
       })
     }
 
-    const agentManager = new AgentManager(agent, transport, {
+    const agentManager = registerManager(new AgentManager(agent, transport, {
       plugins: [complexMockPlugin],
       observabilityConfig: {
         enableTimelineDebug: true
       },
       debug: false
-    }, [], 'complex-mock-test')
+    }, [], 'complex-mock-test'))
 
     await agentManager.initialize()
     await agentManager.send({ content: 'test message', metadata: { test: true } })
-    await agentManager.shutdown()
 
     const timeline = agentManager.getDebugTimeline()
     
@@ -155,4 +159,10 @@ describe('Vitest Mock Function Handling', () => {
     expect(sendEntry!.error).toBeUndefined()
     expect(sendEntry!.duration).toBeGreaterThanOrEqual(0)
   }, 10000)
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

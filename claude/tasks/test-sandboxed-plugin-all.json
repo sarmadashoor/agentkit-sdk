@@ -1,5 +1,0 @@
-{
-  "id": "test-sandboxed-plugin-all",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/plugins/sandboxed-plugin.test.ts --reporter=verbose",
-  "timeout": 60000
-}

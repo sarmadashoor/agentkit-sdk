@@ -153,6 +153,67 @@ setTimeout(() => {
 // With proper VM Script cleanup, Node.js should exit naturally
 ```
 
+### 6. System Handle Protection Added
+
+**File Modified:**
+- `packages/sdk/vitest.setup.ts` - Enhanced aggressive cleanup logic
+
+**Critical Fix:**
+```typescript
+// Before (caused EPIPE errors)
+if (handleType === 'WriteStream') {
+  handle.end();
+  handle.destroy();
+}
+
+// After (protects system handles)
+if (handleType === 'WriteStream' && handle !== process.stdout && handle !== process.stderr) {
+  handle.end();
+  handle.destroy();
+}
+```
+
+**Impact:** Final cleanup no longer forcibly closes system handles (stdout, stderr), preventing EPIPE errors during natural process termination.
+
+### 7. Final System Handle Policy (Updated 2025-06-29)
+
+**File Modified:**
+- `packages/sdk/vitest.setup.ts` - Aggressive cleanup logic updated
+
+**Policy Change:** System handles (WriteStream, Pipe, Socket) are now **logged only** and **never forcibly destroyed**.
+
+**Before (caused EPIPE/crashes):**
+```typescript
+// Aggressively cleaned ALL handles including system ones
+if (handleType === 'WriteStream') {
+  handle.end();
+  handle.destroy();
+}
+if (handleType === 'Pipe') {
+  handle.end(); 
+  handle.destroy();
+}
+if (handleType === 'Socket') {
+  handle.end();
+  handle.destroy();
+}
+```
+
+**After (Node 22+ safe):**
+```typescript
+// System handles - only log, do not destroy
+if (handleType === 'WriteStream' || handleType === 'Pipe' || handleType === 'Socket') {
+  console.log(`[SYSTEM HANDLE] ${handleType} #${i} - informational only (not destroyed)`);
+  continue; // Skip any cleanup attempts
+}
+```
+
+**Benefits:**
+- ✅ **No EPIPE errors** from destroyed system streams
+- ✅ **Natural Node.js 22+ termination** 
+- ✅ **Preserved sandbox security** (non-system handles still cleaned)
+- ✅ **Full compatibility** with both Node 20 and Node 22+
+
 ---
 
 ## 🛡️ Architectural Principles Preserved
@@ -296,6 +357,17 @@ git commit -m "fix(exit): remove forced exit logic for clean Node 22+ terminatio
 - Remove FORCE_TEST_EXIT logic from test files  
 - Remove process.exit from timeout handlers
 - Enable natural Node.js process termination"
+```
+
+### Commit 5: Finalize System Handle Policy
+```bash
+git add packages/sdk/vitest.setup.ts NODE22_COMPATIBILITY_ANALYSIS.md NODE22_REFACTOR_SUMMARY.md
+git commit -m "fix(handles): finalize system handle policy (no forced socket or stream cleanup)
+
+- System handles (WriteStream, Pipe, Socket) are logged only, never destroyed
+- Prevents EPIPE errors from closing system streams
+- Maintains cleanup for non-system handles (MessagePort, Worker, etc.)
+- Full Node 22+ compatibility with natural process termination"
 ```
 
 ---

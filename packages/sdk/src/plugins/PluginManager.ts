@@ -42,7 +42,7 @@ export class PluginManager {
       failFast: options.failFast ?? false,
       observabilityHooks: options.observabilityHooks,
       sandbox: options.sandbox ?? true,
-      sandboxTimeout: options.sandboxTimeout ?? 500,
+      sandboxTimeout: options.sandboxTimeout ?? 2000,
       allowedGlobals: options.allowedGlobals ?? ['Math', 'Date', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean'],
       enableDebugMode: options.enableDebugMode ?? false
     }

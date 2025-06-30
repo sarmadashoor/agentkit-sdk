@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach, afterAll } from 'vitest'
 import { PluginManager } from '../../src/plugins/PluginManager'
 import { AgentKitPlugin, AgentContext, SendPayload } from '../../src/plugins/types'
 import { AgentKitError } from '../../src/errors'
@@ -19,8 +19,16 @@ describe('PluginManager', () => {
     }
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks()
+    // Explicit PluginManager cleanup to prevent resource leaks
+    if (pluginManager) {
+      try {
+        await pluginManager.shutdown()
+      } catch (error) {
+        console.error('[CLEANUP] Error shutting down PluginManager:', error)
+      }
+    }
   })
 
   describe('Plugin Registration and Validation', () => {
@@ -392,4 +400,10 @@ describe('PluginManager', () => {
       expect(() => pluginManager.register(invalidPlugin as any)).toThrow()
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

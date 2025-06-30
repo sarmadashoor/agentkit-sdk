@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi, Mock } from 'vitest'
 import {
   isDebugBuildEnabled,
   devOnly,
@@ -293,4 +293,10 @@ describe('Build Guards', () => {
       expect(consoleLogSpy).toHaveBeenCalled()
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

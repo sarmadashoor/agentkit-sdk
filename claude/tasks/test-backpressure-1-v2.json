@@ -1,7 +1,0 @@
-{
-  "id": "test-backpressure-1-v2",
-  "type": "run-command",
-  "cmd": "cd /home/s/dev/agentkit-sdk/packages/sdk && pnpm test __tests__/transport-backpressure.test.ts -t 'should respect transport backpressure when queue is full'",
-  "description": "Run first test from packages/sdk directory",
-  "timeout": 30000
-}

@@ -1,0 +1,135 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  # TIER 1: Core Tests (Required) - Runs on every push/PR
+  tier1-core:
+    runs-on: ubuntu-latest
+    name: "Core Tests (Required)"
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install pnpm
+      run: npm install -g pnpm@8
+    
+    - name: Install dependencies
+      run: pnpm install
+    
+    - name: Run Tier 1 Core Tests
+      run: npm run test:tier1
+      
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: tier1-test-results
+        path: packages/*/test-results/
+
+  # TIER 2: Extended Tests - Runs on every push/PR  
+  tier2-extended:
+    runs-on: ubuntu-latest
+    name: "Extended Tests"
+    needs: tier1-core  # Only run if core passes
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install pnpm
+      run: npm install -g pnpm@8
+    
+    - name: Install dependencies
+      run: pnpm install
+    
+    - name: Run Tier 2 Extended Tests
+      run: npm run test:tier2
+      timeout-minutes: 10
+
+  # TIER 3: Heavy Integration - Only on main branch
+  tier3-integration:
+    runs-on: ubuntu-latest
+    name: "Integration Tests (Main Only)"
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    strategy:
+      matrix:
+        batch: [plugins, concurrency, observability]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install pnpm
+      run: npm install -g pnpm@8
+    
+    - name: Install dependencies
+      run: pnpm install
+    
+    - name: Run SDK ${{ matrix.batch }} Tests
+      run: cd packages/sdk && npm run test:${{ matrix.batch }}
+      timeout-minutes: 30  # Much longer timeout in CI
+
+  # Full Comprehensive Test - Nightly or on release
+  comprehensive:
+    runs-on: ubuntu-latest
+    name: "Full Test Suite"
+    if: github.event_name == 'schedule' || contains(github.ref, 'release')
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install pnpm
+      run: npm install -g pnpm@8
+    
+    - name: Install dependencies
+      run: pnpm install
+    
+    - name: Run All Tests
+      run: npm run test:ci
+      timeout-minutes: 60  # 1 hour timeout for comprehensive
+
+  # Type checking (already exists)
+  type-check:
+    runs-on: ubuntu-latest
+    name: "Type Safety"
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install pnpm
+      run: npm install -g pnpm@8
+    
+    - name: Install dependencies
+      run: pnpm install
+    
+    - name: Type Check
+      run: npm run typecheck

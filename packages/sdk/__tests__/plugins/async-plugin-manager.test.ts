@@ -2,7 +2,7 @@
  * Comprehensive tests for async PluginManager functionality
  */
 
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, test, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { PluginManager } from '../../src/plugins/PluginManager'
 import { 
   AgentKitPlugin, 
@@ -45,7 +45,15 @@ describe('Async PluginManager', () => {
     }
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Explicit PluginManager cleanup to prevent resource leaks
+    if (pluginManager) {
+      try {
+        await pluginManager.shutdown()
+      } catch (error) {
+        console.error('[CLEANUP] Error shutting down PluginManager:', error)
+      }
+    }
     vi.useRealTimers()
   })
 
@@ -548,4 +556,10 @@ describe('Async PluginManager', () => {
       expect(successCall[2]).toBeGreaterThanOrEqual(99)
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

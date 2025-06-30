@@ -1,5 +1,0 @@
-{
-  "id": "test-full-suite-scan",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/ --reporter=verbose",
-  "timeout": 300000
-}

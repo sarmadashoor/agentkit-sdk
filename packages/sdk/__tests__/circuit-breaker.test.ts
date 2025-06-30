@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach, afterAll } from 'vitest'
 import { CircuitBreaker, CircuitState, CircuitBreakerError } from '../src/circuitBreaker'
+import { cleanupAllResources, registerCircuitBreaker, unregisterCircuitBreaker } from './test-utils'
 
 describe('CircuitBreaker', () => {
   let circuitBreaker: CircuitBreaker
@@ -15,6 +16,10 @@ describe('CircuitBreaker', () => {
   afterEach(async () => {
     console.time('circuit-breaker-cleanup')
     try {
+      // Unregister any circuit breakers created in this test
+      if (circuitBreaker) {
+        unregisterCircuitBreaker(circuitBreaker)
+      }
       vi.useRealTimers()
       // Allow any pending timers to be cleaned up
       await new Promise(resolve => setImmediate(resolve))
@@ -24,9 +29,14 @@ describe('CircuitBreaker', () => {
     console.timeEnd('circuit-breaker-cleanup')
   })
 
+  afterAll(async () => {
+    await cleanupAllResources()
+  })
+
   describe('Configuration and Validation', () => {
     it('should use default options when none provided', () => {
       circuitBreaker = new CircuitBreaker()
+      registerCircuitBreaker(circuitBreaker)
       const stats = circuitBreaker.getStats()
       
       expect(stats.state).toBe(CircuitState.CLOSED)
@@ -516,4 +526,10 @@ describe('CircuitBreaker', () => {
       console.timeEnd('circuit-breaker-full-lifecycle')
     }, { timeout: 15000 })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

@@ -1,5 +1,0 @@
-{
-  "id": "test-observability-integration-imports-fixed",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability/observability-integration.test.ts --reporter=verbose",
-  "timeout": 120000
-}

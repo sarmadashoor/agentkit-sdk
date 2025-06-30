@@ -2,8 +2,9 @@
  * Unit tests for MetricsCollector - Stripe-grade SDK observability
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterAll } from 'vitest'
 import { MetricsCollector, PrometheusMetricsSchema } from '../../src/observability/MetricsCollector'
+import { cleanupAllResources, flushPromises } from '../test-utils'
 
 describe('MetricsCollector', () => {
   let collector: MetricsCollector
@@ -20,6 +21,12 @@ describe('MetricsCollector', () => {
     collector.on('metric', () => {}) // Suppress metric events in tests
     collector.on('pluginMetric', () => {}) // Suppress plugin metric events in tests
     collector.on('reset', () => {}) // Suppress reset events in tests
+  })
+
+  afterEach(async () => {
+    // Clean up all registered resources
+    await cleanupAllResources()
+    await flushPromises()
   })
 
   describe('Initialization', () => {
@@ -491,4 +498,14 @@ describe('MetricsCollector', () => {
       await promise
     })
   })
+
+  afterAll(async () => {
+    // Final cleanup
+    await cleanupAllResources()
+    await flushPromises()
+    
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

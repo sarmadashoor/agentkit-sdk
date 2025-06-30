@@ -187,7 +187,7 @@ class PooledWorker {
     const worker = new Worker(workerURL)
     
     // Clean up blob URL
-    setTimeout(() => URL.revokeObjectURL(workerURL), 1000)
+    setTimeout(() => URL.revokeObjectURL(workerURL), 1000).unref()
     
     return worker
   }
@@ -250,7 +250,7 @@ class PooledWorker {
         this.terminate()
         this.worker = this.createWorker()
         this.setupMessageHandling()
-      }, options.timeout)
+      }, options.timeout).unref() // CRITICAL: .unref() to not keep process alive
 
       this.activeExecution.timeoutId = timeoutId
 
@@ -322,10 +322,19 @@ class PooledWorker {
    * Terminate the worker
    */
   terminate(): void {
+    if (this.debug) {
+      console.log(`[WorkerPool] Terminating worker, active execution: ${!!this.activeExecution}`)
+    }
+    
     if (this.activeExecution) {
       this.rejectExecution(new Error('Worker terminated'))
     }
+    
     this.worker.terminate()
+    
+    if (this.debug) {
+      console.log(`[WorkerPool] Worker terminated successfully`)
+    }
   }
 }
 
@@ -446,7 +455,7 @@ export class WorkerPool {
           clearInterval(checkInterval)
           resolve(availableWorker)
         }
-      }, 10) // Check every 10ms
+      }, 10).unref() // CRITICAL: .unref() to not keep process alive
     })
   }
 
@@ -472,7 +481,7 @@ export class WorkerPool {
         }
         return true
       })
-    }, this.maxIdleTime / 2) as unknown as number
+    }, this.maxIdleTime / 2).unref() as unknown as number // CRITICAL: .unref() to not keep process alive
   }
 
   /**
@@ -494,17 +503,33 @@ export class WorkerPool {
   /**
    * Shutdown the worker pool
    */
-  shutdown(): void {
+  async shutdown(): Promise<void> {
+    // Clear GC interval immediately to prevent process hanging
     if (this.gcInterval) {
       clearInterval(this.gcInterval)
+      this.gcInterval = undefined
     }
 
-    this.workers.forEach(worker => worker.terminate())
+    const workerCount = this.workers.length
+    
+    // Terminate all workers with timeout protection
+    const terminationPromises = this.workers.map(worker => 
+      Promise.race([
+        worker.terminate(),
+        new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
+      ])
+    )
+    
+    await Promise.allSettled(terminationPromises)
     this.workers = []
 
     debugLog.lifecycle('worker pool shutdown', 'WorkerPool', {
-      terminatedWorkers: this.workers.length
+      terminatedWorkers: workerCount
     }, this.debug)
+    
+    if (this.debug) {
+      console.log(`[WorkerPool] Shutdown complete: ${workerCount} workers terminated, GC interval cleared`)
+    }
   }
 }
 

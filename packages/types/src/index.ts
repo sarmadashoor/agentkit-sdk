@@ -195,6 +195,8 @@ export interface CircuitBreakerConfig {
 export interface FeatureFlags {
   /** Enable circuit breaker for fault tolerance */
   enableCircuitBreaker?: boolean
+  /** Enable plugin sandboxing */
+  sandbox?: boolean
 }
 
 export interface ConnectAgentOptions {

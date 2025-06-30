@@ -1,6 +1,8 @@
+import { describe, it, expect, beforeEach, afterAll } from 'vitest'
 import { Instrumentation } from '../../src/metrics/Instrumentation'
 import { PrometheusCollector } from '../../src/metrics/PrometheusCollector'
 import { AGENTKIT_METRICS } from '../../src/metrics/MetricsInterface'
+import { cleanupAllResources, flushPromises } from '../test-utils'
 
 describe('Instrumentation', () => {
   let instrumentation: Instrumentation
@@ -219,31 +221,36 @@ describe('Instrumentation', () => {
       
       const metrics = disabledInstrumentation.getCollector().getMetrics()
       const requestMetric = metrics.find(m => m.name === AGENTKIT_METRICS.REQUESTS_TOTAL)
-      expect(requestMetric?.values).toHaveLength(0)
+      expect(requestMetric?.values || []).toHaveLength(0)
       
       disabledInstrumentation.shutdown()
     })
   })
 
   describe('Resource Metrics', () => {
-    it('should start resource metrics collection when enabled', (done) => {
+    it('should start resource metrics collection when enabled', async () => {
       const resourceInstrumentation = new Instrumentation({
         collector: new PrometheusCollector(),
         collectResourceMetrics: true,
         resourceMetricsInterval: 100 // Fast interval for testing
       })
 
-      setTimeout(() => {
-        const memoryMetric = resourceInstrumentation.getCollector()
-          .getMetric(AGENTKIT_METRICS.MEMORY_USAGE_BYTES)
-        
-        // Memory metric might be collected if Node.js APIs are available
-        // This test just ensures the system doesn't crash
-        expect(memoryMetric).toBeDefined()
-        
-        resourceInstrumentation.shutdown()
-        done()
-      }, 150)
+      await new Promise(resolve => setTimeout(resolve, 150))
+      
+      const memoryMetric = resourceInstrumentation.getCollector()
+        .getMetric(AGENTKIT_METRICS.MEMORY_USAGE_BYTES)
+      
+      // Memory metric might be collected if Node.js APIs are available
+      // This test just ensures the system doesn't crash
+      expect(memoryMetric).toBeDefined()
+      
+      resourceInstrumentation.shutdown()
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

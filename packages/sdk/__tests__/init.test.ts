@@ -29,7 +29,7 @@ describe('@agentkit/sdk', () => {
     initialRequestCount = process._getActiveRequests().length
   })
 
-  afterEach, afterAll(async () => {
+  afterEach(async () => {
     // Clean up all resources
     await cleanupAllResources()
     

@@ -28,6 +28,7 @@ export interface PluginRunnerConfig {
   verify?: VerificationMode
   debug?: boolean
   debugModeEnabled?: boolean
+  sandbox?: boolean
 }
 
 export interface PluginObservabilityHooks {
@@ -69,6 +70,7 @@ export class PluginRunner {
     // Initialize plugin manager with observability hooks
     this.pluginManager = new PluginManager({
       debug: config.debug || false,
+      sandbox: config.sandbox,
       observabilityHooks: {
         onPluginStart: (pluginName: string, hookName: string) => {
           this.observabilityHooks.onPluginStart?.(pluginName, hookName)
@@ -261,7 +263,14 @@ export class PluginRunner {
    * Cleanup plugin resources
    */
   async cleanup(): Promise<void> {
-    // Plugin manager cleanup is handled internally
+    // Synchronous shutdown - PluginManager.shutdown() is not async
+    this.pluginManager.shutdown()
     this.pendingPlugins = []
+    
+    // Give small delay for any lingering async operations to complete
+    await new Promise(resolve => {
+      const timer = setTimeout(resolve, 50)
+      if (timer.unref) timer.unref()
+    })
   }
 }

@@ -1,7 +1,0 @@
-{
-  "id": "test-plugin-reliability-debug",
-  "type": "run-command",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability/plugin-reliability.test.ts -t \"should track plugin timeouts in timeline and metrics\"",
-  "description": "Test simplified plugin reliability with debug output",
-  "timeout": 120000
-}

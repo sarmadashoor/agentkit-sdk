@@ -6,8 +6,9 @@
  * structure, and basic cryptographic properties.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterAll } from 'vitest'
 import { createHmac } from 'crypto'
+import { cleanupAllResources, flushPromises } from '../test-utils'
 
 /**
  * Mock implementation of HMAC plugin signing
@@ -506,4 +507,10 @@ describe('Plugin Signing Simulation', () => {
       expect(totalTime).toBeLessThan(10000) // 10 seconds for 100 operations
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

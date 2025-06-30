@@ -434,12 +434,22 @@ export class BoundedExecutor {
       }))
     }
 
-    // Wait for active requests to complete (with timeout)
-    const maxWaitTime = 5000 // 5 seconds max wait
+    // Wait for active requests to complete (with shorter timeout for tests)
+    const maxWaitTime = 2000 // 2 seconds max wait (reduced from 5 seconds)
     const startTime = Date.now()
     
     while (this.activeRequests > 0 && (Date.now() - startTime) < maxWaitTime) {
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await new Promise(resolve => {
+        const timer = setTimeout(resolve, 10)
+        if (timer.unref) timer.unref()
+      }) // More frequent checks
+    }
+    
+    // Force complete any remaining active requests
+    if (this.activeRequests > 0) {
+      debugLog.lifecycle('forcing shutdown with active requests', 'BoundedExecutor', {
+        remainingActiveRequests: this.activeRequests
+      }, this.debug)
     }
     
     debugLog.lifecycle('shutdown complete', 'BoundedExecutor', {

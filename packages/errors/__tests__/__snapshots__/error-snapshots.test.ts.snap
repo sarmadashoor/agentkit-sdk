@@ -11,7 +11,7 @@ exports[`Error System Snapshots > Error Hierarchy > error serialization and dese
   "message": "Queue is full: request-queue",
   "name": "QueueFullError",
   "stack": "QueueFullError: Queue is full: request-queue
-    at /home/s/dev/agentkit-sdk/packages/errors/__tests__/error-snapshots.test.ts:153:24
+    at /home/s/dev/agentkit-sdk/packages/errors/__tests__/error-snapshots.test.ts:154:24
     at file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:135:14
     at file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:60:26
     at runTest (file:///home/s/dev/agentkit-sdk/node_modules/.pnpm/@vitest+runner@1.6.1/node_modules/@vitest/runner/dist/index.js:781:17)

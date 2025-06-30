@@ -1,5 +1,0 @@
-{
-  "id": "test-circuit-breaker-transport-integration",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/circuit-breaker-transport-integration.test.ts --reporter=verbose",
-  "timeout": 120000
-}

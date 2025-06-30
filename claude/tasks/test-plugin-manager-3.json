@@ -1,5 +1,0 @@
-{
-  "id": "test-plugin-manager-3",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/plugins/plugin-manager.test.ts -t \"should execute onSend hooks with payload\" --reporter=verbose",
-  "timeout": 30000
-}

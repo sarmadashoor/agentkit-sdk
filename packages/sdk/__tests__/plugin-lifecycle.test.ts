@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi, Mock } from 'vitest'
 import { connectAgent } from '../src/index'
 import { GreetPlugin, createGreetPlugin, registerGreetPlugin } from './fixtures/greet-plugin'
 import type { AgentKitPlugin, AgentContext, SendPayload } from '@agentkit/types'
 import { MetricsCollector } from '../src/observability/MetricsCollector'
 import { PluginExecutionTimeline } from '../src/observability/PluginExecutionTimeline'
+import { setupTestCleanup, trackInstance, untrackInstance, suppressExpectedErrors, cleanupAllResources, flushPromises } from './test-utils'
 
 /**
  * Plugin Lifecycle Simulation Test Suite
@@ -15,7 +16,20 @@ import { PluginExecutionTimeline } from '../src/observability/PluginExecutionTim
  * - Debug tracing and metrics
  * - Plugin isolation and security
  * - Memory and resource cleanup
+ * 
+ * IMPORTANT: This file has been updated with proper resource cleanup to prevent test isolation issues.
+ * 
+ * Key cleanup features:
+ * - Automatic registration and tracking of all managers, agents, and transports
+ * - Comprehensive afterEach, afterAll cleanup that shuts down all resources
+ * - Handle leak detection to catch resource management issues
+ * - Plugin manager cleanup and sandbox cleanup
+ * - Removal of manual shutdown calls from individual tests (handled by afterEach, afterAll)
  */
+
+// Leak detection constants
+const BASELINE_HANDLE_COUNT = 3
+const BASELINE_REQUEST_COUNT = 0
 
 // Mock agent and transport for testing
 const mockAgent = {
@@ -67,12 +81,49 @@ describe('Plugin Lifecycle Simulation', () => {
     // Setup observability
     metricsCollector = new MetricsCollector()
     timeline = new PluginExecutionTimeline()
+    
+    // Register for cleanup if these are resource-tracked
+    // Note: GreetPlugin doesn't need cleanup registration as it's a simple test plugin
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     // Restore console
     consoleLogSpy.mockRestore()
     consoleErrorSpy.mockRestore()
+    
+    // Clean up any plugin resources
+    if (plugin && typeof plugin.shutdown === 'function') {
+      try {
+        await plugin.shutdown({
+          agentId: 'cleanup-agent',
+          transportId: 'cleanup-transport',
+          requestId: 'cleanup-request',
+          timestamp: Date.now(),
+          metadata: {}
+        })
+      } catch (error) {
+        console.error('Error during plugin shutdown:', error)
+      }
+    }
+    
+    // Clean up all registered resources
+    await cleanupAllResources()
+    await flushPromises()
+    
+    // Handle leak detection
+    const currentHandles = process._getActiveHandles().length
+    const currentRequests = process._getActiveRequests().length
+    
+    if (currentHandles > BASELINE_HANDLE_COUNT) {
+      console.error(`Handle leak detected: ${currentHandles} handles (expected <= ${BASELINE_HANDLE_COUNT})`)
+      console.error('Active handles:', process._getActiveHandles().map(h => h.constructor.name))
+      throw new Error(`Handle leak: ${currentHandles} active handles`)
+    }
+    
+    if (currentRequests > BASELINE_REQUEST_COUNT) {
+      console.error(`Request leak detected: ${currentRequests} requests (expected <= ${BASELINE_REQUEST_COUNT})`)
+      throw new Error(`Request leak: ${currentRequests} active requests`)
+    }
   })
 
   describe('CLI Scaffolding Integration', () => {
@@ -512,4 +563,10 @@ describe('Plugin Lifecycle Simulation', () => {
       expect(options.plugins[0].name).toBe('greet-plugin')
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

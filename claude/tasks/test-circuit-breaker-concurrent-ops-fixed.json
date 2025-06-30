@@ -1,5 +1,0 @@
-{
-  "id": "test-circuit-breaker-concurrent-ops-fixed",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/circuit-breaker-observability.test.ts -t \"maintains state consistency during concurrent operations\" --reporter=verbose",
-  "timeout": 60000
-}

@@ -1,4 +1,5 @@
-import { describe, it, vi } from 'vitest'
+import { describe, it, expect, vi, afterAll } from 'vitest'
+import { cleanupAllResources, flushPromises } from './test-utils'
 
 describe('Debug Vitest Mock Structure', () => {
   it('should analyze vitest mock function structure', () => {
@@ -28,4 +29,10 @@ describe('Debug Vitest Mock Structure', () => {
     console.log('Object.keys(mockFn):', Object.keys(mockFn))
     console.log('Object.getOwnPropertyNames(mockFn):', Object.getOwnPropertyNames(mockFn))
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

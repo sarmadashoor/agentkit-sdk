@@ -352,6 +352,11 @@ export class Instrumentation {
     this.resourceMetricsTimer = setInterval(() => {
       this.collectResourceMetrics()
     }, this.config.resourceMetricsInterval)
+    
+    // Use unref() to prevent keeping process alive
+    if (this.resourceMetricsTimer.unref) {
+      this.resourceMetricsTimer.unref()
+    }
 
     // Collect initial metrics
     this.collectResourceMetrics()

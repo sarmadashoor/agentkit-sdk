@@ -1,14 +1,21 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest'
 import { connectAgent } from '../src/index'
 import { AgentRegistry } from '@agentkit/registry'
 import { DummyAgent } from '@agentkit/test-agent'
 import { DummyTransport } from '@agentkit/transports-dummy'
+import { cleanupAllResources, flushPromises } from './test-utils'
 
 describe('connectAgent with Instance-Based Registry', () => {
   let registry: AgentRegistry
 
   beforeEach(() => {
     registry = new AgentRegistry()
+  })
+
+  afterEach(async () => {
+    // Clean up all registered resources
+    await cleanupAllResources()
+    await flushPromises()
   })
 
   describe('Registry Injection', () => {
@@ -305,4 +312,14 @@ describe('connectAgent with Instance-Based Registry', () => {
       await handle.shutdown()
     })
   })
+
+  afterAll(async () => {
+    // Final cleanup
+    await cleanupAllResources()
+    await flushPromises()
+    
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

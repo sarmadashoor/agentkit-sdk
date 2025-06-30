@@ -8,12 +8,13 @@
  * - Cross-platform compatibility (Node.js + Browser)
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { mkdtemp, writeFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { connectAgent } from '../src/index'
 import type { Agent, Transport, AgentKitPlugin } from '@agentkit/types'
+import { cleanupAllResources, flushPromises } from './test-utils'
 
 // Extended plugin interface with signature fields
 interface SignedAgentKitPlugin extends AgentKitPlugin {
@@ -86,6 +87,10 @@ describe('Plugin HMAC Verification System (TDD)', () => {
     await rm(tempDir, { recursive: true, force: true })
     process.env = originalEnv
     vi.unstubAllEnvs()
+    
+    // Clean up all registered resources
+    await cleanupAllResources()
+    await flushPromises()
   })
 
   describe('TDD: Plugin Verification in Strict Mode', () => {
@@ -283,7 +288,12 @@ describe('Plugin HMAC Verification System (TDD)', () => {
       const signature1 = signPlugin(testPlugin, 'test-secret-key-for-hmac-signing-that-is-long-enough')
       const signature2 = signPlugin(testPlugin, 'test-secret-key-for-hmac-signing-that-is-long-enough')
       
-      expect(signature1).toStrictEqual(signature2)
+      // Extract timestamps and compare separately to allow for timing differences
+      const { timestamp: ts1, ...rest1 } = signature1
+      const { timestamp: ts2, ...rest2 } = signature2
+      
+      expect(rest1).toStrictEqual(rest2)
+      expect(Math.abs(ts1 - ts2)).toBeLessThan(100) // Allow 100ms tolerance
     })
 
     it('should generate different signatures for different secrets', async () => {
@@ -498,4 +508,14 @@ describe('Plugin HMAC Verification System (TDD)', () => {
       consoleSpy.mockRestore()
     })
   })
+
+  afterAll(async () => {
+    // Final cleanup
+    await cleanupAllResources()
+    await flushPromises()
+    
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

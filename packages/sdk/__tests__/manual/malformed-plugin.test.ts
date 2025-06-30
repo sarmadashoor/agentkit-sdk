@@ -6,12 +6,13 @@
  * Tests comprehensive validation, error categorization, and logging.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { PluginManager } from '../../src/plugins'
 import { VMRunner, createVMRunner, secureClone } from '../../src/security/vmRunner'
 import { MetricsCollector } from '../../src/observability/MetricsCollector'
 import { PluginExecutionTimeline } from '../../src/observability/PluginExecutionTimeline'
 import type { AgentKitPlugin, AgentContext } from '@agentkit/types'
+import { cleanupAllResources, flushPromises } from '../test-utils'
 
 /**
  * Create various types of malformed plugins for testing
@@ -432,4 +433,10 @@ describe('Malformed Plugin Validation - Fixed', () => {
       expect(validationErrors.length).toBeGreaterThan(0)
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

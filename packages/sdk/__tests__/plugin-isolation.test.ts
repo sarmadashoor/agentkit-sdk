@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import vm from 'vm'
 import { GreetPlugin, createGreetPlugin } from './fixtures/greet-plugin'
 import type { AgentKitPlugin, AgentContext, SendPayload } from '@agentkit/types'
+import { cleanupAllResources, flushPromises } from './test-utils'
 
 /**
  * Plugin Isolation and Security Test Suite
@@ -343,6 +344,9 @@ describe('Plugin Isolation and Security', () => {
       
       await plugin.onShutdown(mockContext)
       
+      // Allow metrics to be updated after shutdown
+      await new Promise(resolve => setTimeout(resolve, 20))
+      
       // Verify cleanup
       const metricsAfterShutdown = plugin.getMetrics()
       expect(metricsAfterShutdown.shutdownTime).toBeGreaterThan(0)
@@ -350,7 +354,7 @@ describe('Plugin Isolation and Security', () => {
   })
 
   describe('Sandboxing for Browser Context', () => {
-    it('should simulate Web Worker isolation', (done) => {
+    it('should simulate Web Worker isolation', async () => {
       // Simulate Web Worker message passing
       const workerMessages: any[] = []
       
@@ -383,12 +387,11 @@ describe('Plugin Isolation and Security', () => {
       })
       
       // Simulate worker response
-      setTimeout(() => {
-        expect(workerMessages).toHaveLength(1)
-        expect(workerMessages[0].type).toBe('EXECUTE_PLUGIN')
-        expect(workerMessages[0].data.name).toBe('greet-plugin')
-        done()
-      }, 10)
+      await new Promise(resolve => setTimeout(resolve, 10))
+      
+      expect(workerMessages).toHaveLength(1)
+      expect(workerMessages[0].type).toBe('EXECUTE_PLUGIN')
+      expect(workerMessages[0].data.name).toBe('greet-plugin')
     })
 
     it('should validate serializable plugin data', () => {
@@ -458,4 +461,10 @@ describe('Plugin Isolation and Security', () => {
       consoleSpy.mockRestore()
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

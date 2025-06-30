@@ -270,6 +270,9 @@ export class PluginObservability {
       }
     }, delay)
     
+    // Critical: Use .unref() to prevent keeping process alive
+    if (timeout.unref) timeout.unref()
+    
     this.activeTimeouts.add(timeout)
     return timeout
   }

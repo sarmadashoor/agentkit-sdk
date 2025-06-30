@@ -1,5 +1,0 @@
-{
-  "id": "test-plugin-verification-fix",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/plugin-verification.test.ts --reporter=verbose",
-  "timeout": 90000
-}

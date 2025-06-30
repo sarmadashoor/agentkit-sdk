@@ -3,7 +3,7 @@
  * Tests cryptographic safety, sandboxing, and security features
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { SecurePluginManager } from '../../src/plugins/SecurePluginManager'
 import type { AgentKitPlugin, AgentContext, SendPayload } from '@agentkit/types'
 import { PluginValidationError, PluginCompatibilityError } from '../../src/errors'
@@ -30,7 +30,14 @@ describe('SecurePluginManager - Security and Sandboxing', () => {
   })
 
   afterEach(async () => {
-    await manager.shutdown()
+    // Explicit PluginManager cleanup to prevent resource leaks
+    if (manager) {
+      try {
+        await manager.shutdown()
+      } catch (error) {
+        console.error('[CLEANUP] Error shutting down PluginManager:', error)
+      }
+    }
   })
 
   describe('Plugin Registration Security', () => {
@@ -53,30 +60,41 @@ describe('SecurePluginManager - Security and Sandboxing', () => {
       })
     })
 
-    it('should enforce maximum plugin limits', () => {
+    it('should enforce maximum plugin limits', async () => {
       const smallManager = new SecurePluginManager({ maxPlugins: 2 })
 
-      // Register 2 plugins successfully
-      smallManager.register({
-        name: 'plugin1',
-        version: '1.0.0',
-        onInit: () => {}
-      })
-
-      smallManager.register({
-        name: 'plugin2',
-        version: '1.0.0',
-        onInit: () => {}
-      })
-
-      // Third plugin should fail
-      expect(() => {
+      try {
+        // Register 2 plugins successfully
         smallManager.register({
-          name: 'plugin3',
+          name: 'plugin1',
           version: '1.0.0',
           onInit: () => {}
         })
-      }).toThrow(PluginValidationError)
+
+        smallManager.register({
+          name: 'plugin2',
+          version: '1.0.0',
+          onInit: () => {}
+        })
+
+        // Third plugin should fail
+        expect(() => {
+          smallManager.register({
+            name: 'plugin3',
+            version: '1.0.0',
+            onInit: () => {}
+          })
+        }).toThrow(PluginValidationError)
+      } finally {
+        // Explicit cleanup for test-specific manager
+        if (smallManager) {
+          try {
+            await smallManager.shutdown()
+          } catch (error) {
+            console.error('[CLEANUP] Error shutting down smallManager:', error)
+          }
+        }
+      }
     })
 
     it('should prevent duplicate plugin registration', () => {
@@ -180,11 +198,22 @@ describe('SecurePluginManager - Security and Sandboxing', () => {
         hookTimeout: 500 // Very short timeout
       })
 
-      timeoutManager.register(timeoutPlugin)
-      const result = await timeoutManager.executeHook('onInit', mockContext)
+      try {
+        timeoutManager.register(timeoutPlugin)
+        const result = await timeoutManager.executeHook('onInit', mockContext)
 
-      expect(result.failedPlugins).toHaveLength(1)
-      expect(result.failedPlugins[0].error.message).toMatch(/timeout/i)
+        expect(result.failedPlugins).toHaveLength(1)
+        expect(result.failedPlugins[0].error.message).toMatch(/timeout/i)
+      } finally {
+        // Explicit cleanup for test-specific manager
+        if (timeoutManager) {
+          try {
+            await timeoutManager.shutdown()
+          } catch (error) {
+            console.error('[CLEANUP] Error shutting down timeoutManager:', error)
+          }
+        }
+      }
     })
 
     it('should prevent memory leaks through resource tracking', async () => {
@@ -324,16 +353,27 @@ describe('SecurePluginManager - Security and Sandboxing', () => {
         }
       })
 
-      const plugins = [
-        { name: 'low-priority', version: '1.0.0', onInit: () => {} },
-        { name: 'high-priority', version: '1.0.0', onInit: () => {} },
-        { name: 'medium-priority', version: '1.0.0', onInit: () => {} }
-      ]
+      try {
+        const plugins = [
+          { name: 'low-priority', version: '1.0.0', onInit: () => {} },
+          { name: 'high-priority', version: '1.0.0', onInit: () => {} },
+          { name: 'medium-priority', version: '1.0.0', onInit: () => {} }
+        ]
 
-      plugins.forEach(plugin => priorityManager.register(plugin))
-      const result = await priorityManager.executeHook('onInit', mockContext)
+        plugins.forEach(plugin => priorityManager.register(plugin))
+        const result = await priorityManager.executeHook('onInit', mockContext)
 
-      expect(result.executionOrder).toEqual(['high-priority', 'medium-priority', 'low-priority'])
+        expect(result.executionOrder).toEqual(['high-priority', 'medium-priority', 'low-priority'])
+      } finally {
+        // Explicit cleanup for test-specific manager
+        if (priorityManager) {
+          try {
+            await priorityManager.shutdown()
+          } catch (error) {
+            console.error('[CLEANUP] Error shutting down priorityManager:', error)
+          }
+        }
+      }
     })
 
     it('should support short-circuit execution', async () => {
@@ -345,32 +385,43 @@ describe('SecurePluginManager - Security and Sandboxing', () => {
         }
       })
 
-      const plugins = [
-        {
-          name: 'normal-plugin',
-          version: '1.0.0',
-          onInit: () => 'normal'
-        },
-        {
-          name: 'short-circuit-plugin',
-          version: '1.0.0',
-          onInit: () => {
-            // Signal short-circuit (implementation specific)
-            return { shortCircuit: true }
+      try {
+        const plugins = [
+          {
+            name: 'normal-plugin',
+            version: '1.0.0',
+            onInit: () => 'normal'
+          },
+          {
+            name: 'short-circuit-plugin',
+            version: '1.0.0',
+            onInit: () => {
+              // Signal short-circuit (implementation specific)
+              return { shortCircuit: true }
+            }
+          },
+          {
+            name: 'should-not-execute',
+            version: '1.0.0',
+            onInit: () => 'should-not-run'
           }
-        },
-        {
-          name: 'should-not-execute',
-          version: '1.0.0',
-          onInit: () => 'should-not-run'
+        ]
+
+        plugins.forEach(plugin => shortCircuitManager.register(plugin))
+        const result = await shortCircuitManager.executeHook('onInit', mockContext)
+
+        // Implementation may vary, but the concept should be supported
+        expect(result.executionOrder).toEqual(['normal-plugin', 'short-circuit-plugin', 'should-not-execute'])
+      } finally {
+        // Explicit cleanup for test-specific manager
+        if (shortCircuitManager) {
+          try {
+            await shortCircuitManager.shutdown()
+          } catch (error) {
+            console.error('[CLEANUP] Error shutting down shortCircuitManager:', error)
+          }
         }
-      ]
-
-      plugins.forEach(plugin => shortCircuitManager.register(plugin))
-      const result = await shortCircuitManager.executeHook('onInit', mockContext)
-
-      // Implementation may vary, but the concept should be supported
-      expect(result.executionOrder).toEqual(['normal-plugin', 'short-circuit-plugin', 'should-not-execute'])
+      }
     })
 
     it('should support fail-fast execution', async () => {
@@ -382,32 +433,43 @@ describe('SecurePluginManager - Security and Sandboxing', () => {
         }
       })
 
-      const plugins = [
-        {
-          name: 'success-plugin',
-          version: '1.0.0',
-          onInit: () => 'success'
-        },
-        {
-          name: 'failing-plugin',
-          version: '1.0.0',
-          onInit: () => {
-            throw new Error('Plugin failure')
+      try {
+        const plugins = [
+          {
+            name: 'success-plugin',
+            version: '1.0.0',
+            onInit: () => 'success'
+          },
+          {
+            name: 'failing-plugin',
+            version: '1.0.0',
+            onInit: () => {
+              throw new Error('Plugin failure')
+            }
+          },
+          {
+            name: 'should-not-execute',
+            version: '1.0.0',
+            onInit: () => 'should-not-run'
           }
-        },
-        {
-          name: 'should-not-execute',
-          version: '1.0.0',
-          onInit: () => 'should-not-run'
+        ]
+
+        plugins.forEach(plugin => failFastManager.register(plugin))
+        const result = await failFastManager.executeHook('onInit', mockContext)
+
+        expect(result.successfulPlugins).toEqual(['success-plugin'])
+        expect(result.failedPlugins).toHaveLength(1)
+        expect(result.failedPlugins[0].name).toBe('failing-plugin')
+      } finally {
+        // Explicit cleanup for test-specific manager
+        if (failFastManager) {
+          try {
+            await failFastManager.shutdown()
+          } catch (error) {
+            console.error('[CLEANUP] Error shutting down failFastManager:', error)
+          }
         }
-      ]
-
-      plugins.forEach(plugin => failFastManager.register(plugin))
-      const result = await failFastManager.executeHook('onInit', mockContext)
-
-      expect(result.successfulPlugins).toEqual(['success-plugin'])
-      expect(result.failedPlugins).toHaveLength(1)
-      expect(result.failedPlugins[0].name).toBe('failing-plugin')
+      }
     })
 
     it('should support parallel execution', async () => {
@@ -419,34 +481,45 @@ describe('SecurePluginManager - Security and Sandboxing', () => {
         }
       })
 
-      const startTime = Date.now()
-      const executionTimes: number[] = []
+      try {
+        const startTime = Date.now()
+        const executionTimes: number[] = []
 
-      const plugins = [
-        {
-          name: 'delay-100',
-          version: '1.0.0',
-          onInit: async () => {
-            await new Promise(resolve => setTimeout(resolve, 100))
-            executionTimes.push(Date.now() - startTime)
+        const plugins = [
+          {
+            name: 'delay-100',
+            version: '1.0.0',
+            onInit: async () => {
+              await new Promise(resolve => setTimeout(resolve, 100))
+              executionTimes.push(Date.now() - startTime)
+            }
+          },
+          {
+            name: 'delay-50',
+            version: '1.0.0',
+            onInit: async () => {
+              await new Promise(resolve => setTimeout(resolve, 50))
+              executionTimes.push(Date.now() - startTime)
+            }
           }
-        },
-        {
-          name: 'delay-50',
-          version: '1.0.0',
-          onInit: async () => {
-            await new Promise(resolve => setTimeout(resolve, 50))
-            executionTimes.push(Date.now() - startTime)
+        ]
+
+        plugins.forEach(plugin => parallelManager.register(plugin))
+        const result = await parallelManager.executeHook('onInit', mockContext)
+
+        expect(result.successfulPlugins).toHaveLength(2)
+        // In parallel execution, total time should be less than sum of individual delays
+        expect(result.totalExecutionTime).toBeLessThan(200)
+      } finally {
+        // Explicit cleanup for test-specific manager
+        if (parallelManager) {
+          try {
+            await parallelManager.shutdown()
+          } catch (error) {
+            console.error('[CLEANUP] Error shutting down parallelManager:', error)
           }
         }
-      ]
-
-      plugins.forEach(plugin => parallelManager.register(plugin))
-      const result = await parallelManager.executeHook('onInit', mockContext)
-
-      expect(result.successfulPlugins).toHaveLength(2)
-      // In parallel execution, total time should be less than sum of individual delays
-      expect(result.totalExecutionTime).toBeLessThan(200)
+      }
     })
   })
 
@@ -527,8 +600,16 @@ describe('SecurePluginManager - Security and Sandboxing', () => {
       const testPlugin: AgentKitPlugin = {
         name: 'stats-test',
         version: '1.0.0',
-        onInit: () => 'success',
-        onSend: () => 'success'
+        onInit: async () => {
+          // Add small delay to ensure measurable execution time
+          await new Promise(resolve => setTimeout(resolve, 1))
+          return 'success'
+        },
+        onSend: async () => {
+          // Add small delay to ensure measurable execution time
+          await new Promise(resolve => setTimeout(resolve, 1))
+          return 'success'
+        }
       }
 
       manager.register(testPlugin)
@@ -663,4 +744,10 @@ describe('SecurePluginManager - Security and Sandboxing', () => {
       expect(Object.keys(manager.getPerformanceMetrics())).toHaveLength(0)
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

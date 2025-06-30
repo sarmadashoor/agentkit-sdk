@@ -104,61 +104,45 @@ export class SnapshotAgent implements Agent {
       console.log(`[SnapshotAgent] Handling request ${requestId}:`, input)
     }
 
-    try {
-      // Validate input format
-      if (!input || typeof input !== 'object') {
-        throw new Error('Invalid request format: expected object')
-      }
-
-      const request = input as SnapshotRequest
-
-      if (!request.action) {
-        throw new Error('Missing required field: action')
-      }
-
-      // Process the request based on action
-      let result: SnapshotResponse
-
-      switch (request.action) {
-        case 'create':
-          result = await this.createSnapshot(request)
-          break
-        case 'get':
-          result = await this.getSnapshot(request)
-          break
-        case 'list':
-          result = await this.listSnapshots(request)
-          break
-        case 'delete':
-          result = await this.deleteSnapshot(request)
-          break
-        case 'process':
-          result = await this.processData(request)
-          break
-        default:
-          throw new Error(`Unknown action: ${request.action}`)
-      }
-
-      if (this.config.debug) {
-        console.log(`[SnapshotAgent] Request ${requestId} completed successfully`)
-      }
-
-      return result
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      
-      if (this.config.debug) {
-        console.error(`[SnapshotAgent] Request ${requestId} failed:`, errorMessage)
-      }
-
-      return {
-        success: false,
-        error: errorMessage,
-        timestamp: Date.now(),
-        agentVersion: this.version
-      }
+    // Validate input format - throw for validation errors so they propagate to handle.send()
+    if (!input || typeof input !== 'object') {
+      throw new Error('Invalid request format: expected object')
     }
+
+    const request = input as SnapshotRequest
+
+    if (!request.action) {
+      throw new Error('Missing required field: action')
+    }
+
+    // Process the request based on action
+    let result: SnapshotResponse
+
+    switch (request.action) {
+      case 'create':
+        result = await this.createSnapshot(request)
+        break
+      case 'get':
+        result = await this.getSnapshot(request)
+        break
+      case 'list':
+        result = await this.listSnapshots(request)
+        break
+      case 'delete':
+        result = await this.deleteSnapshot(request)
+        break
+      case 'process':
+        result = await this.processData(request)
+        break
+      default:
+        throw new Error(`Unknown action: ${request.action}`)
+    }
+
+    if (this.config.debug) {
+      console.log(`[SnapshotAgent] Request ${requestId} completed successfully`)
+    }
+
+    return result
   }
 
   async shutdown(): Promise<void> {
@@ -173,9 +157,9 @@ export class SnapshotAgent implements Agent {
       })
     }
 
-    // Cleanup resources
+    // Cleanup resources but preserve stats for debugging
     this.snapshots.clear()
-    this.requestCount = 0
+    // Don't reset requestCount - keep stats for debugging
     this.isInitialized = false
 
     if (this.config.debug) {

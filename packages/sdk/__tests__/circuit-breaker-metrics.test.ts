@@ -1,20 +1,87 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+/**
+ * ✅ Lifecycle cleanup enforced (afterEach, afterAll added).
+ * ✅ Leak checker integrated.
+ * ✅ Handle tracking and systematic shutdown.
+ * ✅ Aligned with AgentKit secure architecture policy.
+ */
+
+import { describe, it, expect, beforeEach, vi, afterEach, afterAll } from 'vitest'
 import { CircuitBreaker, CircuitState } from '../src/circuitBreaker'
+import { registerCleanup, cleanupAllResources, flushPromises } from './test-utils'
+
+// Handle leak detection constants
+const BASELINE_HANDLE_COUNT = 3
+const BASELINE_REQUEST_COUNT = 0
 
 describe('CircuitBreaker Metrics and Logging', () => {
   let circuitBreaker: CircuitBreaker
+  let circuitBreakers: CircuitBreaker[] = []
   let consoleSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
     vi.useFakeTimers()
+    // Mock Date.now to work with fake timers
+    vi.setSystemTime(new Date('2023-01-01T00:00:00.000Z'))
     consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'debug').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    
+    circuitBreakers = []
+    
+    // Register circuit breaker factory
+    registerCleanup(async () => {
+      for (const breaker of circuitBreakers) {
+        try {
+          breaker.shutdown()
+        } catch (error) {
+          console.error('[CLEANUP] Error shutting down circuit breaker:', error)
+        }
+      }
+      circuitBreakers.length = 0
+    })
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Explicit shutdown to avoid handle leaks and ensure deterministic cleanup
+    if (circuitBreaker) {
+      try {
+        circuitBreaker.shutdown()
+      } catch (error) {
+        console.error('[CLEANUP] Error shutting down circuit breaker:', error)
+      }
+    }
+    
+    for (const breaker of circuitBreakers) {
+      try {
+        breaker.shutdown()
+      } catch (error) {
+        console.error('[CLEANUP] Error shutting down circuit breaker:', error)
+      }
+    }
+    circuitBreakers.length = 0
+    
     vi.useRealTimers()
     consoleSpy.mockRestore()
     vi.restoreAllMocks()
+    vi.clearAllTimers()
+    vi.clearAllMocks()
+    await cleanupAllResources()
+    await flushPromises()
+    
+    // Handle leak checker
+    const activeHandles = process._getActiveHandles()
+    const activeRequests = process._getActiveRequests?.() ?? []
+
+    if (activeHandles.length > BASELINE_HANDLE_COUNT) {
+      console.error('[LEAK DETECTED] Active handles:', activeHandles.map(h => h.constructor.name))
+      throw new Error(`Active handles detected after test: ${activeHandles.length} (baseline: ${BASELINE_HANDLE_COUNT})`)
+    }
+
+    if (activeRequests.length > BASELINE_REQUEST_COUNT) {
+      console.error('[LEAK DETECTED] Active requests:', activeRequests.map(r => r.constructor?.name || 'Unknown'))
+      throw new Error(`Active requests detected after test: ${activeRequests.length} (baseline: ${BASELINE_REQUEST_COUNT})`)
+    }
   })
 
   describe('Metrics Tracking', () => {
@@ -25,6 +92,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
         timeout: 1000,
         name: 'metrics-test'
       })
+      circuitBreakers.push(circuitBreaker)
 
       // Execute some successful requests
       await circuitBreaker.execute(async () => 'success1')
@@ -48,6 +116,9 @@ describe('CircuitBreaker Metrics and Logging', () => {
         await circuitBreaker.execute(async () => 'should-be-rejected-2')
       } catch {}
 
+      // Advance time to ensure uptime > 0
+      vi.advanceTimersByTime(100)
+
       const metrics = circuitBreaker.getMetrics()
       
       expect(metrics.totalRequests).toBe(6)
@@ -66,19 +137,20 @@ describe('CircuitBreaker Metrics and Logging', () => {
         failureThreshold: 5,
         name: 'response-time-test'
       })
+      circuitBreakers.push(circuitBreaker)
 
-      // Execute requests with known delays (but shorter for fake timers)
+      // Execute requests with known delays using immediate resolution for fake timers
       await circuitBreaker.execute(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        // Simulate delay but don't actually delay with fake timers
+        vi.advanceTimersByTime(10)
         return 'fast'
       })
 
       await circuitBreaker.execute(async () => {
-        await new Promise(resolve => setTimeout(resolve, 20))
+        // Simulate delay but don't actually delay with fake timers
+        vi.advanceTimersByTime(20)
         return 'slow'
       })
-
-      vi.advanceTimersByTime(50)
 
       const metrics = circuitBreaker.getMetrics()
       expect(metrics.averageResponseTime).toBeGreaterThan(0)
@@ -93,6 +165,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
         timeout: 100,
         name: 'state-transitions-test'
       })
+      circuitBreakers.push(circuitBreaker)
 
       const initialMetrics = circuitBreaker.getMetrics()
       expect(initialMetrics.stateTransitions).toBe(0)
@@ -122,6 +195,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
         failureThreshold: 1000, // High threshold to avoid opening
         name: 'response-history-test'
       })
+      circuitBreakers.push(circuitBreaker)
 
       // Execute 150 requests (more than the 100 limit)
       for (let i = 0; i < 150; i++) {
@@ -145,6 +219,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
         name: 'logging-test',
         debug: true
       })
+      circuitBreakers.push(circuitBreaker)
 
       // Trigger circuit opening
       try {
@@ -162,8 +237,10 @@ describe('CircuitBreaker Metrics and Logging', () => {
         enabled: true,
         failureThreshold: 1,
         timeout: 100,
-        name: 'recovery-logging-test'
+        name: 'recovery-logging-test',
+        debug: true
       })
+      circuitBreakers.push(circuitBreaker)
 
       // Open circuit
       try {
@@ -177,8 +254,10 @@ describe('CircuitBreaker Metrics and Logging', () => {
       // Circuit breaker logs might not use console.log anymore
       // Check if any logging happened during state transitions
       const allLogs = [
-        ...consoleSpy.mock.calls.flat(),
-        ...(console.log as any).mock.calls.flat()
+        ...(console.warn as any).mock.calls.flat(),
+        ...(console.log as any).mock.calls.flat(),
+        ...(console.debug as any).mock.calls.flat(),
+        ...(console.info as any).mock.calls.flat()
       ]
       
       // Should have some logging about state transitions
@@ -193,6 +272,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
         name: 'no-debug-test',
         debug: false
       })
+      circuitBreakers.push(circuitBreaker)
 
       const consoleSpy = vi.spyOn(console, 'log')
       const consoleWarnSpy = vi.spyOn(console, 'warn')
@@ -216,6 +296,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
         timeout: 5000,
         name: 'transport-monitor-test'
       })
+      circuitBreakers.push(circuitBreaker)
 
       // Simulate various transport scenarios
       const scenarios = [
@@ -228,15 +309,14 @@ describe('CircuitBreaker Metrics and Logging', () => {
 
       for (const scenario of scenarios) {
         try {
-          const executePromise = circuitBreaker.execute(async () => {
-            await new Promise(resolve => setTimeout(resolve, scenario.delay))
+          await circuitBreaker.execute(async () => {
+            // Simulate delay by advancing timers instead of using setTimeout
+            vi.advanceTimersByTime(scenario.delay)
             if (scenario.shouldFail) {
               throw new Error(`${scenario.name} simulated failure`)
             }
             return `${scenario.name} completed`
           })
-          vi.advanceTimersByTime(scenario.delay + 100) // Advance past each scenario's delay
-          await executePromise
         } catch {
           // Expected for failing scenarios
         }
@@ -262,6 +342,7 @@ describe('CircuitBreaker Metrics and Logging', () => {
         timeout: 200,
         name: 'recovery-cycle-test'
       })
+      circuitBreakers.push(circuitBreaker)
 
       // Phase 1: Normal operation
       await circuitBreaker.execute(async () => 'normal-1')
@@ -296,4 +377,10 @@ describe('CircuitBreaker Metrics and Logging', () => {
       expect(circuitBreaker.getStats().state).toBe(CircuitState.CLOSED)
     }, 30000)
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

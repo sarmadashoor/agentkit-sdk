@@ -1,5 +1,0 @@
-{
-  "id": "test-plugin-manager-final",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/plugins/plugin-manager.test.ts --reporter=verbose",
-  "timeout": 90000
-}

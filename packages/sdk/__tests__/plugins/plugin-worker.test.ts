@@ -3,7 +3,7 @@
  * Tests for browser-based plugin sandboxing using Web Workers
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { PluginManager } from '../../src/plugins/PluginManager'
 import type { AgentKitPlugin, AgentContext, SendPayload } from '@agentkit/types'
 import { PluginTimeoutError, PluginSandboxError } from '../../src/errors'
@@ -231,9 +231,16 @@ describe('Web Worker Plugin Isolation', () => {
     ;(global as any).process = originalProcess
   })
 
-  afterEach(() => {
-    manager.clear()
-    manager.shutdown()
+  afterEach(async () => {
+    // Explicit PluginManager cleanup to prevent resource leaks
+    if (manager) {
+      try {
+        manager.clear()
+        await manager.shutdown()
+      } catch (error) {
+        console.error('[CLEANUP] Error shutting down PluginManager:', error)
+      }
+    }
     
     // Restore originals
     ;(global as any).Worker = originalWorker
@@ -450,22 +457,31 @@ describe('Web Worker Plugin Isolation', () => {
         sandbox: false // Disable worker isolation
       })
 
-      const plugin: AgentKitPlugin = {
-        name: 'unsandboxed-plugin',
-        version: '1.0.0',
-        onInit: (context: AgentContext) => {
-          // Should work without worker in opt-out mode
-          return { executed: true, platform: 'main-thread' }
+      try {
+        const plugin: AgentKitPlugin = {
+          name: 'unsandboxed-plugin',
+          version: '1.0.0',
+          onInit: (context: AgentContext) => {
+            // Should work without worker in opt-out mode
+            return { executed: true, platform: 'main-thread' }
+          }
+        }
+
+        unsandboxedManager.register(plugin)
+        const results = await unsandboxedManager.executeHook('onInit', mockContext)
+        
+        expect(results).toHaveLength(1)
+        expect(results[0].success).toBe(true)
+      } finally {
+        // Explicit cleanup for test-specific manager
+        if (unsandboxedManager) {
+          try {
+            await unsandboxedManager.shutdown()
+          } catch (error) {
+            console.error('[CLEANUP] Error shutting down unsandboxedManager:', error)
+          }
         }
       }
-
-      unsandboxedManager.register(plugin)
-      const results = await unsandboxedManager.executeHook('onInit', mockContext)
-      
-      expect(results).toHaveLength(1)
-      expect(results[0].success).toBe(true)
-      
-      unsandboxedManager.shutdown()
     })
 
     it('should warn in dev mode if used without isolation', async () => {
@@ -477,22 +493,32 @@ describe('Web Worker Plugin Isolation', () => {
         enableDebugMode: true
       })
 
-      const plugin: AgentKitPlugin = {
-        name: 'dev-plugin',
-        version: '1.0.0',
-        onInit: () => ({ dev: true })
-      }
+      try {
+        const plugin: AgentKitPlugin = {
+          name: 'dev-plugin',
+          version: '1.0.0',
+          onInit: () => ({ dev: true })
+        }
 
-      devManager.register(plugin)
-      await devManager.executeHook('onInit', mockContext)
-      
-      // Should warn about disabled sandboxing in dev mode
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Plugin sandboxing disabled')
-      )
-      
-      warnSpy.mockRestore()
-      devManager.shutdown()
+        devManager.register(plugin)
+        await devManager.executeHook('onInit', mockContext)
+        
+        // Should warn about disabled sandboxing in dev mode
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Plugin sandboxing disabled')
+        )
+      } finally {
+        warnSpy.mockRestore()
+        
+        // Explicit cleanup for test-specific manager
+        if (devManager) {
+          try {
+            await devManager.shutdown()
+          } catch (error) {
+            console.error('[CLEANUP] Error shutting down devManager:', error)
+          }
+        }
+      }
     })
 
     it('should reuse workers efficiently with pool', async () => {
@@ -553,19 +579,28 @@ describe('Web Worker Plugin Isolation', () => {
         }
       })
 
-      const plugin: AgentKitPlugin = {
-        name: 'memory-tracked-plugin',
-        version: '1.0.0',
-        onInit: () => ({ tracked: true })
-      }
+      try {
+        const plugin: AgentKitPlugin = {
+          name: 'memory-tracked-plugin',
+          version: '1.0.0',
+          onInit: () => ({ tracked: true })
+        }
 
-      memoryManager.register(plugin)
-      await memoryManager.executeHook('onInit', mockContext)
-      
-      expect(memoryEvents).toHaveLength(1)
-      expect(memoryEvents[0].memory).toBeDefined()
-      
-      memoryManager.shutdown()
+        memoryManager.register(plugin)
+        await memoryManager.executeHook('onInit', mockContext)
+        
+        expect(memoryEvents).toHaveLength(1)
+        expect(memoryEvents[0].memory).toBeDefined()
+      } finally {
+        // Explicit cleanup for test-specific manager
+        if (memoryManager) {
+          try {
+            await memoryManager.shutdown()
+          } catch (error) {
+            console.error('[CLEANUP] Error shutting down memoryManager:', error)
+          }
+        }
+      }
     })
 
     it('should pre-warm workers for faster execution', async () => {
@@ -577,10 +612,19 @@ describe('Web Worker Plugin Isolation', () => {
         // preWarmWorkers: true // Future enhancement
       })
 
-      // Pre-warming should reduce first execution time
-      // (Implementation will be added to worker pool)
-      
-      fastManager.shutdown()
+      try {
+        // Pre-warming should reduce first execution time
+        // (Implementation will be added to worker pool)
+      } finally {
+        // Explicit cleanup for test-specific manager
+        if (fastManager) {
+          try {
+            await fastManager.shutdown()
+          } catch (error) {
+            console.error('[CLEANUP] Error shutting down fastManager:', error)
+          }
+        }
+      }
     })
   })
 
@@ -669,4 +713,10 @@ describe('Web Worker Plugin Isolation', () => {
       })
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

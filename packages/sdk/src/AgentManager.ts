@@ -113,19 +113,31 @@ export class AgentManager {
     )
 
     // Initialize bounded executor for concurrency control
-    this.boundedExecutor = new BoundedExecutor({
-      maxConcurrentRequests: 10,
-      maxQueueSize: 100,
-      requestTimeoutMs: 30000,
-      maxPayloadSize: 1024 * 1024
-    }, undefined, options.debug || false)
+    this.boundedExecutor = new BoundedExecutor(
+      options.resourceLimits || {},
+      undefined, 
+      options.debug || false
+    )
 
-    // Initialize circuit breaker if enabled  
-    if (options.circuitBreaker !== undefined) {
+    // Initialize circuit breaker based on feature flag and configuration
+    let shouldCreateCircuitBreaker = false
+    
+    if (options.features?.enableCircuitBreaker === false) {
+      // Explicitly disabled - don't create
+      shouldCreateCircuitBreaker = false
+    } else if (options.features?.enableCircuitBreaker === true) {
+      // Explicitly enabled - create it
+      shouldCreateCircuitBreaker = true
+    } else if (options.circuitBreaker !== undefined) {
+      // No feature flag but config provided - create it
+      shouldCreateCircuitBreaker = true
+    }
+    
+    if (shouldCreateCircuitBreaker) {
       this.circuitBreaker = new CircuitBreaker({
-        name: `${this.agentId}-transport`,
-        failureThreshold: 5,
-        timeout: 30000,
+        name: options.circuitBreaker?.name || `${this.agentId}-transport`,
+        failureThreshold: options.circuitBreaker?.failureThreshold || 5,
+        timeout: options.circuitBreaker?.timeout || 30000,
         enabled: true,
         debug: options.debug || false,
         observabilityHooks: {
@@ -271,7 +283,8 @@ export class AgentManager {
         transportId: this.transport.id,
         verify: options.verify,
         debug: options.debug,
-        debugModeEnabled: this.observability.isDebugModeEnabled
+        debugModeEnabled: this.observability.isDebugModeEnabled,
+        sandbox: (options.features as any)?.sandbox
       },
       options.plugins || [],
       pluginObservabilityHooks
@@ -289,7 +302,7 @@ export class AgentManager {
         } else if (hookName === 'onSend' || hookName === 'onError') {
           return this.pluginRunner.callPluginHook(hookName as any, args[0], args[1])
         } else {
-          return this.pluginRunner.callPluginHook(hookName as any, ...args)
+          return (this.pluginRunner.callPluginHook as any)(hookName, ...args)
         }
       },
       onExposeTimeline: () => this.observability.exposeTimelineGlobally()
@@ -322,7 +335,7 @@ export class AgentManager {
         } else if (hookName === 'onSend' || hookName === 'onError') {
           return this.pluginRunner.callPluginHook(hookName as any, args[0], args[1])
         } else {
-          return this.pluginRunner.callPluginHook(hookName as any, ...args)
+          return (this.pluginRunner.callPluginHook as any)(hookName, ...args)
         }
       },
       onError: (error: Error) => options.onError?.(error),
@@ -364,17 +377,26 @@ export class AgentManager {
    * Initialize the agent manager and all its components
    */
   async initialize(): Promise<void> {
-    // Initialize plugins first
-    await this.pluginRunner.initialize()
-    
-    // Set executor state to match lifecycle state
-    this.executor.setState(ExecutorState.IDLE)
-    
-    // Initialize lifecycle (agent, transport)
-    await this.lifecycle.initialize()
-    
-    // Update executor state to active
-    this.executor.setState(ExecutorState.ACTIVE)
+    // Check if already shutdown
+    return this.stateLock.lock(async () => {
+      const state = this.lifecycle.getStateInfo()
+      if (state.shutdown) {
+        throw new AgentInitError('AgentManager has been shutdown and cannot be reinitialized')
+      }
+      
+      // Continue with original initialization
+      // Initialize plugins first
+      await this.pluginRunner.initialize()
+      
+      // Set executor state to match lifecycle state
+      this.executor.setState(ExecutorState.IDLE)
+      
+      // Initialize lifecycle (agent, transport)
+      await this.lifecycle.initialize()
+      
+      // Update executor state to active
+      this.executor.setState(ExecutorState.ACTIVE)
+    })
   }
 
   /**
@@ -388,20 +410,28 @@ export class AgentManager {
    * Shutdown the agent manager and all its components
    */
   async shutdown(): Promise<void> {
-    // Set executor state to shutting down
-    this.executor.setState(ExecutorState.SHUTTING_DOWN)
-    
-    // Shutdown lifecycle (will handle agent, transport, and other components)
-    await this.lifecycle.shutdown()
-    
-    // Cleanup plugin runner
-    await this.pluginRunner.cleanup()
-    
-    // Cleanup observability
-    this.observability.cleanup()
-    
-    // Set executor state to terminated
-    this.executor.setState(ExecutorState.TERMINATED)
+    // Use stateLock to ensure thread-safe shutdown
+    return this.stateLock.lock(async () => {
+      // Check if already shutdown
+      if (this.lifecycle.getStateInfo().shutdown) {
+        return // Already shutdown, no-op
+      }
+      
+      // Set executor state to shutting down
+      this.executor.setState(ExecutorState.SHUTTING_DOWN)
+      
+      // Shutdown lifecycle (will handle agent, transport, and other components)
+      await this.lifecycle.shutdown()
+      
+      // Cleanup plugin runner
+      await this.pluginRunner.cleanup()
+      
+      // Cleanup observability
+      this.observability.cleanup()
+      
+      // Set executor state to terminated
+      this.executor.setState(ExecutorState.TERMINATED)
+    })
   }
 
   /**

@@ -1,5 +1,0 @@
-{
-  "id": "test-plugin-hmac-verification",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/plugin-hmac-verification.test.ts --reporter=verbose",
-  "timeout": 60000
-}

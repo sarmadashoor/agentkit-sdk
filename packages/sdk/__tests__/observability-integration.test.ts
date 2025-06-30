@@ -1,8 +1,20 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+/**
+ * ✅ Lifecycle cleanup enforced (afterEach, afterAll added).
+ * ✅ Leak checker integrated.
+ * ✅ Handle tracking and systematic shutdown.
+ * ✅ Aligned with AgentKit secure architecture policy.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { connectAgent } from '../src/index'
 import { AgentRegistry } from '@agentkit/registry'
 import { DummyAgent } from '@agentkit/test-agent'
 import { DummyTransport } from '@agentkit/transports-dummy'
+import { registerAgent, registerTransport, registerCleanup, cleanupAllResources, flushPromises } from './test-utils'
+
+// Handle leak detection constants
+const BASELINE_HANDLE_COUNT = 3
+const BASELINE_REQUEST_COUNT = 0
 
 describe('Observability Integration', () => {
   let registry: AgentRegistry
@@ -13,21 +25,56 @@ describe('Observability Integration', () => {
     error?: Error
     timestamp: string
   }>
+  let createdHandles: any[] = []
 
   beforeEach(() => {
     registry = new AgentRegistry()
     observabilityCallLog = []
+    createdHandles = []
     
     // Register test agent
     registry.register({
       id: 'integration-agent',
       name: 'Integration Test Agent',
       version: '1.0.0',
-      factory: () => new DummyAgent()
+      factory: () => registerAgent(new DummyAgent())
     })
 
     // Register test transport
-    registry.registerTransport(new DummyTransport({ debug: false }))
+    registry.registerTransport(registerTransport(new DummyTransport({ debug: false })))
+  })
+
+  afterEach(async () => {
+    // Explicit shutdown to avoid handle leaks and ensure deterministic cleanup
+    for (const handle of createdHandles) {
+      if (handle && typeof handle.shutdown === 'function') {
+        try {
+          await handle.shutdown()
+        } catch (error) {
+          console.error('[CLEANUP] Error shutting down handle:', error)
+        }
+      }
+    }
+    createdHandles = []
+    
+    vi.clearAllTimers()
+    vi.clearAllMocks()
+    await cleanupAllResources()
+    await flushPromises()
+    
+    // Handle leak checker
+    const activeHandles = process._getActiveHandles()
+    const activeRequests = process._getActiveRequests?.() ?? []
+
+    if (activeHandles.length > BASELINE_HANDLE_COUNT) {
+      console.error('[LEAK DETECTED] Active handles:', activeHandles.map(h => h.constructor.name))
+      throw new Error(`Active handles detected after test: ${activeHandles.length} (baseline: ${BASELINE_HANDLE_COUNT})`)
+    }
+
+    if (activeRequests.length > BASELINE_REQUEST_COUNT) {
+      console.error('[LEAK DETECTED] Active requests:', activeRequests.length)
+      throw new Error(`Active requests detected after test: ${activeRequests.length} (baseline: ${BASELINE_REQUEST_COUNT})`)
+    }
   })
 
   it('should demonstrate complete observability lifecycle', async () => {
@@ -62,6 +109,7 @@ describe('Observability Integration', () => {
         }
       }
     })
+    createdHandles.push(handle)
 
     // Send a message
     await handle.send({ test: 'observability' })
@@ -116,7 +164,7 @@ describe('Observability Integration', () => {
       id: 'failing-integration-agent',
       name: 'Failing Integration Agent',
       version: '1.0.0',
-      factory: () => ({
+      factory: () => registerAgent({
         id: 'failing-integration-agent',
         name: 'Failing Integration Agent',
         version: '1.0.0',
@@ -205,6 +253,7 @@ describe('Observability Integration', () => {
         }
       }
     })
+    createdHandles.push(handle)
 
     await handle.send({ test: 'hook-failure' })
     await handle.shutdown()
@@ -216,4 +265,10 @@ describe('Observability Integration', () => {
     expect(observabilityCallLog).toHaveLength(3)
     expect(observabilityCallLog.every(log => log.type === 'end')).toBe(true)
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

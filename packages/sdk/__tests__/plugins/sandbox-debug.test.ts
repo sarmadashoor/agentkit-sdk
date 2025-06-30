@@ -2,7 +2,7 @@
  * Simple sandbox debugging test
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest'
 import { PluginManager } from '../../src/plugins/PluginManager'
 import type { AgentKitPlugin, AgentContext } from '@agentkit/types'
 
@@ -68,4 +68,10 @@ describe('Sandbox Debug', () => {
     expect(results[0].success).toBe(false)
     expect(results[0].error?.message).toContain('Cannot set properties of undefined')
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

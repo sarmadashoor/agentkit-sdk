@@ -6,10 +6,11 @@
  * recovery mechanisms to ensure system stability.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { VMRunner, createVMRunner, secureClone } from '../../src/security/vmRunner'
 import { PluginManager } from '../../src/plugins'
 import type { AgentContext, SendPayload } from '@agentkit/types'
+import { cleanupAllResources, flushPromises } from '../test-utils'
 
 /**
  * Create a plugin that crashes in onSend hook
@@ -566,7 +567,7 @@ describe('Fault Boundary Validation', () => {
       }
 
       // Verify observability hooks were called
-      expect(errorSpy).toHaveBeenCalledWith('crashing-plugin', 'onSend', expect.any(Error))
+      expect(errorSpy).toHaveBeenCalledWith('crashing-plugin', 'onSend', expect.any(Error), expect.any(Number))
 
       // Manager should still be functional
       expect(manager.getPlugins()).toHaveLength(2)
@@ -625,4 +626,10 @@ describe('Fault Boundary Validation', () => {
       expect(healthyResult.result.processedBy).toBe('post-rapid-crash-healthy')
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

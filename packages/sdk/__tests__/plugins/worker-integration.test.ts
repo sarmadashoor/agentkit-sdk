@@ -3,8 +3,9 @@
  * Focus on testing the worker execution path specifically
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { WorkerPool, isWebWorkerSupported, isBrowserEnvironment } from '../../src/plugins/worker-utils'
+import { setupTestCleanup, cleanupWorkers, trackInstance, untrackInstance } from '../test-utils'
 
 // Mock browser environment globals
 const mockBrowserGlobals = () => {
@@ -47,11 +48,14 @@ const mockBrowserGlobals = () => {
 }
 
 describe('Web Worker Integration', () => {
+  setupTestCleanup() // Set up automatic cleanup
+  
   let originalWorker: any
   let originalBlob: any
   let originalURL: any
   let originalWindow: any
   let originalDocument: any
+  let workerPools: WorkerPool[] = []
 
   beforeEach(() => {
     // Store original values
@@ -65,13 +69,36 @@ describe('Web Worker Integration', () => {
     mockBrowserGlobals()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Clean up any worker pools
+    for (const pool of workerPools) {
+      try {
+        await pool.terminate()
+      } catch (error) {
+        console.error('[CLEANUP] Error terminating worker pool:', error)
+      }
+      untrackInstance('worker-pool', pool)
+    }
+    workerPools = []
+    
     // Restore original values
     ;(global as any).Worker = originalWorker
     ;(global as any).Blob = originalBlob
     ;(global as any).URL = originalURL
     ;(global as any).window = originalWindow
     ;(global as any).document = originalDocument
+  })
+
+  afterAll(async () => {
+    // Final cleanup
+    for (const pool of workerPools) {
+      try {
+        await pool.terminate()
+      } catch (error) {
+        // Ignore
+      }
+    }
+    workerPools = []
   })
 
   describe('Environment Detection', () => {
@@ -97,9 +124,11 @@ describe('Web Worker Integration', () => {
   describe('Worker Pool Creation', () => {
     it('should create worker pool with default options', () => {
       const pool = new WorkerPool()
+      workerPools.push(pool)
+      trackInstance('worker-pool', pool)
+      
       expect(pool).toBeDefined()
       expect(pool.getStats().totalWorkers).toBe(0)
-      pool.shutdown()
     })
 
     it('should create worker pool with custom options', () => {
@@ -109,8 +138,10 @@ describe('Web Worker Integration', () => {
         debug: true,
         preWarm: false
       })
+      workerPools.push(pool)
+      trackInstance('worker-pool', pool)
+      
       expect(pool).toBeDefined()
-      pool.shutdown()
     })
 
     it('should pre-warm workers when enabled', () => {
@@ -118,6 +149,8 @@ describe('Web Worker Integration', () => {
         maxWorkers: 3,
         preWarm: true
       })
+      workerPools.push(pool)
+      trackInstance('worker-pool', pool)
       
       // Should have pre-warmed workers
       const stats = pool.getStats()
@@ -436,4 +469,10 @@ describe('Web Worker Integration', () => {
       pool.shutdown()
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

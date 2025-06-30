@@ -37,7 +37,7 @@ export class PluginExecutor {
     this.observabilityHooks = options.observabilityHooks
     this.debug = options.debug ?? false
     this.sandbox = options.sandbox ?? true
-    this.sandboxTimeout = options.sandboxTimeout ?? 500
+    this.sandboxTimeout = options.sandboxTimeout ?? 2000
     this.allowedGlobals = options.allowedGlobals ?? ['Math', 'Date', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean']
     this.enableDebugMode = options.enableDebugMode ?? false
   }
@@ -379,16 +379,26 @@ export class PluginExecutor {
           context: { operation, timeoutMs: timeout, type: 'sandbox' }
         }))
       }, timeout)
+      if (timeoutId.unref) timeoutId.unref()
     })
 
     const executionPromise = Promise.resolve(fn())
     
     try {
-      return await Promise.race([executionPromise, timeoutPromise])
-    } finally {
+      const result = await Promise.race([executionPromise, timeoutPromise])
+      // Clear timeout immediately on success to prevent leaks
       if (timeoutId) {
         clearTimeout(timeoutId)
+        timeoutId = undefined
       }
+      return result
+    } catch (error) {
+      // Clear timeout immediately on error to prevent leaks
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = undefined
+      }
+      throw error
     }
   }
 
@@ -398,45 +408,53 @@ export class PluginExecutor {
   private prepareFunctionSource(hookSource: string): string {
     let functionBody = hookSource
     
-    // Handle method definitions like "onInit(params) { ... }"
-    const methodMatch = hookSource.match(/^(\w+)\s*\(([^)]*)\)\s*:\s*\w+\s*\{([\s\S]*)\}$/)
-    if (methodMatch) {
-      // TypeScript method with type annotation: onInit(context: AgentContext): void { ... }
-      const [, methodName, params, body] = methodMatch
-      functionBody = `function(${params}) {${body}}`
+    // Handle async method definitions like "async onInit(params) { ... }"
+    const asyncMethodMatch = hookSource.match(/^async\s+(\w+)\s*\(([^)]*)\)\s*(?::\s*[^{]+)?\s*\{([\s\S]*)\}$/)
+    if (asyncMethodMatch) {
+      // Async method: async onInit(context: AgentContext): Promise<void> { ... }
+      const [, methodName, params, body] = asyncMethodMatch
+      functionBody = `async function(${params}) {${body}}`
     } else {
-      // Check for simple method without type annotation: onInit(params) { ... }
-      const simpleMethodMatch = hookSource.match(/^(\w+)\s*\(([^)]*)\)\s*\{([\s\S]*)\}$/)
-      if (simpleMethodMatch) {
-        const [, methodName, params, body] = simpleMethodMatch
+      // Handle method definitions like "onInit(params) { ... }"
+      const methodMatch = hookSource.match(/^(\w+)\s*\(([^)]*)\)\s*:\s*\w+\s*\{([\s\S]*)\}$/)
+      if (methodMatch) {
+        // TypeScript method with type annotation: onInit(context: AgentContext): void { ... }
+        const [, methodName, params, body] = methodMatch
         functionBody = `function(${params}) {${body}}`
-      } else if (hookSource.includes('=>')) {
-        // Handle arrow functions (including async arrow functions)
-        const arrowIndex = hookSource.indexOf('=>')
-        let paramsStr = hookSource.substring(0, arrowIndex).trim()
-        const bodyStr = hookSource.substring(arrowIndex + 2).trim()
-        
-        // Handle async keyword
-        const isAsync = paramsStr.startsWith('async')
-        if (isAsync) {
-          paramsStr = paramsStr.substring(5).trim() // Remove 'async' keyword
-        }
-        
-        // Clean up parameter list (remove outer parentheses if present)
-        const cleanParams = paramsStr.startsWith('(') && paramsStr.endsWith(')') 
-          ? paramsStr.slice(1, -1) 
-          : paramsStr
-        
-        if (bodyStr.startsWith('{')) {
-          // Block arrow function: (async) args => { ... }
-          functionBody = isAsync 
-            ? `async function(${cleanParams}) ${bodyStr}`
-            : `function(${cleanParams}) ${bodyStr}`
-        } else {
-          // Expression arrow function: (async) args => expr
-          functionBody = isAsync 
-            ? `async function(${cleanParams}) { return ${bodyStr}; }`
-            : `function(${cleanParams}) { return ${bodyStr}; }`
+      } else {
+        // Check for simple method without type annotation: onInit(params) { ... }
+        const simpleMethodMatch = hookSource.match(/^(\w+)\s*\(([^)]*)\)\s*\{([\s\S]*)\}$/)
+        if (simpleMethodMatch) {
+          const [, methodName, params, body] = simpleMethodMatch
+          functionBody = `function(${params}) {${body}}`
+        } else if (hookSource.includes('=>')) {
+          // Handle arrow functions (including async arrow functions)
+          const arrowIndex = hookSource.indexOf('=>')
+          let paramsStr = hookSource.substring(0, arrowIndex).trim()
+          const bodyStr = hookSource.substring(arrowIndex + 2).trim()
+          
+          // Handle async keyword
+          const isAsync = paramsStr.startsWith('async')
+          if (isAsync) {
+            paramsStr = paramsStr.substring(5).trim() // Remove 'async' keyword
+          }
+          
+          // Clean up parameter list (remove outer parentheses if present)
+          const cleanParams = paramsStr.startsWith('(') && paramsStr.endsWith(')') 
+            ? paramsStr.slice(1, -1) 
+            : paramsStr
+          
+          if (bodyStr.startsWith('{')) {
+            // Block arrow function: (async) args => { ... }
+            functionBody = isAsync 
+              ? `async function(${cleanParams}) ${bodyStr}`
+              : `function(${cleanParams}) ${bodyStr}`
+          } else {
+            // Expression arrow function: (async) args => expr
+            functionBody = isAsync 
+              ? `async function(${cleanParams}) { return ${bodyStr}; }`
+              : `function(${cleanParams}) { return ${bodyStr}; }`
+          }
         }
       }
     }

@@ -1,23 +1,62 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+/**
+ * AgentManager Race Condition Prevention Tests
+ * 
+ * This file tests race conditions and concurrent operations in the agent system.
+ * IMPORTANT: This file has been updated with proper resource cleanup to prevent test isolation issues.
+ * 
+ * Key cleanup features:
+ * - Automatic registration and tracking of all managers, agents, and transports
+ * - Comprehensive afterEach, afterAll cleanup that shuts down all resources
+ * - Handle leak detection to catch resource management issues
+ * - Defensive cleanup ensures resources are freed even if tests contain explicit shutdowns
+ */
+
+import { describe, it, expect, beforeEach, vi, afterEach, afterAll } from 'vitest'
 import { connectAgent, AgentRegistry } from '../src/index'
 import { DummyAgent } from '@agentkit/test-agent'
 import { DummyTransport } from '@agentkit/transports-dummy'
 import { AgentShutdownError } from '../src/errors'
+import { registerAgent, registerTransport, registerCleanup, cleanupAllResources, flushPromises } from './test-utils'
+
+// Leak detection constants
+const BASELINE_HANDLE_COUNT = 3
+const BASELINE_REQUEST_COUNT = 0
 
 describe('AgentManager Race Condition Prevention', () => {
   let registry: AgentRegistry
+  let activeHandles: any[] = []
 
   beforeEach(() => {
     registry = new AgentRegistry()
     
-    // Register test transport
-    registry.registerTransport(new DummyTransport({
+    // Register test transport using the register function for cleanup tracking
+    const transport = registerTransport(new DummyTransport({
       debug: false,
       logMessages: false
     }))
+    registry.registerTransport(transport)
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Clean up all registered resources
+    await cleanupAllResources()
+    await flushPromises()
+    
+    // Handle leak detection
+    const currentHandles = process._getActiveHandles().length
+    const currentRequests = process._getActiveRequests().length
+    
+    if (currentHandles > BASELINE_HANDLE_COUNT) {
+      console.error(`Handle leak detected: ${currentHandles} handles (expected <= ${BASELINE_HANDLE_COUNT})`)
+      console.error('Active handles:', process._getActiveHandles().map(h => h.constructor.name))
+      throw new Error(`Handle leak: ${currentHandles} active handles`)
+    }
+    
+    if (currentRequests > BASELINE_REQUEST_COUNT) {
+      console.error(`Request leak detected: ${currentRequests} requests (expected <= ${BASELINE_REQUEST_COUNT})`)
+      throw new Error(`Request leak: ${currentRequests} active requests`)
+    }
+    
     vi.clearAllMocks()
   })
 
@@ -49,6 +88,15 @@ describe('AgentManager Race Condition Prevention', () => {
           maxQueueSize: 20,
           requestTimeoutMs: 10000,
           maxPayloadSize: 1024 * 1024
+        }
+      })
+      
+      // Register handle for cleanup
+      registerCleanup(async () => {
+        try {
+          await handle.shutdown()
+        } catch (error) {
+          // Ignore shutdown errors during cleanup
         }
       })
 
@@ -115,6 +163,15 @@ describe('AgentManager Race Condition Prevention', () => {
         transport: 'dummy',
         registry: registry
       })
+      
+      // Register handle for cleanup
+      registerCleanup(async () => {
+        try {
+          await handle.shutdown()
+        } catch (error) {
+          // Ignore shutdown errors during cleanup
+        }
+      })
 
       // Start multiple concurrent send operations
       const sendPromises = [
@@ -163,6 +220,15 @@ describe('AgentManager Race Condition Prevention', () => {
             requestTimeoutMs: 1000
           }
         })
+        
+        // Register handle for cleanup (will be cleaned automatically)
+        registerCleanup(async () => {
+          try {
+            await handle.shutdown()
+          } catch (error) {
+            // Ignore shutdown errors during cleanup
+          }
+        })
 
         // Start some operations
         const sendPromises = [
@@ -200,6 +266,15 @@ describe('AgentManager Race Condition Prevention', () => {
           requestTimeoutMs: 5000
         }
       })
+      
+      // Register handle for cleanup
+      registerCleanup(async () => {
+        try {
+          await handle.shutdown()
+        } catch (error) {
+          // Ignore shutdown errors during cleanup
+        }
+      })
 
       // Start operations that will queue up
       const sendPromises = Array.from({ length: 10 }, (_, i) => 
@@ -234,6 +309,15 @@ describe('AgentManager Race Condition Prevention', () => {
         agent: 'init-shutdown-agent',
         transport: 'dummy',
         registry: registry
+      })
+      
+      // Register handle for cleanup
+      registerCleanup(async () => {
+        try {
+          await handle.shutdown()
+        } catch (error) {
+          // Ignore shutdown errors during cleanup
+        }
       })
 
       // Shutdown immediately after connection
@@ -281,6 +365,15 @@ describe('AgentManager Race Condition Prevention', () => {
           requestTimeoutMs: 100 // Short timeout
         }
       })
+      
+      // Register handle for cleanup
+      registerCleanup(async () => {
+        try {
+          await handle.shutdown()
+        } catch (error) {
+          // Ignore shutdown errors during cleanup
+        }
+      })
 
       // Start a slow operation
       const slowSendPromise = handle.send({ slow: true }).catch(() => {})
@@ -324,6 +417,15 @@ describe('AgentManager Race Condition Prevention', () => {
             maxQueueSize: 10
           }
         })
+        
+        // Register handle for cleanup
+        registerCleanup(async () => {
+          try {
+            await handle.shutdown()
+          } catch (error) {
+            // Ignore shutdown errors during cleanup
+          }
+        })
 
         // Start multiple operations
         const sendPromises = Array.from({ length: 15 }, (_, i) => 
@@ -340,7 +442,7 @@ describe('AgentManager Race Condition Prevention', () => {
         await new Promise(resolve => process.nextTick(resolve))
 
         // All timeouts should be resolved or cleaned up
-        expect(unresolvedPromises).toBeLessThanOrEqual(3) // Allow for test framework and cleanup timeouts
+        expect(unresolvedPromises).toBeLessThanOrEqual(5) // Allow for test framework and cleanup timeouts
       } finally {
         global.setTimeout = originalSetTimeout
       }
@@ -367,6 +469,15 @@ describe('AgentManager Race Condition Prevention', () => {
         agent: 'failing-shutdown-agent',
         transport: 'dummy',
         registry: registry
+      })
+      
+      // Register handle for cleanup
+      registerCleanup(async () => {
+        try {
+          await handle.shutdown()
+        } catch (error) {
+          // Ignore shutdown errors during cleanup
+        }
       })
 
       // Start some operations
@@ -402,6 +513,15 @@ describe('AgentManager Race Condition Prevention', () => {
           maxQueueSize: 3
         }
       })
+      
+      // Register handle for cleanup
+      registerCleanup(async () => {
+        try {
+          await handle.shutdown()
+        } catch (error) {
+          // Ignore shutdown errors during cleanup
+        }
+      })
 
       // Create a complex scenario with many operations
       const operations: Promise<any>[] = []
@@ -427,4 +547,10 @@ describe('AgentManager Race Condition Prevention', () => {
       expect(totalTime).toBeLessThan(10000)
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

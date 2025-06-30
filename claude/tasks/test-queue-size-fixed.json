@@ -1,7 +1,0 @@
-{
-  "id": "test-queue-size-fixed",
-  "type": "run-command",
-  "cmd": "pnpm --filter=@agentkit/sdk test __tests__/transport-backpressure.test.ts",
-  "description": "Test the fixed queue size test",
-  "timeout": 30000
-}

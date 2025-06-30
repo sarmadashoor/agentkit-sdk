@@ -1,5 +1,0 @@
-{
-  "id": "test-plugin-reliability-spy-1",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability/plugin-reliability.test.ts -t \"should track plugin timeouts in timeline and metrics\" --reporter=verbose",
-  "timeout": 60000
-}

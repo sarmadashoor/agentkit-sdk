@@ -2,9 +2,10 @@
  * Comprehensive tests for CircuitBreaker state transitions and observability
  */
 
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, test, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { CircuitBreaker, CircuitState, CircuitBreakerObservabilityHooks, StateTransitionEvent } from '../src/circuitBreaker'
 import { CircuitBreakerError } from '../src/errors'
+import { cleanupAllResources, flushPromises } from './test-utils'
 
 describe('CircuitBreaker Observability and State Transitions', () => {
   let circuitBreaker: CircuitBreaker
@@ -29,8 +30,27 @@ describe('CircuitBreaker Observability and State Transitions', () => {
     mockFailureFunction = vi.fn().mockRejectedValue(new Error('test failure'))
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.useRealTimers()
+    vi.clearAllMocks()
+    vi.clearAllTimers()
+    
+    // Clean up all registered resources
+    await cleanupAllResources()
+    await flushPromises()
+    
+    // Add small delay to prevent test conflicts
+    await new Promise(resolve => setTimeout(resolve, 10))
+  })
+
+  afterAll(async () => {
+    // Final cleanup
+    await cleanupAllResources()
+    await flushPromises()
+    
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
   })
 
   describe('State Transition Tracking', () => {
@@ -306,9 +326,13 @@ describe('CircuitBreaker Observability and State Transitions', () => {
 
   describe('Circuit Reset and Manual Control', () => {
     test('handles manual circuit reset with proper transitions', async () => {
+      // Use real timers for this test to avoid hangs
+      vi.useRealTimers()
+      
       circuitBreaker = new CircuitBreaker({
         name: 'manual-circuit',
         failureThreshold: 1,
+        timeout: 100,
         enabled: true,
         observabilityHooks: mockObservabilityHooks
       })
@@ -325,14 +349,17 @@ describe('CircuitBreaker Observability and State Transitions', () => {
         expect.objectContaining({
           fromState: CircuitState.OPEN,
           toState: CircuitState.CLOSED,
-          reason: 'recovery successful'
+          reason: 'manual reset'
         })
       )
 
       // Should be able to execute again
       const result = await circuitBreaker.execute(mockSuccessFunction)
       expect(result).toBe('success')
-    })
+      
+      // Restore fake timers
+      vi.useFakeTimers()
+    }, 3000)
 
     test('handles forced circuit opening', () => {
       circuitBreaker = new CircuitBreaker({
@@ -470,28 +497,40 @@ describe('CircuitBreaker Observability and State Transitions', () => {
     })
 
     test('maintains state consistency during concurrent operations', async () => {
+      // Use real timers for this test to avoid hangs
+      vi.useRealTimers()
+      
       circuitBreaker = new CircuitBreaker({
         name: 'concurrent-circuit',
         failureThreshold: 2,
+        timeout: 100,
         enabled: true,
         observabilityHooks: mockObservabilityHooks
       })
 
-      // Simulate concurrent operations
+      // Simulate concurrent operations with proper error handling
       const operations = [
-        circuitBreaker.execute(mockSuccessFunction),
-        circuitBreaker.execute(mockFailureFunction).catch(() => 'failed'),
-        circuitBreaker.execute(mockSuccessFunction),
-        circuitBreaker.execute(mockFailureFunction).catch(() => 'failed')
+        circuitBreaker.execute(mockSuccessFunction).catch(() => 'handled'),
+        circuitBreaker.execute(mockFailureFunction).catch(() => 'handled'),
+        circuitBreaker.execute(mockSuccessFunction).catch(() => 'handled'),
+        circuitBreaker.execute(mockFailureFunction).catch(() => 'handled')
       ]
 
-      await Promise.all(operations)
+      const results = await Promise.allSettled(operations)
+      
+      // Verify all operations completed
+      expect(results).toHaveLength(4)
+      expect(results.every(r => r.status === 'fulfilled')).toBe(true)
 
       const stats = circuitBreaker.getStats()
       expect(stats.successCount + stats.failureCount).toBe(4)
       
       // State should be consistent
       expect([CircuitState.CLOSED, CircuitState.OPEN]).toContain(stats.state)
-    })
+      
+      // Restore fake timers
+      vi.useFakeTimers()
+    }, 5000)
   })
+
 })

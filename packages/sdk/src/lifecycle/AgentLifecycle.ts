@@ -103,9 +103,9 @@ export class AgentLifecycle {
 
   /**
    * Initialize agent and transport
+   * Note: This method expects stateLock to already be held by the caller (AgentManager)
    */
   async initialize(): Promise<void> {
-    return this.stateLock.lock(async () => {
       // Check state under lock
       if (this.state === LifecycleState.ACTIVE) {
         throw new AgentInitError('AgentLifecycle is already initialized', {
@@ -263,23 +263,20 @@ export class AgentLifecycle {
         }
       )
       
-      // Record initialization metrics
-      const duration = Date.now() - startTime
-      this.metricsCollector?.recordInitLatency(duration)
-      
-      return result
-    })
+    // Record initialization metrics
+    const duration = Date.now() - startTime
+    this.metricsCollector?.recordInitLatency(duration)
+    
+    return result
   }
 
   /**
    * Shutdown agent and transport
+   * Note: This method expects stateLock to already be held by the caller (AgentManager)
    */
   async shutdown(): Promise<void> {
     // Guard against recursive plugin calls
     guardAgainstRecursivePluginCalls('AgentLifecycle.shutdown')
-    
-    // Use shared AsyncLock to ensure atomic shutdown operation and prevent race with send
-    return this.stateLock.lock(async () => {
       // Check current state under lock
       if (this.state === LifecycleState.SHUTTING_DOWN || this.state === LifecycleState.TERMINATED) {
         debugLog.operation('shutdown (already shutdown)', { 
@@ -306,9 +303,8 @@ export class AgentLifecycle {
         newState: this.state 
       }, this.config.debug)
 
-      // Proceed with shutdown under lock protection
-      return this.executeShutdownOperation()
-    })
+    // Proceed with shutdown (lock already held by caller)
+    return this.executeShutdownOperation()
   }
 
   /**
@@ -365,7 +361,7 @@ export class AgentLifecycle {
             requestId 
           }, this.config.debug)
           
-          this.backpressureQueue.shutdown()
+          await this.backpressureQueue.shutdown()
           
           debugLog.lifecycle('shutdown complete', 'BackpressureQueue', { 
             requestId 

@@ -1,8 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { createGreetPlugin, GreetPlugin } from './fixtures/greet-plugin'
 import type { AgentContext, SendPayload } from '@agentkit/types'
 import { MetricsCollector } from '../src/observability/MetricsCollector'
 import { PluginExecutionTimeline } from '../src/observability/PluginExecutionTimeline'
+import { cleanupAllResources, flushPromises } from './test-utils'
+
+// Leak detection constants
+const BASELINE_HANDLE_COUNT = 3
+const BASELINE_REQUEST_COUNT = 0
 
 /**
  * Plugin Performance and Observability Test Suite
@@ -38,6 +43,36 @@ describe('Plugin Performance and Observability', () => {
       requestId: 'perf-test-001',
       timestamp: Date.now(),
       metadata: { test: 'performance' }
+    }
+  })
+
+  afterEach(async () => {
+    // Clean up any plugin resources
+    if (plugin && typeof plugin.shutdown === 'function') {
+      try {
+        await plugin.shutdown(mockContext)
+      } catch (error) {
+        console.error('Error during plugin shutdown:', error)
+      }
+    }
+    
+    // Clean up all registered resources
+    await cleanupAllResources()
+    await flushPromises()
+    
+    // Handle leak detection
+    const currentHandles = process._getActiveHandles().length
+    const currentRequests = process._getActiveRequests().length
+    
+    if (currentHandles > BASELINE_HANDLE_COUNT) {
+      console.error(`Handle leak detected: ${currentHandles} handles (expected <= ${BASELINE_HANDLE_COUNT})`)
+      console.error('Active handles:', process._getActiveHandles().map(h => h.constructor.name))
+      throw new Error(`Handle leak: ${currentHandles} active handles`)
+    }
+    
+    if (currentRequests > BASELINE_REQUEST_COUNT) {
+      console.error(`Request leak detected: ${currentRequests} requests (expected <= ${BASELINE_REQUEST_COUNT})`)
+      throw new Error(`Request leak: ${currentRequests} active requests`)
     }
   })
 
@@ -457,4 +492,10 @@ describe('Plugin Performance and Observability', () => {
       })
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

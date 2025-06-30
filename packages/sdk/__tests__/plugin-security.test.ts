@@ -5,31 +5,47 @@
  * 1. Plugin signature verification bypass
  * 2. CLI code injection prevention
  * 3. WebWorker sandbox escape prevention
+ * 
+ * IMPORTANT: This file has been updated with proper resource cleanup to prevent test isolation issues.
+ * 
+ * Key cleanup features:
+ * - Automatic registration and tracking of all managers, agents, and transports
+ * - Comprehensive afterEach, afterAll cleanup that shuts down all resources
+ * - Handle leak detection to catch resource management issues
+ * - Plugin manager cleanup and sandbox cleanup
+ * - Security testing preserved while ensuring proper resource cleanup
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { connectAgent } from '../src/index'
 import { verifyPlugin, validateVerificationMode } from '../src/security/plugin-hmac-verifier'
 import type { Agent, Transport, AgentKitPlugin } from '@agentkit/types'
+import { registerAgent, registerManager, registerTransport, registerCleanup, cleanupAllResources, flushPromises } from './test-utils'
 
 // Mock transport and agent for testing
-const createMockTransport = (): Transport => ({
-  id: 'mock-transport',
-  name: 'Mock Transport',
-  async init() {},
-  async send() {},
-  async receive() { return {} },
-  canAcceptMore: () => true
-})
+const createMockTransport = (): Transport => {
+  const transport = {
+    id: 'mock-transport',
+    name: 'Mock Transport',
+    async init() {},
+    async send() {},
+    async receive() { return {} },
+    canAcceptMore: () => true
+  }
+  return registerTransport(transport)
+}
 
-const createMockAgent = (): Agent => ({
-  id: 'mock-agent',
-  name: 'Mock Agent',
-  version: '1.0.0',
-  async init() {},
-  async handle() { return {} },
-  async shutdown() {}
-})
+const createMockAgent = (): Agent => {
+  const agent = {
+    id: 'mock-agent',
+    name: 'Mock Agent',
+    version: '1.0.0',
+    async init() {},
+    async handle() { return {} },
+    async shutdown() {}
+  }
+  return registerAgent(agent)
+}
 
 const createTestPlugin = (name: string = 'test-plugin'): AgentKitPlugin => ({
   name,
@@ -39,6 +55,10 @@ const createTestPlugin = (name: string = 'test-plugin'): AgentKitPlugin => ({
   async onSend() { return { processed: true } }
 })
 
+// Leak detection constants
+const BASELINE_HANDLE_COUNT = 3
+const BASELINE_REQUEST_COUNT = 0
+
 describe('Critical Security Vulnerability Patches', () => {
   let originalEnv: NodeJS.ProcessEnv
 
@@ -47,11 +67,33 @@ describe('Critical Security Vulnerability Patches', () => {
     // Set secure test environment
     process.env.AGENTKIT_SIGNING_SECRET = 'secure-test-secret-16-characters'
     vi.clearAllMocks()
+    
+    // Register cleanup for any test-created resources
+    // Note: Security tests typically create mock objects, not real resources
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     process.env = originalEnv
     vi.unstubAllEnvs()
+    
+    // Clean up all registered resources
+    await cleanupAllResources()
+    await flushPromises()
+    
+    // Handle leak detection
+    const currentHandles = process._getActiveHandles().length
+    const currentRequests = process._getActiveRequests().length
+    
+    if (currentHandles > BASELINE_HANDLE_COUNT) {
+      console.error(`Handle leak detected: ${currentHandles} handles (expected <= ${BASELINE_HANDLE_COUNT})`)
+      console.error('Active handles:', process._getActiveHandles().map(h => h.constructor.name))
+      throw new Error(`Handle leak: ${currentHandles} active handles`)
+    }
+    
+    if (currentRequests > BASELINE_REQUEST_COUNT) {
+      console.error(`Request leak detected: ${currentRequests} requests (expected <= ${BASELINE_REQUEST_COUNT})`)
+      throw new Error(`Request leak: ${currentRequests} active requests`)
+    }
   })
 
   describe('CVE-1: Signature Verification Bypass Prevention', () => {
@@ -344,4 +386,10 @@ describe('Critical Security Vulnerability Patches', () => {
       }
     })
   })
+
+  afterAll(() => {
+    const handles = process._getActiveHandles();
+    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
+    console.log('🟡 [DEBUG] Total active handles:', handles.length);
+  });
 })

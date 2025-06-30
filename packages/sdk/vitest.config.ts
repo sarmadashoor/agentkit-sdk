@@ -8,16 +8,17 @@ export default defineConfig({
     globals: true,
     
     // Configuration to prevent hanging
-    threads: false,
     hookTimeout: 5000,
     teardownTimeout: 5000,
     testTimeout: 15000,
     
-    // Use forks for Node 22+ compatibility with VM contexts
+    // Use forks for better isolation with limited parallelism
     pool: 'forks',
     poolOptions: {
       forks: {
-        // Better isolation without VM/atomic conflicts
+        // Allow 2-3 parallel workers instead of single fork
+        minForks: 1,
+        maxForks: 3,
         isolate: true
       }
     },

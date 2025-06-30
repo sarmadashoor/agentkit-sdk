@@ -3,6 +3,7 @@
  * and ensures all error properties are consistent and type-safe
  */
 
+import { describe, test, expect } from 'vitest'
 import {
   // Base error
   AgentKitError,

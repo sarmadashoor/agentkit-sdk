@@ -62,7 +62,10 @@ export class AgentObservability {
     }
 
     if (this.config.enableTimelineDebug) {
-      this.timeline = new PluginExecutionTimeline()
+      this.timeline = new PluginExecutionTimeline({
+        warningThreshold: this.config.performanceThreshold,
+        enableConsoleWarnings: this.config.enableConsoleWarnings
+      })
     }
   }
 
@@ -70,7 +73,9 @@ export class AgentObservability {
    * Initialize enhanced debug tools
    */
   private initializeDebugTools(): void {
-    this.debug.info('Initializing enhanced debug tools')
+    if (this.debug && typeof this.debug.info === 'function') {
+      this.debug.info('Initializing enhanced debug tools')
+    }
     
     // Initialize debug manager
     this.debugManager = DebugManager.getInstance({
@@ -101,10 +106,14 @@ export class AgentObservability {
       this.hotReloadManager = new HotReloadManager({
         enabled: true,
         onReload: (filePath, pluginName) => {
-          this.debug.info(`Plugin hot reloaded: ${pluginName}`, { filePath })
+          if (this.debug && typeof this.debug.info === 'function') {
+            this.debug.info(`Plugin hot reloaded: ${pluginName}`, { filePath })
+          }
         },
         onError: (error, filePath) => {
-          this.debug.error(`Hot reload failed: ${filePath}`, { error })
+          if (this.debug && typeof this.debug.error === 'function') {
+            this.debug.error(`Hot reload failed: ${filePath}`, { error })
+          }
         }
       })
     }
@@ -112,7 +121,9 @@ export class AgentObservability {
     // Initialize debug timeline
     this.debugManager.initializeTimeline(this.agentId)
     
-    this.debug.info('Enhanced debug tools initialized successfully')
+    if (this.debug && typeof this.debug.info === 'function') {
+      this.debug.info('Enhanced debug tools initialized successfully')
+    }
   }
 
   // ===== OBSERVABILITY PUBLIC API =====
@@ -185,7 +196,9 @@ export class AgentObservability {
       this.hotReloadManager = new HotReloadManager({ enabled: true })
     }
     
-    this.debug.info('Debug mode enabled with enhanced features', options)
+    if (this.debug && typeof this.debug.info === 'function') {
+      this.debug.info('Debug mode enabled with enhanced features', options)
+    }
   }
 
   /**
@@ -313,7 +326,9 @@ export class AgentObservability {
     this.debugManager?.reset()
     this.pluginTracer?.clearTraces()
     this.timelineLogger?.clear()
-    this.debug.info('Debug data cleared')
+    if (this.debug && typeof this.debug.info === 'function') {
+      this.debug.info('Debug data cleared')
+    }
   }
 
   /**
@@ -321,12 +336,16 @@ export class AgentObservability {
    */
   registerPluginForHotReload(pluginName: string, filePath: string): void {
     if (!this.hotReloadManager) {
-      this.debug.warn('Hot reload manager not available (requires development mode)')
+      if (this.debug && typeof this.debug.warn === 'function') {
+        this.debug.warn('Hot reload manager not available (requires development mode)')
+      }
       return
     }
     
     this.hotReloadManager.registerPlugin(pluginName, filePath)
-    this.debug.info(`Registered plugin for hot reload: ${pluginName}`, { filePath })
+    if (this.debug && typeof this.debug.info === 'function') {
+      this.debug.info(`Registered plugin for hot reload: ${pluginName}`, { filePath })
+    }
   }
 
   /**
@@ -380,6 +399,9 @@ export class AgentObservability {
    * Cleanup observability resources
    */
   cleanup(): void {
+    // Finalize timeline before cleanup
+    this.timeline?.finalize()
+    
     // Clean up hot reload manager if it has a cleanup method
     if (this.hotReloadManager && 'shutdown' in this.hotReloadManager && typeof this.hotReloadManager.shutdown === 'function') {
       this.hotReloadManager.shutdown()

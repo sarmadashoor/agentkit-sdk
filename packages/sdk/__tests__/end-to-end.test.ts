@@ -18,23 +18,19 @@ import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest'
 import { connectAgent, AgentRegistry } from '../src/index'
 import { DummyAgent } from '@agentkit/test-agent'
 import { DummyTransport } from '@agentkit/transports-dummy'
-import { registerAgent, registerTransport, registerCleanup, cleanupAllResources } from './test-utils'
+import { setupTestCleanup, trackInstance, untrackInstance, cleanupAllRequests } from './test-utils'
 
 // Leak detection constants
 const BASELINE_HANDLE_COUNT = 3
 const BASELINE_REQUEST_COUNT = 0
 
 describe('End-to-End AgentKit SDK Test', () => {
+  setupTestCleanup() // Set up automatic cleanup
+  
   let agentHandles: any[] = []
   let transportInstances: any[] = []
-  let initialHandleCount: number
-  let initialRequestCount: number
 
   beforeEach(() => {
-    // Track initial resource state
-    initialHandleCount = process._getActiveHandles().length
-    initialRequestCount = process._getActiveRequests().length
-    
     // Clear registry state
     AgentRegistry.clear()
     
@@ -43,7 +39,7 @@ describe('End-to-End AgentKit SDK Test', () => {
     transportInstances = []
   })
 
-  afterEach, afterAll(async () => {
+  afterEach(async () => {
     // Clean up all agent handles
     for (const handle of agentHandles) {
       try {
@@ -53,6 +49,7 @@ describe('End-to-End AgentKit SDK Test', () => {
       } catch (error) {
         console.warn('Error shutting down agent handle:', error)
       }
+      untrackInstance('agent-handle', handle)
     }
     agentHandles = []
     
@@ -67,29 +64,42 @@ describe('End-to-End AgentKit SDK Test', () => {
       } catch (error) {
         console.warn('Error disposing transport:', error)
       }
+      untrackInstance('transport', transport)
     }
     transportInstances = []
     
     // Clear registry again
     AgentRegistry.clear()
     
-    // Clean up all resources
-    await cleanupAllResources()
-    
-    // Verify no resource leaks
-    const finalHandleCount = process._getActiveHandles().length
-    const finalRequestCount = process._getActiveRequests().length
-    
-    const handleLeak = finalHandleCount - initialHandleCount
-    const requestLeak = finalRequestCount - initialRequestCount
-    
-    if (handleLeak > BASELINE_HANDLE_COUNT) {
-      console.warn(`[E2E TEST] Handle leak detected: ${handleLeak} handles remaining`)
+    // Clean up any pending requests
+    await cleanupAllRequests()
+  })
+
+  afterAll(async () => {
+    // Final cleanup
+    for (const handle of agentHandles) {
+      try {
+        if (handle && handle.shutdown) {
+          await handle.shutdown()
+        }
+      } catch (error) {
+        // Ignore
+      }
     }
+    agentHandles = []
     
-    if (requestLeak > BASELINE_REQUEST_COUNT) {
-      console.warn(`[E2E TEST] Request leak detected: ${requestLeak} requests remaining`)
+    for (const transport of transportInstances) {
+      try {
+        if (transport && transport.dispose) {
+          await transport.dispose()
+        } else if (transport && transport.shutdown) {
+          await transport.shutdown()
+        }
+      } catch (error) {
+        // Ignore
+      }
     }
+    transportInstances = []
     
     // Remove manual GC calls for Node 22+ compatibility
     // Let Node.js handle garbage collection naturally

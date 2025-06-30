@@ -1,5 +1,0 @@
-{
-  "id": "test-plugin-reliability-imports-fixed",
-  "cmd": "pnpm --filter=@agentkit/sdk exec npx vitest run __tests__/observability/plugin-reliability.test.ts --reporter=verbose",
-  "timeout": 120000
-}
