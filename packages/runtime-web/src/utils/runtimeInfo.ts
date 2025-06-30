@@ -168,9 +168,9 @@ function detectEnvironment(): RuntimeInfo['environment'] {
   // Node.js environment detection
   if (typeof process !== 'undefined') {
     const nodeEnv = process.env.NODE_ENV
-    if (nodeEnv === 'development') return 'development'
-    if (nodeEnv === 'production') return 'production'
-    if (nodeEnv === 'test') return 'test'
+    if (nodeEnv === 'development') {return 'development'}
+    if (nodeEnv === 'production') {return 'production'}
+    if (nodeEnv === 'test') {return 'test'}
   }
   
   // Browser environment detection
@@ -203,7 +203,7 @@ function detectEnvironment(): RuntimeInfo['environment'] {
  * Detect browser information
  */
 function detectBrowser(): RuntimeInfo['browser'] | undefined {
-  if (typeof navigator === 'undefined') return undefined
+  if (typeof navigator === 'undefined') {return undefined}
   
   const userAgent = navigator.userAgent
   const name = detectBrowserName(userAgent)
@@ -223,11 +223,11 @@ function detectBrowser(): RuntimeInfo['browser'] | undefined {
  * Detect browser name from user agent
  */
 function detectBrowserName(userAgent: string): string {
-  if (userAgent.includes('Firefox/')) return 'Firefox'
-  if (userAgent.includes('Safari/') && userAgent.includes('Version/')) return 'Safari'
-  if (userAgent.includes('Chrome/')) return 'Chrome'
-  if (userAgent.includes('Edge/')) return 'Edge'
-  if (userAgent.includes('Opera/')) return 'Opera'
+  if (userAgent.includes('Firefox/')) {return 'Firefox'}
+  if (userAgent.includes('Safari/') && userAgent.includes('Version/')) {return 'Safari'}
+  if (userAgent.includes('Chrome/')) {return 'Chrome'}
+  if (userAgent.includes('Edge/')) {return 'Edge'}
+  if (userAgent.includes('Opera/')) {return 'Opera'}
   return 'Unknown'
 }
 
@@ -246,7 +246,7 @@ function detectBrowserVersion(userAgent: string, browserName: string): string {
   const pattern = patterns[browserName]
   if (pattern) {
     const match = userAgent.match(pattern)
-    if (match) return match[1]
+    if (match) {return match[1]}
   }
   
   return 'Unknown'
@@ -256,7 +256,7 @@ function detectBrowserVersion(userAgent: string, browserName: string): string {
  * Detect if device is mobile
  */
 function detectMobile(): boolean {
-  if (typeof navigator === 'undefined') return false
+  if (typeof navigator === 'undefined') {return false}
   
   return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
          (typeof window !== 'undefined' && window.innerWidth <= 768)
@@ -266,7 +266,7 @@ function detectMobile(): boolean {
  * Detect if device is tablet
  */
 function detectTablet(): boolean {
-  if (typeof navigator === 'undefined') return false
+  if (typeof navigator === 'undefined') {return false}
   
   return /iPad|Android/i.test(navigator.userAgent) &&
          (typeof window !== 'undefined' && window.innerWidth > 768 && window.innerWidth <= 1024)
@@ -283,7 +283,7 @@ function detectDesktop(): boolean {
  * Detect Node.js information
  */
 function detectNode(): RuntimeInfo['node'] | undefined {
-  if (typeof process === 'undefined') return undefined
+  if (typeof process === 'undefined') {return undefined}
   
   return {
     version: process.version,
@@ -485,7 +485,7 @@ function detectSecurity(): RuntimeInfo['security'] {
  * Detect if cookies are enabled
  */
 function detectCookiesEnabled(): boolean {
-  if (typeof document === 'undefined') return false
+  if (typeof document === 'undefined') {return false}
   
   try {
     document.cookie = 'test=1'

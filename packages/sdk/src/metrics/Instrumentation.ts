@@ -68,7 +68,7 @@ export class Instrumentation {
    * Record agent initialization
    */
   recordAgentInit(agentId: string, agentType: string, duration: number): void {
-    if (!this.config.enabled) return
+    if (!this.config.enabled) {return}
 
     this.collector.incrementCounter(
       this.withPrefix(AGENTKIT_METRICS.AGENT_INITIALIZATIONS_TOTAL),
@@ -95,7 +95,7 @@ export class Instrumentation {
    * Record agent shutdown
    */
   recordAgentShutdown(agentId: string, agentType: string): void {
-    if (!this.config.enabled) return
+    if (!this.config.enabled) {return}
 
     this.collector.incrementCounter(
       this.withPrefix(AGENTKIT_METRICS.AGENT_SHUTDOWNS_TOTAL),
@@ -113,7 +113,7 @@ export class Instrumentation {
    * Record request handling
    */
   recordRequest(agentId: string, method: string, duration: number, status: string, requestSize?: number, responseSize?: number): void {
-    if (!this.config.enabled) return
+    if (!this.config.enabled) {return}
 
     const labels = this.withDefaultLabels({
       [AGENTKIT_LABELS.AGENT_ID]: agentId,
@@ -154,7 +154,7 @@ export class Instrumentation {
    * Record error occurrence
    */
   recordError(context: string, errorType: string, errorCode?: string): void {
-    if (!this.config.enabled) return
+    if (!this.config.enabled) {return}
 
     this.collector.incrementCounter(
       this.withPrefix(AGENTKIT_METRICS.ERRORS_TOTAL),
@@ -177,7 +177,7 @@ export class Instrumentation {
     duration: number,
     status: string
   ): void {
-    if (!this.config.enabled) return
+    if (!this.config.enabled) {return}
 
     const labels = this.withDefaultLabels({
       [AGENTKIT_LABELS.TRANSPORT_ID]: transportId,
@@ -210,7 +210,7 @@ export class Instrumentation {
    * Record transport queue size
    */
   recordTransportQueueSize(transportId: string, queueSize: number): void {
-    if (!this.config.enabled) return
+    if (!this.config.enabled) {return}
 
     this.collector.setGauge(
       this.withPrefix(AGENTKIT_METRICS.TRANSPORT_QUEUE_SIZE),
@@ -230,7 +230,7 @@ export class Instrumentation {
     duration: number,
     status: 'success' | 'error' | 'timeout'
   ): void {
-    if (!this.config.enabled) return
+    if (!this.config.enabled) {return}
 
     const labels = this.withDefaultLabels({
       [AGENTKIT_LABELS.PLUGIN_NAME]: pluginName,
@@ -271,7 +271,7 @@ export class Instrumentation {
    * Record registry operation
    */
   recordRegistryOperation(operation: 'register' | 'lookup', agentId?: string): void {
-    if (!this.config.enabled) return
+    if (!this.config.enabled) {return}
 
     if (operation === 'register') {
       this.collector.incrementCounter(
@@ -363,7 +363,7 @@ export class Instrumentation {
   }
 
   private collectResourceMetrics(): void {
-    if (!this.config.enabled) return
+    if (!this.config.enabled) {return}
 
     try {
       // Memory usage

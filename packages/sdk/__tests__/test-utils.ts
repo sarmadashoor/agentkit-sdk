@@ -24,7 +24,7 @@ export function untrackInstance(type: string, instance: any): void {
 }
 
 export async function cleanupInstance(instance: any): Promise<void> {
-  if (!instance) return;
+  if (!instance) {return;}
 
   try {
     // Try common cleanup methods
@@ -79,7 +79,7 @@ export function createMockTransport() {
 
 // Enhanced cleanup for BoundedExecutor and concurrency tests
 export async function cleanupExecutor(executor: any): Promise<void> {
-  if (!executor) return;
+  if (!executor) {return;}
 
   try {
     // Clear any pending tasks

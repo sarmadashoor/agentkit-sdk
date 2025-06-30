@@ -308,7 +308,7 @@ describe('Plugin Security Boundaries (Sandbox Isolation)', () => {
           console.log('SECURITY_TEST:malicious-test:escape_attempt')
           try {
             // Try to override error handling
-            ;(globalThis as any).Error = function() { 
+            (globalThis as any).Error = function() { 
               console.log('SECURITY_TEST:malicious-test:error_override_success')
             }
             

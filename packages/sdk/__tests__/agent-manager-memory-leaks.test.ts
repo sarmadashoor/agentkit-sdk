@@ -29,10 +29,10 @@ describe('AgentManager Memory Leak Prevention', () => {
   let originalClearInterval: typeof clearInterval
   
   // Track active timers with proper ID mapping
-  let activeTimeouts = new Set<number>()
-  let activeIntervals = new Set<number>()
-  let timeoutIdMap = new Map<number, number>() // realId -> trackingId
-  let intervalIdMap = new Map<number, number>() // realId -> trackingId
+  const activeTimeouts = new Set<number>()
+  const activeIntervals = new Set<number>()
+  const timeoutIdMap = new Map<number, number>() // realId -> trackingId
+  const intervalIdMap = new Map<number, number>() // realId -> trackingId
   let timerIdCounter = 1
 
   beforeEach(() => {
@@ -278,15 +278,10 @@ describe('AgentManager Memory Leak Prevention', () => {
       class TrackingAgent extends DummyAgent {
         async handle(input: any): Promise<unknown> {
           operationsStarted++
-          try {
-            await new Promise(resolve => setTimeout(resolve, 100).unref())
-            const result = await super.handle(input)
-            operationsCompleted++
-            return result
-          } catch (error) {
-            // Operation was cancelled
-            throw error
-          }
+          await new Promise(resolve => setTimeout(resolve, 100).unref())
+          const result = await super.handle(input)
+          operationsCompleted++
+          return result
         }
       }
 
@@ -336,7 +331,7 @@ describe('AgentManager Memory Leak Prevention', () => {
     })
 
     it('should prevent promise memory leaks during error scenarios', async () => {
-      let unhandledRejections: any[] = []
+      const unhandledRejections: any[] = []
       
       const originalOnUnhandledRejection = process.listeners('unhandledRejection')
       

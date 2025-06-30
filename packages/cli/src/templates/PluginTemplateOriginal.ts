@@ -560,7 +560,7 @@ test.describe('${className} Browser Tests', () => {
     }
   }
 
-  generateTsConfig(config: PluginConfig): any {
+  generateTsConfig(_config: PluginConfig): any {
     return {
       extends: '../../tsconfig.json',
       compilerOptions: {
@@ -686,7 +686,7 @@ export default defineConfig({
 `
   }
 
-  generatePlaywrightConfig(config: PluginConfig): string {
+  generatePlaywrightConfig(_config: PluginConfig): string {
     return `import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({

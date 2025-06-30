@@ -441,7 +441,7 @@ if (!globalThis.Worker) {
           }, 3000)
 
           let ready = false
-          let results: any[] = []
+          const results: any[] = []
 
           workerInstance!.onmessage = (event) => {
             if (event.data.type === 'ready' && !ready) {

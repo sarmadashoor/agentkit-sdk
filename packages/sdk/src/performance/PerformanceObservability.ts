@@ -7,7 +7,7 @@
 import { z } from 'zod'
 import { MetricsCollector, PrometheusMetricsSchema } from '../observability/MetricsCollector'
 import { PluginExecutionTimeline } from '../observability/PluginExecutionTimeline'
-import type { EnhancedBoundedExecutor, PerformanceMetrics } from './EnhancedBoundedExecutor'
+import type { EnhancedBoundedExecutor } from './EnhancedBoundedExecutor'
 import type { RetryableExecutor } from './RetryableExecutor'
 
 // Extended schema for performance metrics
@@ -70,7 +70,6 @@ export type EnhancedPerformanceMetrics = z.infer<typeof PerformanceMetricsSchema
 
 export class PerformanceObservabilityCollector {
   private metricsCollector: MetricsCollector
-  private timeline: PluginExecutionTimeline
   private executor?: EnhancedBoundedExecutor
   private retryExecutor?: RetryableExecutor
   private startTime = Date.now()
@@ -82,10 +81,9 @@ export class PerformanceObservabilityCollector {
   
   constructor(
     metricsCollector: MetricsCollector,
-    timeline: PluginExecutionTimeline
+    _timeline: PluginExecutionTimeline
   ) {
     this.metricsCollector = metricsCollector
-    this.timeline = timeline
     
     this.setupSystemMonitoring()
   }

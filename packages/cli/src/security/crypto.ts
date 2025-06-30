@@ -7,11 +7,10 @@
  * - Key management for development and production
  */
 
-import { createHash, randomBytes } from 'crypto'
-import { sign, verify, generateKeyPair } from 'crypto'
+import { createHash, randomBytes as _randomBytes, sign, verify, generateKeyPair } from 'crypto'
 import { promisify } from 'util'
 import { readFile, writeFile, mkdir, access } from 'fs/promises'
-import { join, dirname } from 'path'
+import { join, dirname as _dirname } from 'path'
 import { homedir } from 'os'
 
 const generateKeyPairAsync = promisify(generateKeyPair)

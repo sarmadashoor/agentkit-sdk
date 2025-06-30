@@ -79,8 +79,8 @@ async function checkNodeVersion(): Promise<HealthCheck> {
 }
 
 async function checkEnvironmentVariables(): Promise<HealthCheck> {
-  const requiredVars = ['NODE_ENV']
-  const optionalVars = ['AGENTKIT_SIGNING_SECRET', 'AGENTKIT_PLUGIN_DIR']
+  const _requiredVars = ['NODE_ENV']
+  const _optionalVars = ['AGENTKIT_SIGNING_SECRET', 'AGENTKIT_PLUGIN_DIR']
   const issues: string[] = []
 
   // Check if we're in a reasonable environment

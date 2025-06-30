@@ -124,6 +124,34 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@20.19.0)(happy-dom@12.10.3)
 
+  packages/qa-scenarios:
+    dependencies:
+      '@agentkit/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+      '@agentkit/test-agent':
+        specifier: workspace:*
+        version: link:../test-agent
+      '@agentkit/transports-dummy':
+        specifier: workspace:*
+        version: link:../transports-dummy
+      '@agentkit/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      '@types/node':
+        specifier: ^20.11.0
+        version: 20.19.0
+      execa:
+        specifier: ^8.0.1
+        version: 8.0.1
+      typescript:
+        specifier: ^5.3.3
+        version: 5.8.3
+      vitest:
+        specifier: ^1.2.0
+        version: 1.6.1(@types/node@20.19.0)(happy-dom@12.10.3)
+
   packages/registry:
     dependencies:
       '@agentkit/errors':

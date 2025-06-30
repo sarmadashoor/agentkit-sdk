@@ -115,9 +115,9 @@ if (typeof global.URL === 'undefined') {
     hash: string
     href: string
     
-    constructor(url: string, base?: string) {
+    constructor(url: string, _base?: string) {
       // Simple URL parsing for testing
-      const match = url.match(/^(https?:)\/\/([^\/]+)(\/[^?]*)?(\?[^#]*)?(#.*)?$/)
+      const match = url.match(/^(https?:)\/\/([^/]+)(\/[^?]*)?(\?[^#]*)?(#.*)?$/)
       if (!match) {
         throw new Error('Invalid URL')
       }

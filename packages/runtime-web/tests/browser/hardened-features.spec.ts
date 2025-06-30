@@ -241,7 +241,7 @@ test.describe('AgentKit Hardened Features - Browser Tests', () => {
           const results = mockPluginManager.executeHook('onSend', originalPayload)
           
           // Verify isolation - original payload should be unchanged
-          const payloadUnchanged = !originalPayload.hasOwnProperty('processed')
+          const payloadUnchanged = !Object.prototype.hasOwnProperty.call(originalPayload, 'processed')
           
           // Verify error isolation - one plugin fails but doesn't break others
           const successCount = results.filter(r => r.success).length

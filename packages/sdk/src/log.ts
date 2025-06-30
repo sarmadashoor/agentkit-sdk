@@ -60,7 +60,7 @@ class ConsoleLogger implements Logger {
 }
 
 // Global logger instance
-let globalLogger: ConsoleLogger = new ConsoleLogger(false)
+const globalLogger: ConsoleLogger = new ConsoleLogger(false)
 
 /**
  * Simple logging function for backward compatibility
@@ -101,7 +101,7 @@ export function logWithContext(
   context?: LogContext,
   debug: boolean = false
 ): void {
-  if (!debug) return
+  if (!debug) {return}
 
   const logger = createLogger(true)
   switch (level) {

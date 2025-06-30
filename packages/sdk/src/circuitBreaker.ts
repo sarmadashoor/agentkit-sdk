@@ -604,20 +604,4 @@ export class CircuitBreaker {
     }, this.options.debug)
   }
 
-  /**
-   * Helper method to create tracked timeouts that will be cleaned up on shutdown
-   */
-  private createTrackedTimeout(callback: () => void, delay: number): NodeJS.Timeout {
-    const timeout = setTimeout(() => {
-      // Remove from tracking set when timeout fires
-      this.activeTimeouts.delete(timeout)
-      if (!this.isShutdown) {
-        callback()
-      }
-    }, delay)
-    
-    // Track the timeout for cleanup
-    this.activeTimeouts.add(timeout)
-    return timeout
-  }
 }

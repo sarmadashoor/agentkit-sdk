@@ -20,15 +20,15 @@ const command = args[0]
 // Parse global flags
 const hasHelp = args.includes('--help') || args.includes('-h')
 const hasVerbose = args.includes('--verbose') || args.includes('-v')
-const hasJson = args.includes('--json')
+const _hasJson = args.includes('--json')
 const hasSkipPrompts = args.includes('--skip-prompts')
 const hasWithTests = args.includes('--with-tests')
-const hasWithDocs = args.includes('--with-docs')
+const _hasWithDocs = args.includes('--with-docs')
 
 // Extract flag values
 const outputFlag = args.find(arg => arg.startsWith('--output='))?.split('=')[1] || 
                    (args.includes('--output') || args.includes('-o') ? args[args.indexOf('--output') + 1] || args[args.indexOf('-o') + 1] : undefined)
-const typeFlag = args.find(arg => arg.startsWith('--type='))?.split('=')[1] || 
+const _typeFlag = args.find(arg => arg.startsWith('--type='))?.split('=')[1] || 
                  (args.includes('--type') ? args[args.indexOf('--type') + 1] : undefined)
 
 if (!command || command === '--help' || command === '-h') {

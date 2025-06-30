@@ -114,9 +114,13 @@ export class PluginRunner {
   /**
    * Helper method to call plugin hooks safely
    */
-  async callPluginHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<void>
-  async callPluginHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<void>  
-  async callPluginHook(hookName: 'onError', error: Error, context: AgentContext): Promise<void>
+  // eslint-disable-next-line no-dupe-class-members
+  callPluginHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<void>
+  // eslint-disable-next-line no-dupe-class-members
+  callPluginHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<void>  
+  // eslint-disable-next-line no-dupe-class-members
+  callPluginHook(hookName: 'onError', error: Error, context: AgentContext): Promise<void>
+  // eslint-disable-next-line no-dupe-class-members
   async callPluginHook(hookName: string, ...args: unknown[]): Promise<void> {
     try {
       let results
@@ -270,7 +274,7 @@ export class PluginRunner {
     // Give small delay for any lingering async operations to complete
     await new Promise(resolve => {
       const timer = setTimeout(resolve, 50)
-      if (timer.unref) timer.unref()
+      if (timer.unref) {timer.unref()}
     })
   }
 }

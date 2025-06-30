@@ -41,11 +41,11 @@ test.describe('Browser Polyfills and Compatibility', () => {
         const signal = controller.signal
         
         // Check basic properties exist
-        if (typeof signal !== 'object' || signal === null) return false
-        if (typeof controller.abort !== 'function') return false
+        if (typeof signal !== 'object' || signal === null) {return false}
+        if (typeof controller.abort !== 'function') {return false}
         
         // Test abort functionality
-        let aborted = signal.aborted
+        const aborted = signal.aborted
         controller.abort()
         return signal.aborted !== aborted || signal.aborted === true
       } catch (error) {

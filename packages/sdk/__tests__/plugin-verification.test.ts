@@ -48,12 +48,6 @@ vi.mock('fs/promises', async () => {
     access: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn().mockResolvedValue('{"mock": "signature"}')
   }
-
-  afterAll(() => {
-    const handles = process._getActiveHandles();
-    console.log('🟡 [DEBUG] Active handles after file teardown:', handles.map(h => h.constructor.name));
-    console.log('🟡 [DEBUG] Total active handles:', handles.length);
-  });
 })
 
 describe('Plugin Verification System', () => {

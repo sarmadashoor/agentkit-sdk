@@ -8,12 +8,12 @@ import { Command } from 'commander'
 import chalk from 'chalk'
 import ora from 'ora'
 import { writeFile, access, stat } from 'fs/promises'
-import { resolve, dirname, basename, extname } from 'path'
+import { resolve, dirname as _dirname, basename, extname } from 'path'
 import { 
   ensureDevKey, 
   signPlugin, 
-  hashFile,
-  getKeyId,
+  hashFile as _hashFile,
+  getKeyId as _getKeyId,
   type PluginSignature 
 } from '../security/crypto'
 
@@ -123,7 +123,7 @@ async function validatePluginFile(pluginPath: string, spinner: ReturnType<typeof
  * Get default signature file path
  */
 function getDefaultSignaturePath(pluginPath: string): string {
-  const dir = dirname(pluginPath)
+  const dir = _dirname(pluginPath)
   const name = basename(pluginPath, extname(pluginPath))
   return resolve(dir, `${name}.sig`)
 }

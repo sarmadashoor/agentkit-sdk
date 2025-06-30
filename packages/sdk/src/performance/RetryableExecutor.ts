@@ -172,8 +172,8 @@ export class RetryableExecutor {
            config.retryableErrors.some(retryableType => error.message.includes(retryableType))
   }
 
-  private recordSuccess(pluginName?: string, attempt?: number, totalTime?: number): void {
-    if (!pluginName) return
+  private recordSuccess(pluginName?: string, attempt?: number, _totalTime?: number): void {
+    if (!pluginName) {return}
     
     const metrics = this.getOrCreatePluginMetrics(pluginName)
     metrics.totalAttempts++
@@ -187,8 +187,8 @@ export class RetryableExecutor {
     this.updatePluginHealth(pluginName, metrics)
   }
 
-  private recordFailure(pluginName?: string, error?: Error): void {
-    if (!pluginName) return
+  private recordFailure(pluginName?: string, _error?: Error): void {
+    if (!pluginName) {return}
     
     const metrics = this.getOrCreatePluginMetrics(pluginName)
     metrics.totalAttempts++

@@ -258,7 +258,7 @@ describe('Plugin Performance and Observability', () => {
 
   describe('Circuit Breaker Integration', () => {
     it('should trigger circuit breaker after multiple failures', async () => {
-      let failureCount = 0
+      const failureCount = 0
       const maxFailures = 3
       
       // Simulate circuit breaker behavior

@@ -7,7 +7,7 @@
  */
 
 import { EventEmitter } from 'events'
-import { deepClone, deepCloneArgs, createFrozenClone, validateClone } from '../utils/deepClone'
+import { deepCloneArgs, createFrozenClone, validateClone } from '../utils/deepClone'
 import { debugLog } from '../log'
 import type { AgentKitPlugin, AgentContext, SendPayload, PluginHookName } from '@agentkit/types'
 import { PluginTimeoutError, PluginValidationError } from '../errors'
@@ -204,7 +204,7 @@ export class PluginSandboxV2 extends EventEmitter {
       }
 
       // Create isolated context with safe plugin metadata and hook function
-      const context = vm.createContext({
+      vm.createContext({
         pluginName: plugin.name,
         pluginVersion: plugin.version,
         hookFunction: hook,
@@ -219,7 +219,7 @@ export class PluginSandboxV2 extends EventEmitter {
       })
 
       // Create execution script
-      const script = this.createVMScript(hookName)
+      this.createVMScript(hookName)
       
       debugLog.operation('sandbox: executing plugin in VM context', {
         plugin: plugin.name,
@@ -295,7 +295,7 @@ export class PluginSandboxV2 extends EventEmitter {
       }, this.options.debug)
 
       // Execute in worker with timeout
-      const result = await this.executeWithWorkerTimeout(
+      await this.executeWithWorkerTimeout(
         worker,
         { 
           pluginName: plugin.name,
@@ -477,7 +477,8 @@ export class PluginSandboxV2 extends EventEmitter {
   /**
    * Execute with VM timeout
    */
-  private async executeWithVMTimeout<T>(
+  // @ts-ignore - Method reserved for future VM timeout functionality
+  private async _executeWithVMTimeout<T>(
     fn: () => T,
     timeout: number,
     abortController: AbortController

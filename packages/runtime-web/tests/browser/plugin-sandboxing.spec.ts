@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 import { test, expect } from '@playwright/test'
 
 test.describe('Plugin WebWorker Sandboxing - Browser Tests', () => {
@@ -644,7 +645,7 @@ test.describe('Plugin WebWorker Sandboxing - Browser Tests', () => {
                     success: true,
                     receivedData: data,
                     prototypeAccess,
-                    canMutate: data.hasOwnProperty('mutated')
+                    canMutate: Object.prototype.hasOwnProperty.call(data, 'mutated')
                   }
                 })
               } catch (error) {
@@ -742,7 +743,6 @@ test.describe('Plugin WebWorker Sandboxing - Browser Tests', () => {
 
             // Basic security check
             const blockedPatterns = [/eval\s*\(/, /Function\s*\(/]
-            const hasDangerousCode = blockedPatterns.some(pattern => pattern.test(pluginCode))
             
             if (hasDangerousCode) {
               throw new Error('Plugin contains blocked patterns')

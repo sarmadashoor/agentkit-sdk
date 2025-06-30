@@ -150,7 +150,7 @@ describe.skip('Plugin Reliability Legacy Tests', () => {
         version: '1.0.0',
         onSend: vi.fn().mockImplementation(async () => {
           // Plugin that tries to pollute global state
-          ;(global as any).pollutedState = 'should not affect timeline'
+          (global as any).pollutedState = 'should not affect timeline'
           await new Promise(resolve => setTimeout(resolve, 10).unref())
         })
       }

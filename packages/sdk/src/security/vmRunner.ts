@@ -10,7 +10,7 @@
 
 import vm from 'vm'
 import { performance } from 'perf_hooks'
-import type { AgentKitPlugin, AgentContext, SendPayload } from '@agentkit/types'
+import type { AgentContext, SendPayload } from '@agentkit/types'
 
 /**
  * Security configuration for VM execution

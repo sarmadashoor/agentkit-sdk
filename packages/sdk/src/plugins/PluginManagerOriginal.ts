@@ -169,9 +169,13 @@ export class PluginManager {
   /**
    * Execute a hook on all plugins that implement it
    */
+  // eslint-disable-next-line no-dupe-class-members
   async executeHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<PluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
   async executeHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<PluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
   async executeHook(hookName: 'onError', error: Error | AgentKitError, context: AgentContext): Promise<PluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
   async executeHook(hookName: PluginHookName, ...args: [AgentContext] | [SendPayload, AgentContext] | [Error | AgentKitError, AgentContext]): Promise<PluginExecutionResult[]> {
     const startTime = Date.now()
     const results: PluginExecutionResult[] = []
@@ -184,7 +188,7 @@ export class PluginManager {
 
     for (const plugin of this.plugins) {
       const hook = (plugin as any)[hookName]
-      if (!hook) continue
+      if (!hook) {continue}
 
       const result = await this.executePluginWithObservability(plugin, hookName, hook, args)
       results.push(result)
@@ -223,12 +227,13 @@ export class PluginManager {
         // Payload and context arguments
         return [this.secureClone(args[0]), this.secureClone(args[1])]
         
-      case 'onError':
+      case 'onError': {
         // Error and context arguments
         // Note: We don't deep clone the error to preserve stack trace and Error object integrity
         const error = args[0]
         const context = this.secureClone(args[1])
         return [error, context]
+      }
         
       default:
         // Type-safe fallback that shouldn't be reached with proper typing
@@ -817,16 +822,8 @@ export class PluginManager {
   /**
    * Handle plugin errors without breaking execution
    */
-  private handlePluginError(plugin: AgentKitPlugin, hookName: string, error: unknown): void {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    const errorDetails = {
-      plugin: plugin.name,
-      hook: hookName,
-      error: errorMessage
-    }
-
+  private handlePluginError(_plugin: AgentKitPlugin, _hookName: string, error: unknown): void {
     debugLog.error('plugin hook error', error as Error, this.options.debug)
-
     debugLog.error('Plugin execution failed', error as Error, this.options.debug)
   }
 
@@ -838,7 +835,7 @@ export class PluginManager {
     
     for (const hookName of hooks) {
       const hook = (plugin as any)[hookName]
-      if (!hook) continue
+      if (!hook) {continue}
       
       if (typeof hook !== 'function') {
         throw new PluginSignatureError(plugin.name, hookName, 'must be a function', {

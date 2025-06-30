@@ -24,7 +24,7 @@ const BASELINE_REQUEST_COUNT = 0
 
 describe('AgentManager Race Condition Prevention', () => {
   let registry: AgentRegistry
-  let activeHandles: any[] = []
+  const activeHandles: any[] = []
 
   beforeEach(() => {
     registry = new AgentRegistry()

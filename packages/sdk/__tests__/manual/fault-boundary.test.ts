@@ -88,6 +88,7 @@ function createTimeoutPlugin(name: string) {
         console.log('[${name}] Starting infinite loop to trigger timeout')
         // Create infinite loop to trigger timeout
         let i = 0
+        // eslint-disable-next-line no-constant-condition
         while (true) {
           i++
           if (i > 1000000) i = 0 // Prevent optimization but keep looping

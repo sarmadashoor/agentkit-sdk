@@ -53,7 +53,7 @@ describe('Sandbox Debug', () => {
       version: '1.0.0',
       onInit: (context: AgentContext) => {
         try {
-          ;(global as any).TEST_VALUE = 'hacked'
+          (global as any).TEST_VALUE = 'hacked'
           return { success: true }
         } catch (e) {
           throw new Error('Global access blocked: ' + (e as Error).message)

@@ -10,7 +10,7 @@ import { setupTestCleanup, cleanupWorkers, trackInstance, untrackInstance } from
 // Mock browser environment globals
 const mockBrowserGlobals = () => {
   // Mock Worker
-  ;(global as any).Worker = vi.fn().mockImplementation(() => ({
+  (global as any).Worker = vi.fn().mockImplementation(() => ({
     postMessage: vi.fn(),
     terminate: vi.fn(),
     addEventListener: vi.fn(),
@@ -111,12 +111,12 @@ describe('Web Worker Integration', () => {
     })
 
     it('should handle missing Worker API', () => {
-      ;(global as any).Worker = undefined
+      (global as any).Worker = undefined
       expect(isWebWorkerSupported()).toBe(false)
     })
 
     it('should handle missing Blob API', () => {
-      ;(global as any).Blob = undefined
+      (global as any).Blob = undefined
       expect(isWebWorkerSupported()).toBe(false)
     })
   })
@@ -231,7 +231,7 @@ describe('Web Worker Integration', () => {
       await expect(pool.execute({
         pluginName: 'timeout-plugin',
         hookName: 'onInit',
-        functionSource: 'function() { while(true) {} }',
+        functionSource: 'function() { while(true) {} }', // eslint-disable-line no-constant-condition
         args: [],
         timeout: 100, // Very short timeout
         allowedGlobals: [],

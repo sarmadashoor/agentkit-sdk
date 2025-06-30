@@ -31,12 +31,13 @@ export class PluginSecurity {
         // Payload and context arguments
         return [this.secureClone(args[0]), this.secureClone(args[1])]
         
-      case 'onError':
+      case 'onError': {
         // Error and context arguments
         // Note: We don't deep clone the error to preserve stack trace and Error object integrity
         const error = args[0]
         const context = this.secureClone(args[1])
         return [error, context]
+      }
         
       default:
         // Type-safe fallback that shouldn't be reached with proper typing

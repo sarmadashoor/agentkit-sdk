@@ -29,8 +29,8 @@ import {
 } from '../errors'
 import { debugLog } from '../log'
 import { PluginSandboxV2, SandboxExecutionResult, PluginErrorEvent } from './PluginSandboxV2'
-import { pluginExecutionContext, withPluginExecutionContext } from './PluginExecutionContext'
-import { VMRunner, VMExecutionResult, secureClone } from '../security/vmRunner'
+import { pluginExecutionContext } from './PluginExecutionContext'
+import { VMRunner, secureClone } from '../security/vmRunner'
 
 /**
  * Plugin registration metadata with order tracking
@@ -204,9 +204,13 @@ export class SecurePluginManagerV2 extends EventEmitter {
   /**
    * Execute hook on all plugins with deterministic FIFO order and complete fault isolation
    */
-  async executeHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<SecurePluginExecutionResult[]>
-  async executeHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<SecurePluginExecutionResult[]>
-  async executeHook(hookName: 'onError', error: Error, context: AgentContext): Promise<SecurePluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
+  executeHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<SecurePluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
+  executeHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<SecurePluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
+  executeHook(hookName: 'onError', error: Error, context: AgentContext): Promise<SecurePluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
   async executeHook(
     hookName: PluginHookName, 
     ...args: [AgentContext] | [SendPayload, AgentContext] | [Error, AgentContext]
@@ -580,7 +584,7 @@ export class SecurePluginManagerV2 extends EventEmitter {
     
     for (const hookName of hooks) {
       const hook = (plugin as any)[hookName]
-      if (!hook) continue
+      if (!hook) {continue}
       
       if (typeof hook !== 'function') {
         throw new PluginSignatureError(plugin.name, hookName, 'must be a function', {

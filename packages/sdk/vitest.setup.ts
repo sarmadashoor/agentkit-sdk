@@ -78,7 +78,7 @@ function getRemediationSuggestions(type: string): string {
 }
 
 function logDanglingResources(handles: any[], label: string = 'HANDLES') {
-  if (!handles.length) return;
+  if (!handles.length) {return;}
 
   const categorized = categorizeHandles(handles);
   const summary = getHandleTypes(handles);
@@ -104,7 +104,7 @@ if (baselineHandles.length === 0) {
 }
 
 function performLeakCheck() {
-  if (hasRunFinalCheck) return;
+  if (hasRunFinalCheck) {return;}
   hasRunFinalCheck = true;
 
   const allHandles = process._getActiveHandles();
@@ -190,7 +190,7 @@ import { inspect } from 'node:util'
 const globalPluginManagers: any[] = [];
 
 // Track all PluginManager instances globally
-const originalPluginManagerConstructor = globalThis.PluginManager;
+const _originalPluginManagerConstructor = globalThis.PluginManager;
 if (typeof globalThis !== 'undefined') {
   globalThis.trackPluginManager = (manager: any) => {
     globalPluginManagers.push(manager);

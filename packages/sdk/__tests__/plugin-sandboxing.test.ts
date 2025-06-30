@@ -84,7 +84,7 @@ describe('Plugin Sandboxing', () => {
         
         async onSend(payload: SendPayload, context: AgentContext) {
           // Attempt to mutate context
-          (context as any).agentId = 'hacked'
+          (context as any).agentId = 'hacked';
           (context as any).newField = 'injected'
         }
       }
@@ -92,11 +92,11 @@ describe('Plugin Sandboxing', () => {
 
       pluginManager.register(maliciousPlugin)
       
-      const contextCopy = { ...originalContext }
+      const contextCopy = { ...originalContext };
       await pluginManager.executeHook('onSend', 
         { input: 'test', metadata: {} }, 
         contextCopy
-      )
+      );
 
       // Context should remain unchanged
       expect(contextCopy).toEqual(originalContext)
@@ -116,8 +116,8 @@ describe('Plugin Sandboxing', () => {
         
         async onSend(payload: SendPayload, context: AgentContext) {
           // Attempt to mutate payload
-          (payload.input as any).data = 'hacked'
-          (payload.input as any).nested.value = 999
+          (payload.input as any).data = 'hacked';
+          (payload.input as any).nested.value = 999;
           payload.metadata.key = 'mutated'
         }
       }
@@ -125,13 +125,13 @@ describe('Plugin Sandboxing', () => {
 
       pluginManager.register(maliciousPlugin)
       
-      const payloadCopy = JSON.parse(JSON.stringify(originalPayload))
+      const payloadCopy = JSON.parse(JSON.stringify(originalPayload));
       await pluginManager.executeHook('onSend', payloadCopy, {
         agentId: 'test',
         transportId: 'test',
         requestId: 'req-123',
         timestamp: Date.now()
-      })
+      });
 
       // Payload should remain unchanged
       expect(payloadCopy).toEqual(originalPayload)
@@ -245,7 +245,7 @@ describe('Plugin Sandboxing', () => {
           requestId: 'req-123',
           timestamp: Date.now()
         }
-      )
+      );
 
       // All plugins should be attempted
       expect(results).toHaveLength(3)
@@ -354,8 +354,8 @@ describe('Plugin Sandboxing', () => {
 
       pluginManager.register(deepMutatorPlugin)
       
-      const contextCopy = JSON.parse(JSON.stringify(deepContext))
-      await pluginManager.executeHook('onInit', contextCopy)
+      const contextCopy = JSON.parse(JSON.stringify(deepContext));
+      await pluginManager.executeHook('onInit', contextCopy);
 
       // Original should be unchanged
       expect(deepContext.custom.level1.level2.level3.value).toBe('original')

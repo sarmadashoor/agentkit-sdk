@@ -14,8 +14,11 @@ const cleanupFns: (() => Promise<void>)[] = [];
 
 // Agent and transport registries (for test compatibility)
 declare global {
+  // eslint-disable-next-line no-var
   var agentRegistry: Map<string, any>;
+  // eslint-disable-next-line no-var
   var transportRegistry: Map<string, any>;
+  // eslint-disable-next-line no-var
   var activeTransports: Set<any>;
 }
 

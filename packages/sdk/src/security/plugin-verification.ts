@@ -9,8 +9,7 @@ import { readFile, access } from 'fs/promises'
 import { resolve, dirname, basename, extname } from 'path'
 import { 
   verifySignature, 
-  findTrustedKey, 
-  loadTrustedKeys,
+  findTrustedKey,
   type PluginSignature, 
   type TrustedKey 
 } from './crypto-utils'

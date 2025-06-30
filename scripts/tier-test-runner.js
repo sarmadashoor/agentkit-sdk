@@ -27,11 +27,12 @@ const TEST_TIERS = {
   },
   tier2: {
     name: 'Extended Features (Optional)',
-    description: '149 tests covering CLI tools, browser support, and transport layers',
+    description: '185 tests covering CLI tools, browser support, transport layers, and QA scenarios',
     packages: [
       { name: 'cli', path: 'packages/cli', tests: 101 },
       { name: 'runtime-web', path: 'packages/runtime-web', tests: 47 },
-      { name: 'transports-dummy', path: 'packages/transports-dummy', tests: 1 }
+      { name: 'transports-dummy', path: 'packages/transports-dummy', tests: 1 },
+      { name: 'qa-scenarios', path: 'packages/qa-scenarios', tests: 36 }
     ],
     timeout: 120000, // 2 minutes
     required: false

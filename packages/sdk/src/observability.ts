@@ -50,7 +50,7 @@ export function safeHookExecution(
   agentId: string,
   debug: boolean = false
 ): void {
-  if (!hookFn) return
+  if (!hookFn) {return}
 
   try {
     hookFn()
@@ -223,7 +223,7 @@ export class ObservabilityTracker {
    * Emit backpressure detected event
    */
   emitBackpressureDetected(event: BackpressureEvent): void {
-    if (this.isShutdown) return
+    if (this.isShutdown) {return}
     
     safeHookExecution(
       'onTransportBackpressureDetected',
@@ -237,7 +237,7 @@ export class ObservabilityTracker {
    * Emit backpressure resolved event
    */
   emitBackpressureResolved(event: BackpressureResolvedEvent): void {
-    if (this.isShutdown) return
+    if (this.isShutdown) {return}
     
     safeHookExecution(
       'onTransportBackpressureResolved',
@@ -251,7 +251,7 @@ export class ObservabilityTracker {
    * Emit backpressure queue enqueued event
    */
   emitBackpressureQueueEnqueued(event: BackpressureQueueEvent): void {
-    if (this.isShutdown) return
+    if (this.isShutdown) {return}
     
     safeHookExecution(
       'onBackpressureQueueEnqueued',
@@ -265,7 +265,7 @@ export class ObservabilityTracker {
    * Emit backpressure queue processed event
    */
   emitBackpressureQueueProcessed(event: BackpressureQueueEvent): void {
-    if (this.isShutdown) return
+    if (this.isShutdown) {return}
     
     safeHookExecution(
       'onBackpressureQueueProcessed',
@@ -279,7 +279,7 @@ export class ObservabilityTracker {
    * Emit backpressure queue failed event
    */
   emitBackpressureQueueFailed(event: BackpressureQueueFailedEvent): void {
-    if (this.isShutdown) return
+    if (this.isShutdown) {return}
     
     safeHookExecution(
       'onBackpressureQueueFailed',
@@ -293,7 +293,7 @@ export class ObservabilityTracker {
    * Emit circuit breaker state change event
    */
   emitCircuitBreakerStateChange(event: CircuitBreakerStateChangeEvent): void {
-    if (this.isShutdown) return
+    if (this.isShutdown) {return}
     
     safeHookExecution(
       'onCircuitBreakerStateChange',
@@ -307,7 +307,7 @@ export class ObservabilityTracker {
    * Emit circuit breaker request rejected event
    */
   emitCircuitBreakerRequestRejected(event: CircuitBreakerRejectionEvent): void {
-    if (this.isShutdown) return
+    if (this.isShutdown) {return}
     
     safeHookExecution(
       'onCircuitBreakerRequestRejected',

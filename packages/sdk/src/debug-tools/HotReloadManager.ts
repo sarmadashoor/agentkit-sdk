@@ -8,7 +8,6 @@
 import { watch, FSWatcher } from 'fs'
 import { readFile, stat } from 'fs/promises'
 import { join, resolve, extname } from 'path'
-import { DebugManager } from './DebugManager'
 import { createDebugContext } from './debugMode'
 
 /**
@@ -50,12 +49,10 @@ export class HotReloadManager {
   private pluginRegistry: Map<string, PluginReloadInfo> = new Map()
   private reloadCallbacks: Map<string, Function[]> = new Map()
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map()
-  private debugManager: DebugManager
   private debug = createDebugContext('HotReloadManager')
   private isEnabled = false
 
   constructor(config: HotReloadConfig = {}) {
-    this.debugManager = DebugManager.getInstance()
     this.config = {
       enabled: process.env.NODE_ENV === 'development',
       watchPaths: ['./src/plugins', './plugins'],
@@ -247,7 +244,7 @@ export class HotReloadManager {
       }
 
       const watcher = watch(absolutePath, { recursive: true }, (eventType, filename) => {
-        if (!filename) return
+        if (!filename) {return}
         
         const filePath = join(absolutePath, filename)
         this.handleFileChange(eventType, filePath)
@@ -433,8 +430,6 @@ export class HotReloadManager {
 
   private async loadPlugin(filePath: string): Promise<any> {
     // Dynamic import to get fresh module
-    const timestamp = Date.now()
-    const moduleUrl = `${filePath}?t=${timestamp}`
     
     if (extname(filePath) === '.ts') {
       // For TypeScript files, we might need to use ts-node or similar

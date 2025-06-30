@@ -10,14 +10,12 @@ import type {
   PluginHookName
 } from '@agentkit/types'
 import { 
-  PluginManagerOptions,
-  PluginExecutionResult
+  PluginManagerOptions
 } from './types'
 import { 
   AgentKitError,
   PluginValidationError,
-  PluginCompatibilityError,
-  PluginTimeoutError 
+  PluginCompatibilityError
 } from '@agentkit/errors'
 import { debugLog } from '../log'
 import { deepClone } from '../utils/deepClone'

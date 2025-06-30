@@ -410,10 +410,10 @@ export class PluginPerformanceCollector {
   }
 
   private calculateThroughput(executions: PluginExecutionTrace[]): number {
-    if (executions.length === 0) return 0
+    if (executions.length === 0) {return 0}
 
     const completedExecutions = executions.filter(e => e.status === 'success')
-    if (completedExecutions.length === 0) return 0
+    if (completedExecutions.length === 0) {return 0}
 
     const timeSpan = Math.max(...executions.map(e => e.endTime || e.startTime)) - 
                     Math.min(...executions.map(e => e.startTime))
@@ -459,7 +459,7 @@ export function comparePluginPerformance(
   const collector = new PluginPerformanceCollector()
   
   // Record all executions
-  Object.entries(pluginData).forEach(([pluginName, executions]) => {
+  Object.entries(pluginData).forEach(([_pluginName, executions]) => {
     executions.forEach(exec => collector.recordExecution(exec))
   })
   

@@ -106,7 +106,7 @@ export class PluginConfigGenerator {
   /**
    * Generate TypeScript configuration
    */
-  generateTsConfig(config: PluginConfig): any {
+  generateTsConfig(_config: PluginConfig): any {
     return {
       extends: '../../tsconfig.json',
       compilerOptions: {

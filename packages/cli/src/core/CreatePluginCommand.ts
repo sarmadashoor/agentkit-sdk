@@ -160,7 +160,7 @@ export class CreatePluginCommand {
     }
   }
 
-  private async tryAutoRegister(pluginName: string): Promise<void> {
+  private async tryAutoRegister(_pluginName: string): Promise<void> {
     // Try to auto-register with plugin loader
     try {
       const registryPath = path.join(process.cwd(), 'packages', 'registry', 'src', 'plugin-loader.ts')

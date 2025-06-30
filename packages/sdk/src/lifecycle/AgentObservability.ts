@@ -217,7 +217,6 @@ export class AgentObservability {
     }
     
     if (pluginName) {
-      const traces = this.pluginTracer.getPluginTraces(pluginName)
       const report = measurePluginPerformance(pluginName, 'combined', () => Promise.resolve(), 1)
       return [report] as any // Simplified for now
     }

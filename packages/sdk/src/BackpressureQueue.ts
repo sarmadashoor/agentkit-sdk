@@ -184,7 +184,7 @@ export class BackpressureQueue<T = any> {
       const delay = Math.max(0, nextRetryTime - now)
       
       this.processingTimer = setTimeout(() => this.processQueue(), delay)
-      if (this.processingTimer.unref) this.processingTimer.unref()
+      if (this.processingTimer.unref) {this.processingTimer.unref()}
     } else {
       // Queue is empty
       this.isProcessing = false
@@ -386,7 +386,7 @@ export class BackpressureQueue<T = any> {
     while (this.queue.length > 0 && !this.isShutdown) {
       await new Promise(resolve => {
         const timer = setTimeout(resolve, 10)
-        if (timer.unref) timer.unref()
+        if (timer.unref) {timer.unref()}
       })
     }
   }

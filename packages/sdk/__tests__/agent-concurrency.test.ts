@@ -100,7 +100,7 @@ describe('AgentManager Concurrency and Cleanup', () => {
     }, 10000) // Add 10 second timeout
 
     it('should process concurrent messages in correct order with queuing', async () => {
-      let processingOrder: number[] = []
+      const processingOrder: number[] = []
       
       // Create agent that tracks processing order
       class OrderTrackingAgent extends DummyAgent {
@@ -177,7 +177,7 @@ describe('AgentManager Concurrency and Cleanup', () => {
       await shutdownPromise
       // Remove from tracking since we explicitly shut it down
       const index = createdHandles.indexOf(handle)
-      if (index > -1) createdHandles.splice(index, 1)
+      if (index > -1) {createdHandles.splice(index, 1)}
     }, 5000) // Add 5 second timeout
 
     it('should handle high concurrency load without hanging', async () => {
@@ -263,7 +263,7 @@ describe('AgentManager Concurrency and Cleanup', () => {
       await handle.shutdown()
       // Remove from tracking since we explicitly shut it down
       const index = createdHandles.indexOf(handle)
-      if (index > -1) createdHandles.splice(index, 1)
+      if (index > -1) {createdHandles.splice(index, 1)}
 
       expect(cleanupCalled).toBe(true)
       expect(cleanupAgentId).toBe('cleanup-test-agent')
@@ -300,7 +300,7 @@ describe('AgentManager Concurrency and Cleanup', () => {
       await expect(handle.shutdown()).rejects.toThrow('Shutdown failed')
       // Remove from tracking since we attempted shutdown
       const index = createdHandles.indexOf(handle)
-      if (index > -1) createdHandles.splice(index, 1)
+      if (index > -1) {createdHandles.splice(index, 1)}
       expect(cleanupCalled).toBe(true)
     })
 
@@ -329,7 +329,7 @@ describe('AgentManager Concurrency and Cleanup', () => {
       await expect(handle.shutdown()).resolves.not.toThrow()
       // Remove from tracking since we explicitly shut it down
       const index = createdHandles.indexOf(handle)
-      if (index > -1) createdHandles.splice(index, 1)
+      if (index > -1) {createdHandles.splice(index, 1)}
       shutdownCompleted = true
       
       expect(shutdownCompleted).toBe(true)
@@ -361,7 +361,7 @@ describe('AgentManager Concurrency and Cleanup', () => {
       await handle.shutdown()
       // Remove from tracking since we explicitly shut it down
       const index = createdHandles.indexOf(handle)
-      if (index > -1) createdHandles.splice(index, 1)
+      if (index > -1) {createdHandles.splice(index, 1)}
       
       expect(cleanupCallCount).toBe(1)
     })
@@ -393,7 +393,7 @@ describe('AgentManager Concurrency and Cleanup', () => {
       await handle.shutdown()
       // Remove from tracking since we explicitly shut it down
       const index = createdHandles.indexOf(handle)
-      if (index > -1) createdHandles.splice(index, 1)
+      if (index > -1) {createdHandles.splice(index, 1)}
 
       // Should receive registry metadata ID, not factory-created ID
       expect(receivedAgentId).toBe('metadata-cleanup-agent')
@@ -462,7 +462,7 @@ describe('AgentManager Concurrency and Cleanup', () => {
       await handle.shutdown()
       // Remove from tracking since we explicitly shut it down
       const index = createdHandles.indexOf(handle)
-      if (index > -1) createdHandles.splice(index, 1)
+      if (index > -1) {createdHandles.splice(index, 1)}
 
       // Should log cleanup hook execution with correct format
       expect(consoleDebugSpy).toHaveBeenCalledWith(
@@ -547,7 +547,7 @@ describe('AgentManager Concurrency and Cleanup', () => {
       await Promise.allSettled([...sendPromises, shutdownPromise])
       // Remove from tracking since we explicitly shut it down
       const index = createdHandles.indexOf(handle)
-      if (index > -1) createdHandles.splice(index, 1)
+      if (index > -1) {createdHandles.splice(index, 1)}
       
       // Additional sends should be rejected
       await expect(handle.send({ id: 4 })).rejects.toThrow(/shutdown/)

@@ -1,7 +1,7 @@
 import type { AgentKitPlugin, AgentContext, SendPayload, PluginHookName } from '@agentkit/types'
 import { AgentKitError } from '../errors'
 import { debugLog } from '../log'
-import { WorkerPool, isWebWorkerSupported, isBrowserEnvironment } from './worker-utils'
+import { WorkerPool } from './worker-utils'
 
 // Import new modular components
 import { PluginRegistry } from './core/PluginRegistry'
@@ -135,9 +135,13 @@ export class PluginManager {
   /**
    * Execute a hook on all plugins that implement it
    */
-  async executeHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<PluginExecutionResult[]>
-  async executeHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<PluginExecutionResult[]>
-  async executeHook(hookName: 'onError', error: Error | AgentKitError, context: AgentContext): Promise<PluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
+  executeHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<PluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
+  executeHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<PluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
+  executeHook(hookName: 'onError', error: Error | AgentKitError, context: AgentContext): Promise<PluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
   async executeHook(
     hookName: PluginHookName, 
     ...args: [AgentContext] | [SendPayload, AgentContext] | [Error | AgentKitError, AgentContext]
@@ -221,7 +225,7 @@ export class PluginManager {
         }, this.options.debug)
         break
 
-      case 'worker':
+      case 'worker': {
         this.workerPool = new WorkerPool({
           maxWorkers: 3,
           maxIdleTime: 30000,
@@ -233,8 +237,9 @@ export class PluginManager {
           webWorkerSupport: true
         }, this.options.debug)
         break
+      }
 
-      case 'none':
+      case 'none': {
         this.options.sandbox = false
         debugLog.lifecycle('sandbox disabled - platform not supported', 'PluginManager', {
           platform: this.platformEnv.getPlatformName(),
@@ -250,6 +255,7 @@ export class PluginManager {
           )
         }
         break
+      }
     }
   }
 }

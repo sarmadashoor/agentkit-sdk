@@ -178,7 +178,7 @@ async function createPluginJson(pluginDir: string, pluginName: string): Promise<
 }
 
 async function createReadme(pluginDir: string, pluginName: string): Promise<void> {
-  const className = toPascalCase(pluginName)
+  const _className = toPascalCase(pluginName)
   const content = `# ${pluginName}
 
 A simple AgentKit plugin that demonstrates basic functionality.

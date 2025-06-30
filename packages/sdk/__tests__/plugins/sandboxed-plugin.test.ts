@@ -77,7 +77,7 @@ describe('Plugin Sandboxing Security', () => {
         version: '1.0.0',
         onInit: (context: AgentContext) => {
           // This should fail in sandbox - no access to process
-          ;(global as any).process.exit(1)
+          (global as any).process.exit(1)
         }
       }
 
@@ -116,7 +116,7 @@ describe('Plugin Sandboxing Security', () => {
         version: '1.0.0',
         onInit: (context: AgentContext) => {
           // This should fail in sandbox - no access to global
-          ;(global as any).HACKED = 'yes'
+          (global as any).HACKED = 'yes'
           ;(globalThis as any).EVIL_DATA = { malicious: true }
         }
       }
@@ -137,7 +137,7 @@ describe('Plugin Sandboxing Security', () => {
         version: '1.0.0',
         onInit: (context: AgentContext) => {
           // Plugin should not be able to mutate the original context
-          ;(context as any).agentId = 'HACKED'
+          (context as any).agentId = 'HACKED'
           ;(context as any).malicious = true
           ;(context.metadata as any).hacked = 'yes'
         }
@@ -158,6 +158,7 @@ describe('Plugin Sandboxing Security', () => {
         version: '1.0.0',
         onInit: (context: AgentContext) => {
           // Infinite loop should timeout
+          // eslint-disable-next-line no-constant-condition
           while (true) {
             Math.random()
           }
@@ -407,7 +408,7 @@ describe('Plugin Sandboxing Security', () => {
         expect(results[0].success).toBe(true)
       } finally {
         // Restore original require
-        ;(global as any).require = originalRequire
+        (global as any).require = originalRequire
         if (originalVm) {
           require.cache[require.resolve('vm')] = originalVm
         }
@@ -446,6 +447,7 @@ describe('Plugin Sandboxing Security', () => {
           name: 'timeout-metrics-plugin',
           version: '1.0.0',
           onInit: () => {
+            // eslint-disable-next-line no-constant-condition
             while (true) { /* timeout */ }
           }
         }

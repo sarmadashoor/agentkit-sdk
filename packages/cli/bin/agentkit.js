@@ -40,12 +40,12 @@ var args = process.argv.slice(2);
 var command = args[0];
 var hasHelp = args.includes("--help") || args.includes("-h");
 var hasVerbose = args.includes("--verbose") || args.includes("-v");
-var hasJson = args.includes("--json");
+var _hasJson = args.includes("--json");
 var hasSkipPrompts = args.includes("--skip-prompts");
 var hasWithTests = args.includes("--with-tests");
-var hasWithDocs = args.includes("--with-docs");
+var _hasWithDocs = args.includes("--with-docs");
 var outputFlag = args.find((arg) => arg.startsWith("--output="))?.split("=")[1] || (args.includes("--output") || args.includes("-o") ? args[args.indexOf("--output") + 1] || args[args.indexOf("-o") + 1] : void 0);
-var typeFlag = args.find((arg) => arg.startsWith("--type="))?.split("=")[1] || (args.includes("--type") ? args[args.indexOf("--type") + 1] : void 0);
+var _typeFlag = args.find((arg) => arg.startsWith("--type="))?.split("=")[1] || (args.includes("--type") ? args[args.indexOf("--type") + 1] : void 0);
 if (!command || command === "--help" || command === "-h") {
   console.log(`
 ${styles.bold("Usage:")} agentkit <command> [options]

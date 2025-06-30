@@ -131,7 +131,7 @@ export default defineConfig({
   /**
    * Generate Playwright configuration (for browser-safe plugins)
    */
-  generatePlaywrightConfig(config: PluginConfig): string {
+  generatePlaywrightConfig(_config: PluginConfig): string {
     return `import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({

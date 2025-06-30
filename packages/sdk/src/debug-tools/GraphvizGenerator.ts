@@ -337,7 +337,7 @@ export class GraphvizGenerator {
     const shape = this.getNodeShape(node)
     const style = this.getNodeStyle(node, options)
     
-    let attributes = [
+    const attributes = [
       `fillcolor="${color}"`,
       `shape=${shape}`,
       `style="${style}"`
@@ -362,7 +362,7 @@ export class GraphvizGenerator {
       const color = this.getEdgeColor(edge)
       const label = edge.label || ''
       
-      let attributes = [
+      const attributes = [
         `style="${style}"`,
         `color="${color}"`
       ]
@@ -433,9 +433,9 @@ export class GraphvizGenerator {
   private getNodeColor(node: GraphNode, colorScheme: string): string {
     switch (colorScheme) {
       case 'performance':
-        if (node.duration === undefined) return 'lightgray'
-        if (node.duration > 100) return 'lightcoral'
-        if (node.duration > 50) return 'orange'
+        if (node.duration === undefined) {return 'lightgray'}
+        if (node.duration > 100) {return 'lightcoral'}
+        if (node.duration > 50) {return 'orange'}
         return 'lightgreen'
       
       case 'status':
@@ -447,13 +447,14 @@ export class GraphvizGenerator {
           default: return 'lightgray'
         }
       
-      case 'memory':
+      case 'memory': {
         const memoryDelta = node.metadata?.memoryDelta as number
-        if (!memoryDelta) return 'lightgray'
+        if (!memoryDelta) {return 'lightgray'}
         const memoryMB = memoryDelta / 1024 / 1024
-        if (memoryMB > 10) return 'lightcoral'
-        if (memoryMB > 5) return 'orange'
+        if (memoryMB > 10) {return 'lightcoral'}
+        if (memoryMB > 5) {return 'orange'}
         return 'lightgreen'
+      }
       
       default:
         return 'lightblue'
@@ -508,8 +509,8 @@ export class GraphvizGenerator {
   private calculateEdgeWeight(from: LifecycleTimelineEntry, to: LifecycleTimelineEntry): number {
     // Calculate weight based on time proximity and relationship
     const timeDelta = to.timestamp - from.timestamp
-    if (timeDelta < 10) return 3 // Very close timing
-    if (timeDelta < 100) return 2 // Close timing
+    if (timeDelta < 10) {return 3} // Very close timing
+    if (timeDelta < 100) {return 2} // Close timing
     return 1 // Normal timing
   }
 }

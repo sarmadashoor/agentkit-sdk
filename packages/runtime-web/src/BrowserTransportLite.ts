@@ -141,7 +141,7 @@ export class BrowserTransportLite implements Transport {
     }
   }
 
-  async init(config?: Record<string, unknown>): Promise<void> {
+  async init(_config?: Record<string, unknown>): Promise<void> {
     // Browser transport doesn't need initialization
   }
 

@@ -6,7 +6,6 @@
  */
 
 import { PluginExecutionTrace, PluginPerformanceSnapshot } from './types'
-import { DebugManager } from './DebugManager'
 import { tracePluginExecution } from './tracePluginExecution'
 import { snapshotPluginPerf } from './snapshotPluginPerf'
 import { createDebugContext } from './debugMode'
@@ -111,8 +110,6 @@ export class PluginDevelopmentWrapper {
   private originalPlugin: any
   private config: Required<DevelopmentWrapperConfig>
   private executions: PluginExecutionTrace[] = []
-  private performanceCollector: any
-  private debugManager: DebugManager
   private debug = createDebugContext('PluginDevelopmentWrapper')
   private reportTimer?: NodeJS.Timeout
 
@@ -123,7 +120,6 @@ export class PluginDevelopmentWrapper {
   ) {
     this.pluginName = pluginName
     this.originalPlugin = plugin
-    this.debugManager = DebugManager.getInstance()
     
     this.config = {
       enablePerformanceMonitoring: true,
@@ -377,25 +373,25 @@ export class PluginDevelopmentWrapper {
     let score = 100
 
     // Deduct points for slow execution
-    if (snapshot.averageExecutionTime > 200) score -= 30
-    else if (snapshot.averageExecutionTime > 100) score -= 20
-    else if (snapshot.averageExecutionTime > 50) score -= 10
+    if (snapshot.averageExecutionTime > 200) {score -= 30}
+    else if (snapshot.averageExecutionTime > 100) {score -= 20}
+    else if (snapshot.averageExecutionTime > 50) {score -= 10}
 
     // Deduct points for low success rate
-    if (snapshot.successRate < 95) score -= 25
-    else if (snapshot.successRate < 98) score -= 15
-    else if (snapshot.successRate < 99) score -= 5
+    if (snapshot.successRate < 95) {score -= 25}
+    else if (snapshot.successRate < 98) {score -= 15}
+    else if (snapshot.successRate < 99) {score -= 5}
 
     // Deduct points for high memory usage
     const memoryMB = snapshot.memoryUsage.current / 1024 / 1024
-    if (memoryMB > 50) score -= 20
-    else if (memoryMB > 20) score -= 10
-    else if (memoryMB > 10) score -= 5
+    if (memoryMB > 50) {score -= 20}
+    else if (memoryMB > 20) {score -= 10}
+    else if (memoryMB > 10) {score -= 5}
 
-    if (score >= 90) return 'A'
-    if (score >= 80) return 'B'
-    if (score >= 70) return 'C'
-    if (score >= 60) return 'D'
+    if (score >= 90) {return 'A'}
+    if (score >= 80) {return 'B'}
+    if (score >= 70) {return 'C'}
+    if (score >= 60) {return 'D'}
     return 'F'
   }
 
@@ -476,17 +472,17 @@ export class PluginDevelopmentWrapper {
   private calculateHookGrade(metrics: any): 'A' | 'B' | 'C' | 'D' | 'F' {
     let score = 100
 
-    if (metrics.averageTime > 100) score -= 30
-    else if (metrics.averageTime > 50) score -= 15
+    if (metrics.averageTime > 100) {score -= 30}
+    else if (metrics.averageTime > 50) {score -= 15}
 
     const errorRate = (metrics.errorCount / metrics.executionCount) * 100
-    if (errorRate > 5) score -= 25
-    else if (errorRate > 2) score -= 10
+    if (errorRate > 5) {score -= 25}
+    else if (errorRate > 2) {score -= 10}
 
-    if (score >= 90) return 'A'
-    if (score >= 80) return 'B'
-    if (score >= 70) return 'C'
-    if (score >= 60) return 'D'
+    if (score >= 90) {return 'A'}
+    if (score >= 80) {return 'B'}
+    if (score >= 70) {return 'C'}
+    if (score >= 60) {return 'D'}
     return 'F'
   }
 
@@ -511,14 +507,14 @@ export class PluginDevelopmentWrapper {
     // Simplified percentile calculation based on performance metrics
     let score = 50 // Start at median
 
-    if (snapshot.averageExecutionTime < 50) score += 20
-    else if (snapshot.averageExecutionTime > 150) score -= 20
+    if (snapshot.averageExecutionTime < 50) {score += 20}
+    else if (snapshot.averageExecutionTime > 150) {score -= 20}
 
-    if (snapshot.successRate > 99) score += 15
-    else if (snapshot.successRate < 95) score -= 15
+    if (snapshot.successRate > 99) {score += 15}
+    else if (snapshot.successRate < 95) {score -= 15}
 
-    if (snapshot.memoryUsage.current < 10 * 1024 * 1024) score += 10
-    else if (snapshot.memoryUsage.current > 50 * 1024 * 1024) score -= 10
+    if (snapshot.memoryUsage.current < 10 * 1024 * 1024) {score += 10}
+    else if (snapshot.memoryUsage.current > 50 * 1024 * 1024) {score -= 10}
 
     return Math.max(1, Math.min(99, score))
   }

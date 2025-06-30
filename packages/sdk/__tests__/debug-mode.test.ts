@@ -338,7 +338,7 @@ describe('Debug Mode Trace Output', () => {
       const result = colorFormatter.formatSuccess('Test', 'onInit', 10)
       
       // Should contain ANSI color codes
-      expect(result).toMatch(/\x1b\[\d+m/)
+      expect(result).toMatch(/\\u001b\[\d+m/)
     })
 
     it('should not apply colors when colors are disabled', () => {
@@ -346,7 +346,7 @@ describe('Debug Mode Trace Output', () => {
       const result = noColorFormatter.formatSuccess('Test', 'onInit', 10)
       
       // Should not contain ANSI color codes
-      expect(result).not.toMatch(/\x1b\[\d+m/)
+      expect(result).not.toMatch(/\\u001b\[\d+m/)
     })
 
     it('should detect TTY for color support', () => {
@@ -364,7 +364,7 @@ describe('Debug Mode Trace Output', () => {
       const result = autoFormatter.formatError('Test', 'onSend', 'Error', 10)
       
       // Should contain color codes when TTY is detected
-      expect(result).toMatch(/\x1b\[\d+m/)
+      expect(result).toMatch(/\\u001b\[\d+m/)
       
       vi.unstubAllGlobals()
     })

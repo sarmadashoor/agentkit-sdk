@@ -103,7 +103,6 @@ export class DebugManager {
   private executionMetrics: ExecutionMetrics[] = []
   private snapshotHistory: DebugSnapshot[] = []
   private isEnabled: boolean = false
-  private startTime: number = Date.now()
 
   private constructor(config: Partial<DebugConfig> = {}) {
     this.config = DebugConfigSchema.parse(config)
@@ -192,7 +191,7 @@ export class DebugManager {
    * Initialize debug timeline
    */
   initializeTimeline(agentId: string): void {
-    if (!this.isEnabled) return
+    if (!this.isEnabled) {return}
 
     this.timeline = {
       timelineId: `timeline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -237,7 +236,7 @@ export class DebugManager {
    * Add plugin performance snapshot
    */
   addPluginSnapshot(pluginName: string, snapshot: PluginPerformanceSnapshot): void {
-    if (!this.isEnabled) return
+    if (!this.isEnabled) {return}
     
     this.pluginSnapshots.set(pluginName, snapshot)
   }
@@ -253,7 +252,7 @@ export class DebugManager {
    * Add execution metrics
    */
   addExecutionMetrics(metrics: ExecutionMetrics): void {
-    if (!this.isEnabled) return
+    if (!this.isEnabled) {return}
     
     this.executionMetrics.push(metrics)
     
@@ -320,14 +319,13 @@ export class DebugManager {
     this.pluginSnapshots.clear()
     this.executionMetrics = []
     this.snapshotHistory = []
-    this.startTime = Date.now()
   }
 
   /**
    * Log debug message if enabled
    */
   log(level: DebugLevel, message: string, data?: any): void {
-    if (!this.isEnabled || !this.shouldLog(level)) return
+    if (!this.isEnabled || !this.shouldLog(level)) {return}
 
     const timestamp = new Date().toISOString()
     const prefix = this.getLogPrefix(level)
@@ -345,7 +343,7 @@ export class DebugManager {
    * Log with table format for better readability
    */
   table(data: any[], title?: string): void {
-    if (!this.isEnabled || !this.config.enableConsoleOutput) return
+    if (!this.isEnabled || !this.config.enableConsoleOutput) {return}
 
     if (title) {
       console.log(`\n📊 ${title}`)
@@ -450,7 +448,7 @@ export class DebugManager {
     hookName?: string
   }> {
     // Extract errors from timeline entries
-    if (!this.timeline) return []
+    if (!this.timeline) {return []}
     
     return this.timeline.entries
       .filter(entry => entry.status === 'failed' && entry.error)

@@ -139,7 +139,7 @@ export class PluginExecutor {
       }
       
       // Extract the function body to avoid issues with function declarations
-      let functionBody = this.prepareFunctionSource(hookSource)
+      const functionBody = this.prepareFunctionSource(hookSource)
       
       // Create script that completely isolates execution in the VM context
       const executionScript = `
@@ -379,7 +379,7 @@ export class PluginExecutor {
           context: { operation, timeoutMs: timeout, type: 'sandbox' }
         }))
       }, timeout)
-      if (timeoutId.unref) timeoutId.unref()
+      if (timeoutId.unref) {timeoutId.unref()}
     })
 
     const executionPromise = Promise.resolve(fn())
@@ -412,20 +412,20 @@ export class PluginExecutor {
     const asyncMethodMatch = hookSource.match(/^async\s+(\w+)\s*\(([^)]*)\)\s*(?::\s*[^{]+)?\s*\{([\s\S]*)\}$/)
     if (asyncMethodMatch) {
       // Async method: async onInit(context: AgentContext): Promise<void> { ... }
-      const [, methodName, params, body] = asyncMethodMatch
+      const [, _methodName, params, body] = asyncMethodMatch
       functionBody = `async function(${params}) {${body}}`
     } else {
       // Handle method definitions like "onInit(params) { ... }"
       const methodMatch = hookSource.match(/^(\w+)\s*\(([^)]*)\)\s*:\s*\w+\s*\{([\s\S]*)\}$/)
       if (methodMatch) {
         // TypeScript method with type annotation: onInit(context: AgentContext): void { ... }
-        const [, methodName, params, body] = methodMatch
+        const [, _methodName, params, body] = methodMatch
         functionBody = `function(${params}) {${body}}`
       } else {
         // Check for simple method without type annotation: onInit(params) { ... }
         const simpleMethodMatch = hookSource.match(/^(\w+)\s*\(([^)]*)\)\s*\{([\s\S]*)\}$/)
         if (simpleMethodMatch) {
-          const [, methodName, params, body] = simpleMethodMatch
+          const [, _methodName, params, body] = simpleMethodMatch
           functionBody = `function(${params}) {${body}}`
         } else if (hookSource.includes('=>')) {
           // Handle arrow functions (including async arrow functions)

@@ -41,9 +41,13 @@ export class PluginObservability {
   /**
    * Execute a hook on all plugins that implement it
    */
-  async executeHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<PluginExecutionResult[]>
-  async executeHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<PluginExecutionResult[]>
-  async executeHook(hookName: 'onError', error: Error | AgentKitError, context: AgentContext): Promise<PluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
+  executeHook(hookName: 'onInit' | 'onShutdown', context: AgentContext): Promise<PluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
+  executeHook(hookName: 'onSend', payload: SendPayload, context: AgentContext): Promise<PluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
+  executeHook(hookName: 'onError', error: Error | AgentKitError, context: AgentContext): Promise<PluginExecutionResult[]>
+  // eslint-disable-next-line no-dupe-class-members
   async executeHook(
     hookName: PluginHookName, 
     ...args: [AgentContext] | [SendPayload, AgentContext] | [Error | AgentKitError, AgentContext]
@@ -190,9 +194,7 @@ export class PluginObservability {
   /**
    * Handle plugin errors without breaking execution
    */
-  private handlePluginError(plugin: AgentKitPlugin, hookName: string, error: unknown): void {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    
+  private handlePluginError(_plugin: AgentKitPlugin, _hookName: string, error: unknown): void {
     debugLog.error('plugin hook error', error as Error, this.debug)
     debugLog.error('Plugin execution failed', error as Error, this.debug)
   }
@@ -271,7 +273,7 @@ export class PluginObservability {
     }, delay)
     
     // Critical: Use .unref() to prevent keeping process alive
-    if (timeout.unref) timeout.unref()
+    if (timeout.unref) {timeout.unref()}
     
     this.activeTimeouts.add(timeout)
     return timeout

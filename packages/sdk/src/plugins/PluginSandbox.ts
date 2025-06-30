@@ -5,7 +5,7 @@
 
 import { debugLog } from '../log'
 import { deepClone } from '../utils/deepClone'
-import type { AgentContext, SendPayload, PluginHookName } from '@agentkit/types'
+import type { PluginHookName } from '@agentkit/types'
 
 /**
  * Environment detection
@@ -67,7 +67,7 @@ class SecurityViolationDetector {
       /__proto__/g
     ]
 
-    dangerousPatterns.forEach((pattern, index) => {
+    dangerousPatterns.forEach((pattern, _index) => {
       if (pattern.test(code)) {
         this.violations.push(`Detected dangerous pattern: ${pattern.source}`)
       }
@@ -117,7 +117,7 @@ class NodeVMSandbox {
   }
 
   private createContext(): void {
-    if (!this.vm) return
+    if (!this.vm) {return}
 
     // Create minimal, controlled context
     const safeGlobals = {

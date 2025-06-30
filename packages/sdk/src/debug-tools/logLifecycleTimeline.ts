@@ -120,7 +120,7 @@ export class LifecycleTimelineLogger {
     id: string,
     status: 'completed' | 'failed' | 'timeout' = 'completed',
     error?: string,
-    result?: any
+    _result?: any
   ): void {
     const entry = this.entries.find(e => e.id === id)
     if (!entry) {
@@ -196,7 +196,7 @@ export class LifecycleTimelineLogger {
    * Display timeline in table format
    */
   displayTable(): void {
-    if (!this.config.enableTableOutput) return
+    if (!this.config.enableTableOutput) {return}
 
     const entries = this.applyFilters(this.entries)
     const tableData = entries.map(entry => ({
@@ -217,7 +217,7 @@ export class LifecycleTimelineLogger {
    * Display timeline in tree format
    */
   displayTree(): void {
-    if (!this.config.enableConsoleOutput) return
+    if (!this.config.enableConsoleOutput) {return}
 
     const entries = this.applyFilters(this.entries)
     const groupedByRequest = this.groupEntriesByRequest(entries)
@@ -377,10 +377,10 @@ export class LifecycleTimelineLogger {
   }
 
   private calculateThroughput(entries: LifecycleTimelineEntry[]): number {
-    if (entries.length === 0) return 0
+    if (entries.length === 0) {return 0}
     
     const completedEntries = entries.filter(e => e.status === 'completed')
-    if (completedEntries.length === 0) return 0
+    if (completedEntries.length === 0) {return 0}
     
     const timeSpan = Math.max(...entries.map(e => e.timestamp)) - Math.min(...entries.map(e => e.timestamp))
     return timeSpan > 0 ? (completedEntries.length / timeSpan) * 1000 : 0 // per second
@@ -482,7 +482,7 @@ export class LifecycleTimelineLogger {
 
   private captureStackTrace(): string[] {
     const stack = new Error().stack
-    if (!stack) return []
+    if (!stack) {return []}
     
     return stack
       .split('\n')

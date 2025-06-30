@@ -100,7 +100,7 @@ export class PluginRegistry {
     
     for (const hookName of hooks) {
       const hook = (plugin as any)[hookName]
-      if (!hook) continue
+      if (!hook) {continue}
       
       if (typeof hook !== 'function') {
         throw new PluginSignatureError(plugin.name, hookName, 'must be a function', {

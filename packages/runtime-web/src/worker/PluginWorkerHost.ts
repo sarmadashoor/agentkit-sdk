@@ -137,7 +137,7 @@ export class PluginWorkerHost implements AgentKitPlugin {
    * Handle send operations in worker
    */
   async onSend?(payload: SendPayload, context: AgentContext): Promise<void> {
-    if (!this.plugin.onSend) return
+    if (!this.plugin.onSend) {return}
 
     try {
       await this.ensureWorker()
@@ -172,7 +172,7 @@ export class PluginWorkerHost implements AgentKitPlugin {
    * Handle errors in worker
    */
   async onError?(error: Error, context: AgentContext): Promise<void> {
-    if (!this.plugin.onError) return
+    if (!this.plugin.onError) {return}
 
     try {
       await this.ensureWorker()
@@ -341,7 +341,7 @@ export class PluginWorkerHost implements AgentKitPlugin {
     success: boolean,
     error?: Error
   ): void {
-    if (!this.config.enableMetrics) return
+    if (!this.config.enableMetrics) {return}
 
     const metrics: ExecutionMetrics = {
       hookName,

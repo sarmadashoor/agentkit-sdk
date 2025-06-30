@@ -148,7 +148,7 @@ test.describe('AgentKit Basic Hardening Verification - Browser', () => {
         const errorResult = executeWithIsolation(errorFunction, [])
         
         // Verify original data unchanged
-        const dataUnchanged = !originalData.hasOwnProperty('processed')
+        const dataUnchanged = !Object.prototype.hasOwnProperty.call(originalData, 'processed')
         
         return {
           success: safeResult.success && !errorResult.success && dataUnchanged,

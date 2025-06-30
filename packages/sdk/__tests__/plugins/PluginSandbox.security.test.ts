@@ -335,6 +335,7 @@ describe('PluginSandbox - Security Tests', () => {
           name: 'infinite-plugin',
           version: '1.0.0',
           onInit: function(context) {
+            // eslint-disable-next-line no-constant-condition
             while (true) {
               // Infinite loop
             }

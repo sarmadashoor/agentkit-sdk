@@ -279,7 +279,7 @@ describe.skip('AgentManager Plugin Integration (LEGACY - INCOMPATIBLE WITH SANDB
 
   describe('Plugin Context', () => {
     it('should provide correct context to plugins', async () => {
-      let capturedContexts: any[] = []
+      const capturedContexts: any[] = []
       
       const contextPlugin: AgentKitPlugin = {
         name: 'context-plugin',

@@ -1,0 +1,24 @@
+{
+  "name": "@agentkit/qa-scenarios",
+  "version": "0.1.0",
+  "description": "Automated QA scenarios for AgentKit SDK integration testing",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "vitest --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentkit/sdk": "workspace:*",
+    "@agentkit/types": "workspace:*",
+    "@agentkit/test-agent": "workspace:*",
+    "@agentkit/transports-dummy": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^1.2.0",
+    "typescript": "^5.3.3",
+    "@types/node": "^20.11.0",
+    "execa": "^8.0.1"
+  }
+}

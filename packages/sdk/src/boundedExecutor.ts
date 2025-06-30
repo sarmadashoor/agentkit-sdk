@@ -142,20 +142,12 @@ export class BoundedExecutor {
     }
   }
 
-  /**
-   * Check if we can accept a new request
-   */
-  private canAcceptRequest(): boolean {
-    const totalLoad = this.activeRequests + this.requestQueue.length
-    return this.activeRequests < this.limits.maxConcurrentRequests || 
-           this.requestQueue.length < this.limits.maxQueueSize
-  }
 
   /**
    * Process queued requests when slots become available
    */
   private processQueue(): void {
-    if (this.isProcessing) return
+    if (this.isProcessing) {return}
     this.isProcessing = true
 
     // Process as many queued requests as we have capacity for
@@ -221,7 +213,6 @@ export class BoundedExecutor {
       this.observabilityHooks?.onRequestCompleted?.(request.id, duration)
       request.resolve(result)
     } catch (error) {
-      const duration = Date.now() - startTime
       debugLog.error('BoundedExecutor request failed', error as Error, this.debug)
       this.observabilityHooks?.onRequestFailed?.(request.id, error as Error)
       request.reject(error as Error)
@@ -248,8 +239,6 @@ export class BoundedExecutor {
     requestFn: () => Promise<T>,
     payload?: unknown
   ): Promise<T> {
-    const startTime = Date.now()
-    
     debugLog.operation('BoundedExecutor execute request', {
       requestId,
       activeRequests: this.activeRequests,
@@ -441,7 +430,7 @@ export class BoundedExecutor {
     while (this.activeRequests > 0 && (Date.now() - startTime) < maxWaitTime) {
       await new Promise(resolve => {
         const timer = setTimeout(resolve, 10)
-        if (timer.unref) timer.unref()
+        if (timer.unref) {timer.unref()}
       }) // More frequent checks
     }
     

@@ -11,7 +11,7 @@ import { PluginTimeoutError, PluginSandboxError } from '../../src/errors'
 // Mock Web Worker environment for testing
 const mockWorkerEnvironment = () => {
   // Mock Blob and URL for worker creation
-  ;(global as any).Blob = vi.fn().mockImplementation((content, options) => ({
+  (global as any).Blob = vi.fn().mockImplementation((content, options) => ({
     content,
     type: options?.type || 'text/plain'
   }))
@@ -243,7 +243,7 @@ describe('Web Worker Plugin Isolation', () => {
     }
     
     // Restore originals
-    ;(global as any).Worker = originalWorker
+    (global as any).Worker = originalWorker
     ;(global as any).window = originalWindow
     ;(global as any).document = originalDocument
   })
@@ -295,7 +295,7 @@ describe('Web Worker Plugin Isolation', () => {
         onInit: (context: AgentContext) => {
           // This should fail in Web Worker - no window access
           try {
-            ;(window as any).EVIL_GLOBAL = 'hacked'
+            (window as any).EVIL_GLOBAL = 'hacked'
             window.location.href = 'https://evil.com'
             return { windowHacked: true }
           } catch (e) {
@@ -319,7 +319,7 @@ describe('Web Worker Plugin Isolation', () => {
         version: '1.0.0',
         onInit: (context: AgentContext) => {
           // Try to pollute shared state
-          ;(globalThis as any).SHARED_HACK = 'contaminated'
+          (globalThis as any).SHARED_HACK = 'contaminated'
           ;(self as any).WORKER_HACK = 'evil'
           return { polluted: true }
         }
@@ -342,6 +342,7 @@ describe('Web Worker Plugin Isolation', () => {
         version: '1.0.0',
         onInit: (context: AgentContext) => {
           // Infinite loop should timeout and terminate worker
+          // eslint-disable-next-line no-constant-condition
           while (true) {
             Math.random()
           }
@@ -557,7 +558,7 @@ describe('Web Worker Plugin Isolation', () => {
   describe('Memory and Performance', () => {
     it('should track memory usage if available', async () => {
       // Mock performance.memory
-      ;(global as any).performance = {
+      (global as any).performance = {
         memory: {
           usedJSHeapSize: 1024 * 1024,
           totalJSHeapSize: 2 * 1024 * 1024

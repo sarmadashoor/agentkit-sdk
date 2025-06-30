@@ -201,7 +201,7 @@ class SimulatedTransport implements Transport {
 // ============================================================================
 
 // Plugin state tracking (external to plugins since they run in sandbox)
-let pluginAState = {
+const pluginAState = {
   pingCount: 0,
   lastResponse: null as any,
   messageLog: [] as any[]
@@ -257,7 +257,7 @@ const createPingPongPlugin = (observabilityHooks?: ObservabilityHooks): AgentKit
 }
 
 // Plugin B state tracking (external to plugins since they run in sandbox)
-let pluginBState = {
+const pluginBState = {
   messageCount: 0,
   messageLog: [] as any[]
 }

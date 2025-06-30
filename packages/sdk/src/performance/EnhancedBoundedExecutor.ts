@@ -235,7 +235,7 @@ export class EnhancedBoundedExecutor {
   }
 
   private checkPluginTimeout(pluginName?: string): void {
-    if (!pluginName) return
+    if (!pluginName) {return}
 
     const now = Date.now()
     this.lastTimeoutBurst.push(now)
@@ -453,7 +453,7 @@ export class EnhancedBoundedExecutor {
   }
 
   private processQueue(): void {
-    if (this.isProcessing) return
+    if (this.isProcessing) {return}
     this.isProcessing = true
 
     while (this.taskQueue.length > 0 && this.activeRequests < this.limits.maxConcurrentTasks) {
@@ -486,12 +486,12 @@ export class EnhancedBoundedExecutor {
   }
 
   private calculatePayloadSize(payload: unknown): number {
-    if (payload === null || payload === undefined) return 0
+    if (payload === null || payload === undefined) {return 0}
     
     try {
       return JSON.stringify(payload).length
     } catch {
-      if (typeof payload === 'string') return payload.length
+      if (typeof payload === 'string') {return payload.length}
       return 100 // Default fallback
     }
   }
@@ -571,7 +571,7 @@ export class EnhancedBoundedExecutor {
   }
 
   private calculatePercentile(values: number[], percentile: number): number {
-    if (values.length === 0) return 0
+    if (values.length === 0) {return 0}
     
     const sorted = [...values].sort((a, b) => a - b)
     const index = Math.ceil((percentile / 100) * sorted.length) - 1
@@ -579,7 +579,7 @@ export class EnhancedBoundedExecutor {
   }
 
   async shutdown(): Promise<void> {
-    if (this.isShutdown) return
+    if (this.isShutdown) {return}
 
     this.isShutdown = true
     

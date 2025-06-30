@@ -17,7 +17,7 @@ let testCounter = 0
 let baselineHandles: any[] = []
 
 // Track transport instances for cleanup
-let activeTransports: Set<any> = new Set()
+const activeTransports: Set<any> = new Set()
 
 // Helper function to detect leaks against baseline
 function logActiveHandles(label: string) {

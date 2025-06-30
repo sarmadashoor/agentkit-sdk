@@ -5,7 +5,7 @@
  * performance metrics, memory tracking, and execution flow visualization.
  */
 
-import { PluginExecutionTrace, LifecycleTimelineEntry } from './types'
+import { PluginExecutionTrace } from './types'
 import { DebugManager } from './DebugManager'
 
 /**
@@ -230,7 +230,7 @@ export class PluginExecutionTracer {
 
   private captureCallStack(): string[] {
     const stack = new Error().stack
-    if (!stack) return []
+    if (!stack) {return []}
     
     return stack
       .split('\n')
@@ -267,7 +267,7 @@ export async function tracePluginExecution<T>(
     return { result, trace }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    const trace = tracer.endTrace(traceId, 'error', errorMessage)
+    tracer.endTrace(traceId, 'error', errorMessage)
     throw error
   }
 }

@@ -137,7 +137,7 @@ class MetricHistogram {
    * Calculate percentile from histogram
    */
   percentile(p: number): number {
-    if (this.count === 0) return 0
+    if (this.count === 0) {return 0}
 
     const targetCount = (p / 100) * this.count
     let cumulativeCount = 0

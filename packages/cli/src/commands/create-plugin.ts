@@ -1,14 +1,14 @@
 import { Command } from 'commander'
-import { input, select, checkbox, confirm } from '@inquirer/prompts'
+import { input, select as _select, checkbox, confirm as _confirm } from '@inquirer/prompts'
 import chalk from 'chalk'
 import ora from 'ora'
 import fs from 'fs-extra'
 import path from 'path'
 import validateNpmPackageName from 'validate-npm-package-name'
 import { CreatePluginCommand } from '../core/CreatePluginCommand'
-import type { PluginHookName } from '../types/agentkit-types'
+import type { PluginHookName as _PluginHookName } from '../types/agentkit-types'
 
-const VALID_HOOKS: PluginHookName[] = ['onInit', 'onSend', 'onError', 'onShutdown']
+const VALID_HOOKS: _PluginHookName[] = ['onInit', 'onSend', 'onError', 'onShutdown']
 
 export const createPluginCommand = new Command('create-plugin')
   .description('Create a new AgentKit plugin with TypeScript, tests, and best practices')

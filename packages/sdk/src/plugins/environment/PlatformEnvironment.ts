@@ -44,8 +44,8 @@ export class PlatformEnvironment {
    * Get human-readable platform name
    */
   getPlatformName(): string {
-    if (this.capabilities.isNodeJS) return 'node'
-    if (this.capabilities.isBrowser) return 'browser'
+    if (this.capabilities.isNodeJS) {return 'node'}
+    if (this.capabilities.isBrowser) {return 'browser'}
     return 'unknown'
   }
 

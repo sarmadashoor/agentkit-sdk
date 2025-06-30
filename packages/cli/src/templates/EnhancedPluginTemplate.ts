@@ -1,5 +1,5 @@
 import { PluginConfig } from '../types'
-import type { PluginHookName } from '../types/agentkit-types'
+import type { PluginHookName as _PluginHookName } from '../types/agentkit-types'
 
 export class EnhancedPluginTemplate {
   generate(config: PluginConfig): string {
@@ -261,7 +261,7 @@ if (process.env.NODE_ENV === 'development') {
   private debugEnabled = process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true'`
   }
 
-  private generatePerformanceFeatures(config: PluginConfig): string {
+  private generatePerformanceFeatures(_config: PluginConfig): string {
     return `
   // Performance monitoring
   private metrics = {
@@ -335,7 +335,7 @@ if (process.env.NODE_ENV === 'development') {
     }`
   }
 
-  private generateDebugMethods(config: PluginConfig): string {
+  private generateDebugMethods(_config: PluginConfig): string {
     return `
   /**
    * Get debug information about plugin state
@@ -367,7 +367,7 @@ if (process.env.NODE_ENV === 'development') {
   }`
   }
 
-  private generatePerformanceMethods(config: PluginConfig): string {
+  private generatePerformanceMethods(_config: PluginConfig): string {
     return `
   /**
    * Get performance metrics

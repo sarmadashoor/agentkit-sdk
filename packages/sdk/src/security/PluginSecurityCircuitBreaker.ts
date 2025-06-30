@@ -120,7 +120,6 @@ export class PluginSecurityCircuitBreaker extends EventEmitter {
     }
 
     const stats = this.pluginStats.get(pluginName)!
-    const currentState = this.pluginStates.get(pluginName)!
 
     // Update violation counts
     stats.totalViolations++

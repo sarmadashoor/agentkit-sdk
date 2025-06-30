@@ -20,7 +20,7 @@ function jsonCloneWithCircularHandling<T>(obj: T): T {
   const seen = new WeakSet()
   
   const stringify = (value: any): string => {
-    return JSON.stringify(value, (key, val) => {
+    return JSON.stringify(value, (_key, val) => {
       if (val !== null && typeof val === 'object') {
         if (seen.has(val)) {
           return '[Circular Reference]'
@@ -71,16 +71,16 @@ export function deepClone<T>(obj: T): T {
  * Check if a value can be safely cloned
  */
 export function isCloneable(value: unknown): boolean {
-  if (value === null || value === undefined) return true
+  if (value === null || value === undefined) {return true}
   
   const type = typeof value
-  if (type === 'boolean' || type === 'number' || type === 'string') return true
+  if (type === 'boolean' || type === 'number' || type === 'string') {return true}
   
   if (type === 'object') {
     // Check for non-cloneable types
-    if (value instanceof Promise) return false
-    if (value instanceof WeakMap || value instanceof WeakSet) return false
-    if (typeof (value as any).then === 'function') return false // Thenable
+    if (value instanceof Promise) {return false}
+    if (value instanceof WeakMap || value instanceof WeakSet) {return false}
+    if (typeof (value as any).then === 'function') {return false} // Thenable
     
     return true
   }

@@ -8,16 +8,11 @@
  * @security Critical - This module implements plugin sandboxing
  */
 
-import type { AgentKitPlugin, AgentContext, SendPayload, PluginHookName } from '@agentkit/types'
+import type { AgentKitPlugin, PluginHookName } from '@agentkit/types'
 import { 
-  WebWorkerMessage,
   WebWorkerMessageValidator,
   WebWorkerCommunicator,
-  PluginExecutionRequest,
-  PluginExecutionResult,
-  isPluginExecutionRequest,
-  isTerminationMessage,
-  isHealthCheckMessage
+  PluginExecutionResult
 } from '../WebWorkerMessages'
 
 /**
@@ -416,7 +411,7 @@ const createErrorMessage = (error, code, stack) => ({
    * Set up message handlers for worker communication
    */
   private setupMessageHandlers(): void {
-    if (!this.communicator) return
+    if (!this.communicator) {return}
 
     this.communicator.setHandlers({
       onExecutionResult: (result) => this.handleExecutionResult(result),
@@ -548,7 +543,7 @@ const createErrorMessage = (error, code, stack) => ({
       const prefix = `[${this.config.plugin.name}:worker]`
       const level = log.payload.level as keyof Console
       if (typeof console[level] === 'function') {
-        ;(console[level] as any)(prefix, ...log.payload.args)
+        (console[level] as any)(prefix, ...log.payload.args)
       }
     }
   }
@@ -561,7 +556,7 @@ const createErrorMessage = (error, code, stack) => ({
     this.state = 'error'
 
     // Reject all pending executions
-    for (const [id, callbacks] of this.executionCallbacks) {
+    for (const [_id, callbacks] of this.executionCallbacks) {
       callbacks.reject(new Error(`Worker error: ${error.payload.error}`))
     }
     this.executionCallbacks.clear()
@@ -604,7 +599,7 @@ const createErrorMessage = (error, code, stack) => ({
   /**
    * Find execution ID from result (simplified matching)
    */
-  private findExecutionId(result: PluginExecutionResult): string | undefined {
+  private findExecutionId(_result: PluginExecutionResult): string | undefined {
     // In production, would use proper ID mapping
     const entries = Array.from(this.pendingExecutions.entries())
     return entries[0]?.[0]
@@ -647,7 +642,7 @@ const createErrorMessage = (error, code, stack) => ({
     this.communicator = null
 
     // Clean up pending executions
-    for (const [id, callbacks] of this.executionCallbacks) {
+    for (const [_id, callbacks] of this.executionCallbacks) {
       callbacks.reject(new Error('Worker terminated'))
     }
     this.executionCallbacks.clear()

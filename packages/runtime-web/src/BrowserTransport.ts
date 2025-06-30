@@ -1,7 +1,6 @@
 import { Transport, TransportMessage } from '@agentkit/types'
 import { 
   InvalidConfigurationError, 
-  TransportInitError,
   TransportSendError,
   TransportReceiveError,
   NetworkError,
@@ -65,7 +64,7 @@ export class BrowserTransport implements Transport {
     }
   }
 
-  async init(config?: unknown): Promise<void> {
+  async init(_config?: unknown): Promise<void> {
     // Browser transport doesn't need initialization
     // This method exists to satisfy the Transport interface
   }
@@ -303,7 +302,7 @@ export class BrowserTransport implements Transport {
           // Ignore errors reading response body
         }
         
-        const errorMessage = errorText 
+        const _errorMessage = errorText 
           ? `HTTP ${response.status}: ${response.statusText} - ${errorText}`
           : `HTTP ${response.status}: ${response.statusText}`
         

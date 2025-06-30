@@ -10,26 +10,15 @@ import {
   Transport, 
   AgentRuntimeHandle,
   ConnectAgentOptions as BaseConnectAgentOptions,
-  AgentInput,
-  AgentOutput
+  AgentInput
 } from '@agentkit/types'
 import { 
-  AgentInitError,
-  AgentHandleError,
-  AgentShutdownError,
-  TransportInitError,
-  TransportSendError,
-  TransportBackpressureError,
-  getErrorMessage
+  AgentInitError
 } from './errors'
-import { PluginVerificationError } from '@agentkit/errors'
 import { debugLog } from './log'
 import { ObservabilityTracker } from './observability'
-import { MetricsCollector } from './observability/MetricsCollector'
-import { PluginExecutionTimeline } from './observability/PluginExecutionTimeline'
 import { BoundedExecutor } from './boundedExecutor'
 import { CircuitBreaker } from './circuitBreaker'
-import { Mutex } from './utils/mutex'
 import { AsyncLock } from './utils/AsyncLock'
 import { BackpressureQueue, BackpressureQueueOptions } from './BackpressureQueue'
 
@@ -37,18 +26,15 @@ import { BackpressureQueue, BackpressureQueueOptions } from './BackpressureQueue
 import { 
   AgentLifecycle, 
   LifecycleState,
-  type LifecycleConfig,
   type LifecycleCallbacks
 } from './lifecycle/AgentLifecycle'
 import { 
   PluginRunner, 
-  type PluginRunnerConfig,
   type PluginObservabilityHooks
 } from './lifecycle/PluginRunner'
 import { 
   SandboxedExecutor, 
   ExecutorState,
-  type ExecutorConfig,
   type ExecutorCallbacks
 } from './lifecycle/SandboxedExecutor'
 import { 
@@ -257,7 +243,7 @@ export class AgentManager {
 
     // Initialize plugin runner with observability hooks
     const pluginObservabilityHooks: PluginObservabilityHooks = {
-      onPluginStart: (pluginName: string, hookName: string) => {
+      onPluginStart: (_pluginName: string, _hookName: string) => {
         // Timeline tracking handled by completion hooks (onPluginSuccess/onPluginError)
         if (this.observability.isDebugModeEnabled) {
           // Debug logging handled by PluginRunner

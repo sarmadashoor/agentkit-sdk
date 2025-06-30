@@ -19,7 +19,7 @@ class MockWorker {
   private autoResponses = new Map<string, any>()
 
   postMessage(data: any): void {
-    if (this.terminated) throw new Error('Worker terminated')
+    if (this.terminated) {throw new Error('Worker terminated')}
     
     // Simulate async message handling
     setTimeout(() => {
@@ -147,7 +147,7 @@ describe('WebWorker Plugin Isolation', () => {
 
   afterEach(() => {
     // Restore globals
-    ;(global as any).Worker = originalWorker
+    (global as any).Worker = originalWorker
     ;(global as any).URL = originalURL
   })
 
@@ -207,9 +207,11 @@ describe('WebWorker Plugin Isolation', () => {
     it('should handle execution timeouts', async () => {
       const plugin = createTestPlugin({
         async onSend(payload: SendPayload, context: AgentContext) {
-          // Simulate infinite loop
-          while (true) {
+          // Simulate long-running operation that would timeout
+          const shouldContinue = true
+          while (shouldContinue) {
             await new Promise(resolve => setTimeout(resolve, 100))
+            // In real scenario, this would be interrupted by timeout
           }
         }
       })
@@ -491,7 +493,7 @@ describe('WebWorker Plugin Isolation', () => {
         async onInit(context: AgentContext) {
           // This should fail in worker
           try {
-            ;(global as any).document.createElement('div')
+            (global as any).document.createElement('div')
             return 'DOM accessed'
           } catch (error) {
             return 'DOM blocked'
@@ -513,7 +515,7 @@ describe('WebWorker Plugin Isolation', () => {
         async onInit(context: AgentContext) {
           // This should fail in worker
           try {
-            ;(global as any).window.location = 'evil.com'
+            (global as any).window.location = 'evil.com'
             return 'Global accessed'
           } catch (error) {
             return 'Global blocked'
@@ -533,7 +535,7 @@ describe('WebWorker Plugin Isolation', () => {
       const plugin = createTestPlugin({
         async onSend(payload: SendPayload, context: AgentContext) {
           // Try to modify payload (should not affect original)
-          ;(payload as any).compromised = true
+          (payload as any).compromised = true
           ;(context as any).compromised = true
           return 'processed'
         }

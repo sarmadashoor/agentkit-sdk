@@ -136,7 +136,7 @@ export function getGlobalDebugManager(): DebugManager | null {
  * Log debug message if debug mode is enabled
  */
 export function debugLog(level: DebugLevel, message: string, data?: any): void {
-  if (!globalDebugEnabled || !globalDebugManager) return
+  if (!globalDebugEnabled || !globalDebugManager) {return}
   
   globalDebugManager.log(level, message, data)
 }
@@ -235,7 +235,7 @@ export function debugPerformance(threshold: number = 100) {
       const startTime = performance.now()
       const startMemory = process.memoryUsage().heapUsed
       
-      const measurePerformance = (result?: any, error?: any) => {
+      const measurePerformance = (_result?: any, error?: any) => {
         const duration = performance.now() - startTime
         const endMemory = process.memoryUsage().heapUsed
         const memoryDelta = endMemory - startMemory

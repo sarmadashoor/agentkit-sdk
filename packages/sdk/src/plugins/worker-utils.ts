@@ -197,7 +197,7 @@ class PooledWorker {
    */
   private setupMessageHandling(): void {
     this.worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
-      if (!this.activeExecution) return
+      if (!this.activeExecution) {return}
 
       const { type, result, error } = event.data
 
@@ -214,7 +214,7 @@ class PooledWorker {
       }
     }
 
-    this.worker.onmessageerror = (error: MessageEvent) => {
+    this.worker.onmessageerror = (_error: MessageEvent) => {
       if (this.activeExecution) {
         this.rejectExecution(new Error('Worker message error'))
       }
@@ -278,7 +278,7 @@ class PooledWorker {
    * Resolve the current execution
    */
   private resolveExecution(result: unknown): void {
-    if (!this.activeExecution) return
+    if (!this.activeExecution) {return}
 
     if (this.activeExecution.timeoutId) {
       clearTimeout(this.activeExecution.timeoutId)
@@ -293,7 +293,7 @@ class PooledWorker {
    * Reject the current execution
    */
   private rejectExecution(error: Error): void {
-    if (!this.activeExecution) return
+    if (!this.activeExecution) {return}
 
     if (this.activeExecution.timeoutId) {
       clearTimeout(this.activeExecution.timeoutId)

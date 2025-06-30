@@ -176,7 +176,7 @@ export class PrometheusCollector implements MetricsCollector {
 
   getMetric(name: string): SerializedMetric | undefined {
     const metric = this.metrics.get(name)
-    if (!metric) return undefined
+    if (!metric) {return undefined}
     
     return {
       name: metric.name,
@@ -235,7 +235,7 @@ export class PrometheusCollector implements MetricsCollector {
         lines.push(`${name}${labelStr} ${value.value} ${value.timestamp}`)
         break
         
-      case 'histogram':
+      case 'histogram': {
         const histValue = value as HistogramValue
         
         // Add bucket values
@@ -249,8 +249,9 @@ export class PrometheusCollector implements MetricsCollector {
         lines.push(`${name}_sum${labelStr} ${histValue.sum} ${value.timestamp}`)
         lines.push(`${name}_count${labelStr} ${histValue.count} ${value.timestamp}`)
         break
+      }
         
-      case 'summary':
+      case 'summary': {
         const summaryValue = value as SummaryValue
         
         // Add quantile values
@@ -264,6 +265,7 @@ export class PrometheusCollector implements MetricsCollector {
         lines.push(`${name}_sum${labelStr} ${summaryValue.sum} ${value.timestamp}`)
         lines.push(`${name}_count${labelStr} ${summaryValue.count} ${value.timestamp}`)
         break
+      }
     }
     
     return lines
@@ -291,9 +293,9 @@ export class PrometheusCollector implements MetricsCollector {
   }
 
   private calculateQuantile(sortedValues: number[], quantile: number): number {
-    if (sortedValues.length === 0) return 0
-    if (quantile <= 0) return sortedValues[0]
-    if (quantile >= 1) return sortedValues[sortedValues.length - 1]
+    if (sortedValues.length === 0) {return 0}
+    if (quantile <= 0) {return sortedValues[0]}
+    if (quantile >= 1) {return sortedValues[sortedValues.length - 1]}
     
     const index = quantile * (sortedValues.length - 1)
     const lower = Math.floor(index)

@@ -5,7 +5,7 @@
  * and lifecycle hooks for AgentKit SDK.
  */
 
-import { Agent, Transport, AgentConfig, TransportConfig } from '@agentkit/types'
+import { Agent, Transport, AgentConfig } from '@agentkit/types'
 import { 
   AgentInitError,
   AgentShutdownError,
@@ -57,7 +57,8 @@ export class AgentLifecycle {
     private config: LifecycleConfig,
     private callbacks: LifecycleCallbacks,
     private observabilityTracker: ObservabilityTracker,
-    private stateLock: AsyncLock,
+    // @ts-ignore - Used for state synchronization - kept for future use
+    private _stateLock: AsyncLock,
     registeredScopes: string[] = [],
     private boundedExecutor?: BoundedExecutor,
     private circuitBreaker?: CircuitBreaker,

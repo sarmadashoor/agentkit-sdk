@@ -6,7 +6,7 @@
  */
 
 import { debugLog } from '../../log'
-import { deepClone, isCloneable } from '../../utils/deepClone'
+import { isCloneable } from '../../utils/deepClone'
 
 export interface SecurityOptions {
   maxDepth?: number
@@ -167,7 +167,7 @@ export class SecurityUtils {
       const clonedObj: any = {}
       seen.set(obj, clonedObj)
       for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
           clonedObj[key] = this.performSafeClone(obj[key], depth + 1, seen)
         }
       }

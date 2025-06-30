@@ -5,8 +5,7 @@
  * The full crypto functionality is in the CLI package.
  */
 
-import { createHash } from 'crypto'
-import { verify } from 'crypto'
+import { createHash, verify } from 'crypto'
 import { readFile } from 'fs/promises'
 
 export interface PluginSignature {
