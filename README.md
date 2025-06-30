@@ -272,16 +272,24 @@ pnpm install
 
 ### Available Scripts
 
-All commands use pnpm by default:
-
+#### **🚀 Development Commands (Fast Feedback)**
 | Command | Description |
 |---------|-------------|
+| `npm run test:fast` | **Quick tests (4 packages, ~30s) - RECOMMENDED** |
+| `npm test` | Smart adaptive testing (dev vs CI) |
 | `pnpm build` | Build all packages in dependency order |
-| `pnpm test` | Run comprehensive test suite (51+ tests) |
 | `pnpm typecheck` | Validate TypeScript across all packages |
-| `pnpm clean` | Remove all build artifacts |
 | `pnpm lint` | Run ESLint across packages |
-| `pnpm analyze:deps` | Analyze package dependencies with madge |
+
+#### **🏗️ CI/CD Commands (Comprehensive)**
+| Command | Description |
+|---------|-------------|
+| `npm run test:ci` | Full test suite (92 tests, 5-10min) |
+| `npm run test:sequential` | Original pnpm workspace testing |
+| `pnpm analyze:deps` | Check for circular dependencies |
+| `pnpm clean` | Remove all build artifacts |
+
+**📖 See [Testing Strategy](./docs/development/testing-strategy.md) for detailed testing guidance.**
 
 ### Package Development
 
@@ -298,16 +306,30 @@ pnpm lint
 
 ## Documentation
 
+### **📚 Core Documentation**
 | Document | Description |
 |----------|-------------|
-| [📖 Architecture Overview](./docs/architecture.md) | System design, modules, and philosophy |
-| [🗂️ Registry Documentation](./docs/registry.md) | Agent registration and metadata patterns |
-| [🚀 Migration Guide](./docs/migration.md) | Version scope and stability guarantees |
-| [📋 Changelog](./docs/CHANGELOG.md) | Complete version history and features |
-| [⚡ Performance Guide](./PERFORMANCE.md) | Profiling, optimization, and monitoring |
-| [🔧 CLI Reference](./CLI.md) | Command-line tools and plugin scaffolding |
-| [🧩 Plugin Development](./PLUGIN_DEVELOPMENT.md) | Complete plugin development lifecycle |
-| [📚 API Reference](./API.md) | Comprehensive API documentation |
+| [🚀 **Developer Guide**](./docs/developer-guide.md) | **Complete SDK usage guide and examples** |
+| [📚 **API Reference**](./docs/api-reference.md) | **Comprehensive API documentation** |
+| [🔧 **Testing Strategy**](./docs/development/testing-strategy.md) | **When/how to test, commands, and best practices** |
+| [🐛 **Troubleshooting**](./docs/troubleshooting.md) | **Common issues and solutions** |
+
+### **🏗️ Architecture & Design**
+| Document | Description |
+|----------|-------------|
+| [📖 Architecture Overview](./docs/architecture/overview.md) | System design and core principles |
+| [🛡️ Design Decisions](./docs/architecture/design-decisions.md) | Architectural constraints and assertions |
+| [🔌 Plugin System](./docs/architecture/plugins/) | Plugin architecture and security |
+| [📊 Observability](./docs/architecture/observability.md) | Metrics and monitoring framework |
+
+### **⚙️ Development**
+| Document | Description |
+|----------|-------------|
+| [🐛 Debugging Guide](./docs/development/debugging.md) | Debug techniques and tools |
+| [🧪 Testing Guide](./docs/development/testing-guide.md) | Legacy testing documentation |
+| [🗂️ Registry Patterns](./docs/registry.md) | Agent registration patterns |
+| [🚀 Migration Guide](./docs/migration.md) | Version and upgrade guide |
+| [📋 Changelog](./docs/CHANGELOG.md) | Release history and features |
 
 ## Examples
 
@@ -369,24 +391,28 @@ interface AgentMetadata {
 
 ## Testing
 
-The SDK includes comprehensive testing infrastructure:
+The SDK includes comprehensive testing infrastructure with **92 test files** across 7 packages:
 
-- **51+ tests** covering all packages and scenarios
-- **Unit tests** for individual components
-- **Integration tests** for full lifecycle workflows  
-- **Edge case testing** for error scenarios and validation
-- **End-to-end tests** with real agent/transport interactions
-
+#### **🎯 Quick Testing (Development)**
 ```bash
-# Run all tests
-npm run test:npm
-
-# Run tests for specific package
-cd packages/sdk && npm test
-
-# Run with coverage
-npm test -- --coverage
+npm run test:fast      # 4 packages, ~30 seconds, reliable exit
+npm test               # Adaptive testing (fast in dev, full in CI)
 ```
+
+#### **🔬 Comprehensive Testing (CI/CD)**
+```bash
+npm run test:ci        # All 92 tests, sequential execution, 5-10 minutes
+npm run test:sequential # Original pnpm workspace behavior
+```
+
+#### **📦 Package-Specific Testing**
+```bash
+cd packages/sdk && npm test         # SDK tests (60 files)
+cd packages/runtime-web && npm test # Browser tests (11 files)  
+cd packages/cli && npm test         # CLI tests (7 files)
+```
+
+**📖 Complete testing guide:** [Testing Strategy](./docs/development/testing-strategy.md)
 
 ## Contributing
 

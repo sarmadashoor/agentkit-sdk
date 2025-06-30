@@ -60,3 +60,14 @@ temp
 .madge/
 *.madge.svg
 *.madge.png
+
+# Documentation artifacts (temporary files that should not be committed)
+ci-reports/
+test-output/
+**/test-results/
+TEST_*_ANALYSIS.txt
+TEST_*_RESOLUTION.md
+*_SUMMARY.md
+*_DIAGNOSTIC_REPORT*.md
+leak-summary.txt
+Notes.txt
