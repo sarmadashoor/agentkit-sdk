@@ -129,6 +129,9 @@ export class SecurePluginManager {
       sandboxTimeout: options.sandboxTimeout ?? 500,
       allowedGlobals: options.allowedGlobals ?? [],
       enableDebugMode: options.enableDebugMode ?? false,
+      pluginPublicKey: options.pluginPublicKey ?? '',
+      allowUnsignedPlugins: options.allowUnsignedPlugins ?? true,
+      trustedPluginKeys: options.trustedPluginKeys ?? [],
       sdkVersion: options.sdkVersion ?? '1.0.0',
       executionOrder: {
         parallel: false,

@@ -60,6 +60,12 @@ export interface PluginManagerOptions {
   allowedGlobals?: string[]
   /** Enable debug mode for sandbox execution */
   enableDebugMode?: boolean
+  /** Public key for plugin signature verification */
+  pluginPublicKey?: string
+  /** Whether to allow unsigned plugins in development */
+  allowUnsignedPlugins?: boolean
+  /** Additional trusted public keys for plugin verification */
+  trustedPluginKeys?: string[]
 }
 
 /**

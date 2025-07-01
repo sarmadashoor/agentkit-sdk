@@ -72,7 +72,10 @@ export class PluginManager {
       sandbox: options.sandbox ?? true, // Default to enabled
       sandboxTimeout: options.sandboxTimeout ?? 500, // Default 500ms for sandbox
       allowedGlobals: options.allowedGlobals ?? ['Math', 'Date', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean'],
-      enableDebugMode: options.enableDebugMode ?? false
+      enableDebugMode: options.enableDebugMode ?? false,
+      pluginPublicKey: options.pluginPublicKey ?? '',
+      allowUnsignedPlugins: options.allowUnsignedPlugins ?? true,
+      trustedPluginKeys: options.trustedPluginKeys ?? []
     }
     
     // Initialize sandbox support based on platform

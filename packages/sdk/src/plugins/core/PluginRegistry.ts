@@ -2,6 +2,8 @@ import type { AgentKitPlugin, PluginHookName } from '@agentkit/types'
 import { AgentKitPluginSchema } from '../types'
 import { PluginValidationError, PluginSignatureError } from '../../errors'
 import { debugLog } from '../../log'
+import { PluginSignature, PluginSignatureConfig } from '../../security/PluginSignature'
+import { EnvironmentGuard } from '../../security/EnvironmentGuard'
 
 /**
  * Plugin Registry - Manages plugin registration and lookup
@@ -9,15 +11,29 @@ import { debugLog } from '../../log'
 export class PluginRegistry {
   private plugins: AgentKitPlugin[] = []
   private debug: boolean
+  private signature?: PluginSignature
 
-  constructor(debug: boolean = false) {
+  constructor(debug: boolean = false, signatureConfig?: PluginSignatureConfig) {
     this.debug = debug
+
+    if (signatureConfig || EnvironmentGuard.isProduction()) {
+      this.signature = new PluginSignature(signatureConfig || {
+        publicKey: process.env.AGENTKIT_PUBLIC_KEY || '',
+        allowUnsigned: !EnvironmentGuard.isProduction(),
+        trustedKeys: process.env.AGENTKIT_TRUSTED_KEYS?.split(',') || []
+      });
+    }
   }
 
   /**
    * Register a plugin with validation
    */
   register(plugin: AgentKitPlugin): void {
+    // Verify plugin signature if signature verification is enabled
+    if (this.signature && !this.signature.verifyPlugin(plugin as any)) {
+      throw new PluginSignatureError(plugin.name, 'signature', 'Plugin signature verification failed');
+    }
+
     // Validate plugin schema
     try {
       AgentKitPluginSchema.parse(plugin)

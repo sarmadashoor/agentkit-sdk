@@ -249,6 +249,7 @@ export const testUtils = {
 
 // Make test utils available globally for easy access in tests
 declare global {
+  // eslint-disable-next-line no-var
   var testUtils: {
     resetMocks: () => void
     mockFetchSuccess: (responseData: any, status?: number) => void

@@ -1,6 +1,7 @@
 import type { AgentKitPlugin, PluginHookName } from '@agentkit/types'
-import { PluginTimeoutError, PluginSandboxError } from '../../errors'
+import { PluginTimeoutError, PluginSandboxError, PluginHookError } from '../../errors'
 import { debugLog } from '../../log'
+import { EnvironmentGuard } from '../../security/EnvironmentGuard'
 import { PlatformEnvironment } from '../environment/PlatformEnvironment'
 import { PluginSecurity } from '../security/PluginSecurity'
 import type { PluginManagerObservabilityHooks } from '../types'
@@ -74,9 +75,15 @@ export class PluginExecutor {
    * Get execution strategy based on platform capabilities
    */
   private getExecutionStrategy(): 'vm' | 'worker' | 'direct' {
-    // If sandboxing is disabled, always use direct execution
-    if (!this.sandbox) {
+    // Security: Only allow direct execution in explicit dev mode
+    if (!this.sandbox && EnvironmentGuard.canDisableSandbox()) {
       return 'direct'
+    }
+    
+    // Force sandboxing in production even if disabled
+    if (EnvironmentGuard.isProduction() && !this.sandbox) {
+      console.error('[AgentKit Security] Attempted to disable sandbox in production. Forcing VM execution.');
+      return 'vm';
     }
     
     const capabilities = this.platformEnv.getCapabilities()
@@ -352,15 +359,19 @@ export class PluginExecutor {
       hook: hookName
     }, this.debug)
 
-    // Execute the hook (can be sync or async)
-    const result = hook.apply(plugin, args)
-    
-    // If result is a promise, await it
-    if (result && typeof result.then === 'function') {
-      return await result
+    try {
+      // Execute the hook (can be sync or async)
+      const result = hook.apply(plugin, args)
+      
+      // If result is a promise, await it
+      if (result && typeof result.then === 'function') {
+        return await result
+      }
+      
+      return result
+    } catch (err) {
+      throw new PluginHookError(plugin.name, hookName, `Hook execution failed: ${(err as Error).message}`)
     }
-    
-    return result
   }
 
   /**

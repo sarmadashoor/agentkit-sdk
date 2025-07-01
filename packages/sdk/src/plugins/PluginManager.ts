@@ -2,6 +2,7 @@ import type { AgentKitPlugin, AgentContext, SendPayload, PluginHookName } from '
 import { AgentKitError } from '../errors'
 import { debugLog } from '../log'
 import { WorkerPool } from './worker-utils'
+import { EnvironmentGuard } from '../security/EnvironmentGuard'
 
 // Import new modular components
 import { PluginRegistry } from './core/PluginRegistry'
@@ -35,20 +36,39 @@ export class PluginManager {
   private isShutdown = false
 
   constructor(options: PluginManagerOptions = {}) {
+    // Security: Force sandbox in production, allow disable only if environment allows it
+    const sandboxOverride = EnvironmentGuard.isProduction() 
+      ? true 
+      : options.sandbox === false && EnvironmentGuard.canDisableSandbox()
+        ? false
+        : options.sandbox;
+    
     // Setup configuration with defaults
     this.options = {
       debug: options.debug ?? false,
       hookTimeout: options.hookTimeout ?? 5000,
       failFast: options.failFast ?? false,
       observabilityHooks: options.observabilityHooks,
-      sandbox: options.sandbox ?? true,
+      sandbox: sandboxOverride ?? true,
       sandboxTimeout: options.sandboxTimeout ?? 2000,
-      allowedGlobals: options.allowedGlobals ?? ['Math', 'Date', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean'],
-      enableDebugMode: options.enableDebugMode ?? false
+      allowedGlobals: Object.freeze(options.allowedGlobals ?? ['Math', 'Date', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean']) as string[],
+      enableDebugMode: options.enableDebugMode ?? false,
+      pluginPublicKey: options.pluginPublicKey ?? '',
+      allowUnsignedPlugins: options.allowUnsignedPlugins ?? true,
+      trustedPluginKeys: Object.freeze(options.trustedPluginKeys ?? []) as string[]
+    }
+    
+    // Warn if sandbox disabled in non-production
+    if (!this.options.sandbox && !EnvironmentGuard.isProduction()) {
+      console.warn('[AgentKit Security] Sandbox disabled in development mode. This is unsafe for production.');
     }
 
     // Initialize core modules
-    this.registry = new PluginRegistry(this.options.debug)
+    this.registry = new PluginRegistry(this.options.debug, {
+      publicKey: this.options.pluginPublicKey || process.env.AGENTKIT_PUBLIC_KEY || '',
+      allowUnsigned: !EnvironmentGuard.isProduction() && this.options.allowUnsignedPlugins,
+      trustedKeys: this.options.trustedPluginKeys
+    })
     this.platformEnv = new PlatformEnvironment(this.options.debug)
     this.security = new PluginSecurity(this.options.debug)
 
@@ -95,6 +115,9 @@ export class PluginManager {
     if (!this.options.sandbox && (this.options.debug || this.options.enableDebugMode)) {
       console.warn('Plugin sandboxing disabled. This should only be used in development or trusted environments.')
     }
+    
+    // Freeze the options object after all initialization is complete
+    Object.freeze(this.options)
   }
 
   /**
@@ -240,7 +263,6 @@ export class PluginManager {
       }
 
       case 'none': {
-        this.options.sandbox = false
         debugLog.lifecycle('sandbox disabled - platform not supported', 'PluginManager', {
           platform: this.platformEnv.getPlatformName(),
           isNodeJS: capabilities.isNodeJS,
