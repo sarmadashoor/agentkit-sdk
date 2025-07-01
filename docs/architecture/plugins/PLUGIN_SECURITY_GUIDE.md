@@ -433,6 +433,300 @@ if (result.failedPlugins.length > 0) {
 3. Monitor execution statistics
 4. Use performance metrics to identify bottlenecks
 
+## Advanced Plugin Signing System
+
+### 🔐 Cryptographic Plugin Verification
+
+AgentKit implements Stripe-level security standards with cryptographic plugin signing:
+
+- **RSA-2048 Signatures**: Industry-standard cryptographic verification
+- **Manifest-Based Capabilities**: Granular permission control
+- **Multi-Key Support**: Multiple trusted signing authorities
+- **Fingerprint Integrity**: Content tampering detection
+- **Performance Caching**: Optimized verification with secure caching
+
+### Plugin Signature Manifest Schema
+
+```typescript
+interface PluginSignatureManifest {
+  /** Plugin name (must match plugin.name) */
+  name: string
+  /** Plugin version (must match plugin.version) */
+  version: string
+  /** Array of hook names this plugin is allowed to implement */
+  allowedHooks: string[]
+  /** SHA-256 fingerprint hash of plugin content for integrity verification */
+  fingerprintHash: string
+}
+```
+
+### Enhanced Plugin Interface
+
+```typescript
+interface AgentKitPlugin {
+  name: string
+  version: string
+  description?: string
+  
+  // Basic signature (backward compatible)
+  signature?: string
+  publicKey?: string
+  
+  // Advanced manifest-based signing
+  signatureManifest?: PluginSignatureManifest
+  capabilities?: string[]
+  
+  // Plugin hooks
+  onInit?(context: AgentContext): void | Promise<void>
+  onSend?(payload: SendPayload, context: AgentContext): void | Promise<void>
+  onError?(error: Error, context: AgentContext): void | Promise<void>
+  onShutdown?(context: AgentContext): void | Promise<void>
+}
+```
+
+### Plugin Signing Workflow
+
+#### Step 1: Generate Key Pair
+
+```bash
+# Generate RSA-2048 key pair
+openssl genrsa -out private-key.pem 2048
+openssl rsa -in private-key.pem -pubout -out public-key.pem
+```
+
+#### Step 2: Create Plugin with Manifest
+
+```typescript
+import { createHash, sign } from 'crypto'
+import fs from 'fs'
+
+// Your plugin implementation
+const plugin: AgentKitPlugin = {
+  name: 'my-secure-plugin',
+  version: '1.0.0',
+  capabilities: ['network.http', 'filesystem.read'],
+  
+  onInit: (context) => {
+    console.log(`Plugin initialized for agent: ${context.agentId}`)
+  },
+  
+  onSend: (payload, context) => {
+    // Process the payload safely
+    return { processed: true }
+  }
+}
+
+// Generate plugin fingerprint
+function generatePluginFingerprint(plugin: AgentKitPlugin): string {
+  const normalized = {
+    name: plugin.name,
+    version: plugin.version,
+    capabilities: plugin.capabilities || [],
+    hooks: {
+      onInit: plugin.onInit?.toString() || '',
+      onSend: plugin.onSend?.toString() || '',
+      onError: plugin.onError?.toString() || '',
+      onShutdown: plugin.onShutdown?.toString() || ''
+    }
+  }
+
+  return createHash('sha256')
+    .update(JSON.stringify(normalized, null, 0))
+    .digest('hex')
+}
+
+// Create manifest
+const manifest: PluginSignatureManifest = {
+  name: plugin.name,
+  version: plugin.version,
+  allowedHooks: ['onInit', 'onSend'],
+  fingerprintHash: generatePluginFingerprint(plugin)
+}
+
+// Add manifest to plugin
+plugin.signatureManifest = manifest
+```
+
+#### Step 3: Sign the Plugin
+
+```typescript
+// Sign the plugin fingerprint
+const privateKey = fs.readFileSync('private-key.pem', 'utf8')
+const fingerprint = generatePluginFingerprint(plugin)
+const signature = sign('SHA256', Buffer.from(fingerprint), privateKey)
+
+// Add signature to plugin
+plugin.signature = signature.toString('base64')
+```
+
+#### Step 4: Configure Plugin Manager
+
+```typescript
+import fs from 'fs'
+
+const publicKey = fs.readFileSync('public-key.pem', 'utf8')
+const trustedKeys = [
+  fs.readFileSync('trusted-key-1.pem', 'utf8'),
+  fs.readFileSync('trusted-key-2.pem', 'utf8')
+]
+
+const manager = new PluginManager({
+  debug: false,
+  allowUnsignedPlugins: false, // Require signatures in production
+  pluginPublicKey: publicKey,
+  trustedPluginKeys: trustedKeys
+})
+
+// Register signed plugin
+try {
+  manager.register(plugin)
+  console.log('Plugin registered successfully')
+} catch (error) {
+  console.error('Plugin registration failed:', error.message)
+}
+```
+
+### Capability-Based Access Control
+
+```typescript
+// Define plugin capabilities
+const plugin: AgentKitPlugin = {
+  name: 'network-plugin',
+  version: '1.0.0',
+  
+  // Declare required capabilities
+  capabilities: [
+    'network.http',        // HTTP requests
+    'network.websocket',   // WebSocket connections
+    'filesystem.read',     // Read file access
+    'crypto.verify',       // Cryptographic operations
+    'ui.notifications'     // User notifications
+  ],
+  
+  signatureManifest: {
+    name: 'network-plugin',
+    version: '1.0.0',
+    allowedHooks: ['onInit', 'onSend'], // Restrict hook usage
+    fingerprintHash: '...'
+  }
+}
+```
+
+### Environment-Specific Behavior
+
+#### Production Mode
+```typescript
+// Strict security enforcement
+process.env.NODE_ENV = 'production'
+
+const manager = new PluginManager({
+  allowUnsignedPlugins: false,     // Reject unsigned plugins
+  pluginPublicKey: process.env.AGENTKIT_PUBLIC_KEY,
+  trustedPluginKeys: process.env.AGENTKIT_TRUSTED_KEYS?.split(',')
+})
+
+// Production warnings for missing manifests
+// Console: "Plugin 'my-plugin' missing signature manifest - this will be required in future versions"
+```
+
+#### Development Mode
+```typescript
+// Relaxed for development
+process.env.NODE_ENV = 'development'
+
+const manager = new PluginManager({
+  debug: true,
+  allowUnsignedPlugins: true,      // Allow unsigned for development
+  pluginPublicKey: publicKey       // Optional verification
+})
+
+// Development warnings for security violations
+// Console: "Plugin sandboxing disabled. This should only be used in development or trusted environments."
+```
+
+### Security Validation Levels
+
+#### Level 1: Basic Validation
+- Plugin schema validation
+- Hook signature verification
+- Basic security checks
+
+#### Level 2: Signature Verification
+- Cryptographic signature validation
+- Multi-key support
+- Signature caching for performance
+
+#### Level 3: Manifest Enforcement
+- Manifest integrity verification
+- Hook capability restrictions
+- Fingerprint tamper detection
+
+#### Level 4: Capability Control
+- Granular permission validation
+- Custom capability definitions
+- Runtime capability enforcement
+
+### CLI Tools for Plugin Signing
+
+```bash
+# Install AgentKit CLI
+npm install -g @agentkit/cli
+
+# Create new plugin with signing setup
+agentkit create-plugin my-plugin --with-signing
+
+# Generate and sign plugin
+agentkit sign-plugin plugin.json --private-key private-key.pem
+
+# Verify plugin signature
+agentkit verify-plugin plugin.signed.json --public-key public-key.pem
+
+# List trusted keys
+agentkit list-keys --config trusted-keys.json
+```
+
+### Security Monitoring and Observability
+
+```typescript
+const manager = new PluginManager({
+  observabilityHooks: {
+    onPluginSignatureVerified: (pluginName, isValid, duration) => {
+      console.log(`Plugin ${pluginName} signature verification: ${isValid ? 'PASS' : 'FAIL'} (${duration}ms)`)
+    },
+    
+    onPluginManifestValidated: (pluginName, manifest, isValid) => {
+      if (!isValid) {
+        console.error(`Plugin ${pluginName} manifest validation failed`)
+      }
+    },
+    
+    onPluginCapabilityViolation: (pluginName, violatedCapability) => {
+      console.warn(`Plugin ${pluginName} attempted unauthorized capability: ${violatedCapability}`)
+    },
+    
+    onPluginSandboxEscape: (pluginName, attempt) => {
+      console.error(`Security Alert: Plugin ${pluginName} attempted sandbox escape: ${attempt}`)
+    }
+  }
+})
+```
+
+### Best Practices for Plugin Authors
+
+1. **Minimal Capabilities**: Only declare necessary capabilities
+2. **Manifest Compliance**: Ensure manifest matches implementation
+3. **Key Security**: Protect private signing keys
+4. **Version Control**: Update manifest for each version
+5. **Testing**: Test plugins in both signed and unsigned modes
+
+### Best Practices for SDK Integrators
+
+1. **Key Management**: Secure storage of trusted public keys
+2. **Environment Separation**: Different keys for dev/staging/production
+3. **Monitoring**: Track signature verification metrics
+4. **Rotation**: Regular key rotation procedures
+5. **Incident Response**: Procedures for compromised plugins
+
 ## Security Compliance
 
 The AgentKit plugin system is designed to meet enterprise security requirements:
@@ -443,3 +737,7 @@ The AgentKit plugin system is designed to meet enterprise security requirements:
 - ✅ **Resource Control**: Memory and execution time limits
 - ✅ **Error Resilience**: Failure isolation and recovery
 - ✅ **Audit Trail**: Detailed execution and error logging
+- ✅ **Cryptographic Security**: RSA-2048 signature verification
+- ✅ **Manifest Integrity**: Content tampering detection
+- ✅ **Capability Control**: Granular permission enforcement
+- ✅ **Multi-Key Trust**: Multiple signing authority support

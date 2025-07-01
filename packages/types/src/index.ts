@@ -365,12 +365,24 @@ const SendPayloadSchema = z.object({
   metadata: z.record(z.unknown())
 })
 
+const PluginSignatureManifestSchema = z.object({
+  name: z.string().min(1),
+  version: z.string().regex(/^\d+\.\d+\.\d+$/),
+  allowedHooks: z.array(z.string()),
+  fingerprintHash: z.string().regex(/^[a-f0-9]{64}$/) // SHA-256 hash validation
+})
+
 const AgentKitPluginSchema = z.object({
   name: z.string().min(1),
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
   description: z.string().optional(),
   compatibility: PluginCompatibilitySchema,
   permissions: PluginPermissionsSchema,
+  signature: z.string().optional(),
+  publicKey: z.string().optional(),
+  trustPolicy: z.enum(['strict', 'warn', 'off']).optional(),
+  signatureManifest: PluginSignatureManifestSchema.optional(),
+  capabilities: z.array(z.string()).optional(),
   onInit: z.function().args(AgentContextSchema).returns(z.union([z.void(), z.promise(z.void())])).optional(),
   onSend: z.function().args(SendPayloadSchema, AgentContextSchema).returns(z.union([z.void(), z.promise(z.void())])).optional(),
   onError: z.function().args(z.instanceof(Error), AgentContextSchema).returns(z.union([z.void(), z.promise(z.void())])).optional(),
@@ -560,6 +572,20 @@ export interface PluginPermissions {
 }
 
 /**
+ * Plugin signature manifest containing signed metadata
+ */
+export interface PluginSignatureManifest {
+  /** Plugin name (must match plugin.name) */
+  name: string
+  /** Plugin version (must match plugin.version) */
+  version: string
+  /** Array of hook names this plugin is allowed to implement */
+  allowedHooks: string[]
+  /** SHA-256 fingerprint hash of plugin content for integrity verification */
+  fingerprintHash: string
+}
+
+/**
  * AgentKit Plugin Interface
  * Plugins can hook into various lifecycle events
  * All hooks support both sync and async execution
@@ -582,6 +608,11 @@ export interface AgentKitPlugin {
   publicKey?: string
   /** Trust policy for this plugin: 'strict' | 'warn' | 'off' */
   trustPolicy?: 'strict' | 'warn' | 'off'
+  
+  /** Signed manifest containing plugin metadata and allowed hooks */
+  signatureManifest?: PluginSignatureManifest
+  /** Plugin capabilities - extensible string array for custom permissions */
+  capabilities?: string[]
   
   /**
    * Called when the agent is initialized
@@ -654,7 +685,8 @@ export {
   SendPayloadSchema, 
   AgentKitPluginSchema,
   PluginCompatibilitySchema,
-  PluginPermissionsSchema 
+  PluginPermissionsSchema,
+  PluginSignatureManifestSchema
 }
 
 // Type guard

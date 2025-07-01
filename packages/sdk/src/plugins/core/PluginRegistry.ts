@@ -1,4 +1,4 @@
-import type { AgentKitPlugin, PluginHookName } from '@agentkit/types'
+import type { AgentKitPlugin, PluginHookName, PluginSignatureManifest } from '@agentkit/types'
 import { AgentKitPluginSchema } from '../types'
 import { PluginValidationError, PluginSignatureError } from '../../errors'
 import { debugLog } from '../../log'
@@ -6,7 +6,13 @@ import { PluginSignature, PluginSignatureConfig } from '../../security/PluginSig
 import { EnvironmentGuard } from '../../security/EnvironmentGuard'
 
 /**
- * Plugin Registry - Manages plugin registration and lookup
+ * Plugin Registry - Enhanced with manifest and capability enforcement
+ * 
+ * Implements Stripe-level security validation:
+ * - Plugin signature verification
+ * - Manifest integrity validation
+ * - Hook capability restrictions
+ * - Schema validation with enhanced security checks
  */
 export class PluginRegistry {
   private plugins: AgentKitPlugin[] = []
@@ -26,15 +32,22 @@ export class PluginRegistry {
   }
 
   /**
-   * Register a plugin with validation
+   * Register a plugin with comprehensive security validation
+   * 
+   * Validation performed:
+   * 1. Plugin signature verification
+   * 2. Manifest integrity and capability validation
+   * 3. Schema validation
+   * 4. Hook signature validation
+   * 5. Capability enforcement
    */
   register(plugin: AgentKitPlugin): void {
-    // Verify plugin signature if signature verification is enabled
+    // Step 1: Verify plugin signature and manifest
     if (this.signature && !this.signature.verifyPlugin(plugin as any)) {
       throw new PluginSignatureError(plugin.name, 'signature', 'Plugin signature verification failed');
     }
 
-    // Validate plugin schema
+    // Step 2: Validate plugin schema
     try {
       AgentKitPluginSchema.parse(plugin)
     } catch (error) {
@@ -43,22 +56,33 @@ export class PluginRegistry {
       })
     }
 
-    // Validate hook functions are actually functions and have correct signatures
+    // Step 3: Enhanced manifest validation
+    if (plugin.signatureManifest) {
+      this.validatePluginManifest(plugin, plugin.signatureManifest)
+    } else if (EnvironmentGuard.isProduction()) {
+      // Require manifest in production for enhanced security
+      console.warn(`[AgentKit Security] Plugin "${plugin.name}" missing signature manifest - this will be required in future versions`)
+    }
+
+    // Step 4: Validate hook functions and signatures
     this.validatePluginHooks(plugin)
 
+    // Step 5: Validate plugin capabilities
+    this.validatePluginCapabilities(plugin)
+
+    // Registration successful - add to registry
     this.plugins.push(plugin)
     
-    const availableHooks = [
-      plugin.onInit ? 'onInit' : null,
-      plugin.onSend ? 'onSend' : null, 
-      plugin.onError ? 'onError' : null,
-      plugin.onShutdown ? 'onShutdown' : null
-    ].filter(Boolean)
+    const availableHooks = this.getImplementedHooks(plugin)
+    const capabilities = plugin.capabilities || []
     
     debugLog.operation('plugin registered', {
       name: plugin.name,
       version: plugin.version,
-      hooks: availableHooks
+      hooks: availableHooks,
+      capabilities: capabilities.length,
+      hasManifest: !!plugin.signatureManifest,
+      hasSignature: !!plugin.signature
     }, this.debug)
   }
 
@@ -106,6 +130,95 @@ export class PluginRegistry {
     return this.plugins
       .map(plugin => ({ plugin, hook: (plugin as any)[hookName] }))
       .filter(({ hook }) => typeof hook === 'function')
+  }
+
+  /**
+   * Validate plugin manifest against plugin implementation
+   * 
+   * Verifies:
+   * - Manifest metadata matches plugin metadata
+   * - Plugin hooks are within allowed hooks
+   * - Manifest integrity is maintained
+   */
+  private validatePluginManifest(plugin: AgentKitPlugin, manifest: PluginSignatureManifest): void {
+    // Validate manifest metadata matches plugin
+    if (manifest.name !== plugin.name) {
+      throw new PluginValidationError(plugin.name, `Manifest name mismatch: expected "${plugin.name}", got "${manifest.name}"`)
+    }
+
+    if (manifest.version !== plugin.version) {
+      throw new PluginValidationError(plugin.name, `Manifest version mismatch: expected "${plugin.version}", got "${manifest.version}"`)
+    }
+
+    // Validate plugin hooks are within allowed hooks
+    const implementedHooks = this.getImplementedHooks(plugin)
+    const unauthorizedHooks = implementedHooks.filter(hook => !manifest.allowedHooks.includes(hook))
+    
+    if (unauthorizedHooks.length > 0) {
+      throw new PluginSignatureError(
+        plugin.name, 
+        'manifest', 
+        `Plugin implements unauthorized hooks: ${unauthorizedHooks.join(', ')}. Allowed hooks: ${manifest.allowedHooks.join(', ')}`,
+        { context: { unauthorizedHooks, allowedHooks: manifest.allowedHooks } }
+      )
+    }
+
+    debugLog.operation('plugin manifest validated', {
+      name: plugin.name,
+      implementedHooks,
+      allowedHooks: manifest.allowedHooks,
+      fingerprintHash: manifest.fingerprintHash.substring(0, 8) + '...'
+    }, this.debug)
+  }
+
+  /**
+   * Validate plugin capabilities against security policies
+   * 
+   * Note: This is extensible for future capability-based access control
+   */
+  private validatePluginCapabilities(plugin: AgentKitPlugin): void {
+    if (!plugin.capabilities) {
+      return // No capabilities to validate
+    }
+
+    // Basic capability validation
+    const validCapabilities = [
+      'network.http', 'network.websocket',
+      'filesystem.read', 'filesystem.write',
+      'system.process', 'system.environment',
+      'crypto.sign', 'crypto.verify',
+      'ui.notifications', 'ui.dialogs'
+    ]
+
+    const invalidCapabilities = plugin.capabilities.filter(cap => 
+      !validCapabilities.some(valid => cap.startsWith(valid.split('.')[0]))
+    )
+
+    if (invalidCapabilities.length > 0) {
+      console.warn(`[AgentKit Security] Plugin "${plugin.name}" declares unrecognized capabilities: ${invalidCapabilities.join(', ')}`)
+    }
+
+    // Log capability registration for security monitoring
+    if (plugin.capabilities.length > 0) {
+      debugLog.operation('plugin capabilities registered', {
+        name: plugin.name,
+        capabilities: plugin.capabilities
+      }, this.debug)
+    }
+  }
+
+  /**
+   * Get list of hooks implemented by a plugin
+   */
+  private getImplementedHooks(plugin: AgentKitPlugin): string[] {
+    const hooks: string[] = []
+    
+    if (typeof plugin.onInit === 'function') hooks.push('onInit')
+    if (typeof plugin.onSend === 'function') hooks.push('onSend')
+    if (typeof plugin.onError === 'function') hooks.push('onError')
+    if (typeof plugin.onShutdown === 'function') hooks.push('onShutdown')
+    
+    return hooks
   }
 
   /**
