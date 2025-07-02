@@ -3,6 +3,17 @@ import { AgentKitError } from '../errors'
 import { debugLog } from '../log'
 import { WorkerPool } from './worker-utils'
 import { EnvironmentGuard } from '../security/EnvironmentGuard'
+// Import deep freeze utility for strict immutability
+function deepFreeze<T extends object>(obj: T): Readonly<T> {
+  // Simple deep freeze implementation
+  Object.getOwnPropertyNames(obj).forEach(prop => {
+    const value = (obj as Record<string, unknown>)[prop]
+    if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+      deepFreeze(value)
+    }
+  })
+  return Object.freeze(obj)
+}
 
 // Import new modular components
 import { PluginRegistry } from './core/PluginRegistry'
@@ -67,7 +78,7 @@ export class PluginManager {
     this.registry = new PluginRegistry(this.options.debug, {
       publicKey: this.options.pluginPublicKey || process.env.AGENTKIT_PUBLIC_KEY || '',
       allowUnsigned: !EnvironmentGuard.isProduction() && this.options.allowUnsignedPlugins,
-      trustedKeys: this.options.trustedPluginKeys
+      trustedKeys: this.options.trustedPluginKeys ? [...this.options.trustedPluginKeys] : []
     })
     this.platformEnv = new PlatformEnvironment(this.options.debug)
     this.security = new PluginSecurity(this.options.debug)
@@ -84,7 +95,7 @@ export class PluginManager {
       debug: this.options.debug,
       sandbox: this.options.sandbox,
       sandboxTimeout: this.options.sandboxTimeout,
-      allowedGlobals: this.options.allowedGlobals,
+      allowedGlobals: this.options.allowedGlobals ? [...this.options.allowedGlobals] : [],
       enableDebugMode: this.options.enableDebugMode
     })
 
@@ -116,8 +127,9 @@ export class PluginManager {
       console.warn('Plugin sandboxing disabled. This should only be used in development or trusted environments.')
     }
     
-    // Freeze the options object after all initialization is complete
-    Object.freeze(this.options)
+    // Deep freeze the options object after all initialization is complete
+    // This prevents any mutations to the options object or its nested properties
+    deepFreeze(this.options)
   }
 
   /**

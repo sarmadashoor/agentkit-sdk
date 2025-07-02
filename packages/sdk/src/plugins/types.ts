@@ -45,27 +45,27 @@ export type { AgentKitPlugin } from '@agentkit/types'
  */
 export interface PluginManagerOptions {
   /** Enable debug logging */
-  debug?: boolean
+  readonly debug?: boolean
   /** Maximum time to wait for a plugin hook (ms) */
-  hookTimeout?: number
+  readonly hookTimeout?: number
   /** Observability hooks for monitoring plugin execution */
-  observabilityHooks?: PluginManagerObservabilityHooks
+  readonly observabilityHooks?: PluginManagerObservabilityHooks
   /** Whether to fail fast on plugin errors (default: false - continue execution) */
-  failFast?: boolean
+  readonly failFast?: boolean
   /** Enable plugin sandboxing with vm.runInContext (Node.js only, default: true) */
-  sandbox?: boolean
+  readonly sandbox?: boolean
   /** Custom timeout for sandbox execution (default: 500ms) */
-  sandboxTimeout?: number
+  readonly sandboxTimeout?: number
   /** Allowed global objects in sandbox context */
-  allowedGlobals?: string[]
+  readonly allowedGlobals?: readonly string[]
   /** Enable debug mode for sandbox execution */
-  enableDebugMode?: boolean
+  readonly enableDebugMode?: boolean
   /** Public key for plugin signature verification */
-  pluginPublicKey?: string
+  readonly pluginPublicKey?: string
   /** Whether to allow unsigned plugins in development */
-  allowUnsignedPlugins?: boolean
+  readonly allowUnsignedPlugins?: boolean
   /** Additional trusted public keys for plugin verification */
-  trustedPluginKeys?: string[]
+  readonly trustedPluginKeys?: readonly string[]
 }
 
 /**
