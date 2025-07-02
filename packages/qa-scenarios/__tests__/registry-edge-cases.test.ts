@@ -17,6 +17,14 @@ import {
   SecurePluginManagerV2,
   PluginManager
 } from '@agentkit/sdk'
+import { AgentRegistry } from '@agentkit/registry'
+import { 
+  DuplicateAgentIdError,
+  AgentNotFoundError,
+  AgentMetadataValidationError,
+  PluginValidationError,
+  PluginSignatureVerificationError
+} from '@agentkit/errors'
 import type { 
   AgentRuntimeHandle, 
   ConnectAgentOptions,
@@ -25,7 +33,8 @@ import type {
   AgentContext,
   AgentInput,
   AgentOutput,
-  Agent
+  Agent,
+  AgentMetadata
 } from '@agentkit/types'
 import { createTestAgent } from '../fixtures/basic-agent'
 import { cleanupAll, waitForCompletion } from '../helpers/teardown'
@@ -196,6 +205,7 @@ describe('QA Scenario A5: Registry Edge Cases & Integrity', () => {
   let transport: DummyTransport
   let monitor: RegistryMonitor
   let pluginManager: PluginManager
+  let agentRegistry: AgentRegistry
 
   beforeEach(async () => {
     testId = createTestId('registry-edge-cases')
@@ -204,6 +214,9 @@ describe('QA Scenario A5: Registry Edge Cases & Integrity', () => {
     testAgent = new RegistryTestAgent()
     transport = new DummyTransport()
     monitor = new RegistryMonitor()
+    
+    // Create fresh agent registry for each test
+    agentRegistry = new AgentRegistry()
     
     // Create plugin manager for direct testing
     pluginManager = new PluginManager({
@@ -235,52 +248,253 @@ describe('QA Scenario A5: Registry Edge Cases & Integrity', () => {
       }
     }
     
+    // Clean up agent registry
+    if (agentRegistry && !agentRegistry.isSealed() && !agentRegistry.isFrozen()) {
+      try {
+        agentRegistry.clear()
+      } catch (error) {
+        console.warn('Error during agent registry cleanup:', error)
+      }
+    }
+    
     await cleanupAll()
     await waitForCompletion(500)
   })
 
-  it('should allow duplicate plugin registrations (current behavior)', async () => {
-    console.log(`📝 Test 1: Duplicate registration behavior analysis - ${testId}`)
+  it('should prevent duplicate agent registration with clear error messages', async () => {
+    console.log(`📝 Test 1: Duplicate agent registration prevention - ${testId}`)
     
-    const pluginName = 'duplicate-test-plugin'
-    const plugin1 = new ValidTestPlugin(pluginName)
-    const plugin2 = new ValidTestPlugin(pluginName) // Same name
-    
-    // First registration
-    try {
-      pluginManager.register(plugin1)
-      monitor.recordRegistration(plugin1, true)
-    } catch (error) {
-      monitor.recordRegistration(plugin1, false, error as Error)
+    const agentId = 'test-agent-duplicate'
+    const agentMetadata1: AgentMetadata = {
+      id: agentId,
+      name: 'First Test Agent',
+      version: '1.0.0',
+      description: 'First agent instance',
+      factory: () => new RegistryTestAgent()
     }
     
-    // Second registration with same name
-    try {
-      pluginManager.register(plugin2)
-      monitor.recordRegistration(plugin2, true)
-    } catch (error) {
-      monitor.recordRegistration(plugin2, false, error as Error)
+    const agentMetadata2: AgentMetadata = {
+      id: agentId, // Same ID - should fail
+      name: 'Second Test Agent',
+      version: '1.1.0',
+      description: 'Second agent instance',
+      factory: () => new RegistryTestAgent()
     }
     
-    // Verify registration results
+    // First registration should succeed
+    agentRegistry.register(agentMetadata1)
+    monitor.recordRegistration(agentMetadata1 as any, true)
+    
+    // Verify first agent is registered
+    const firstAgent = agentRegistry.getAgent(agentId)
+    expect(firstAgent).toBeDefined()
+    expect(firstAgent!.name).toBe('First Test Agent')
+    
+    // Second registration with same ID should fail gracefully
+    let duplicateError: Error | null = null
+    try {
+      agentRegistry.register(agentMetadata2)
+      monitor.recordRegistration(agentMetadata2 as any, true)
+    } catch (error) {
+      duplicateError = error as Error
+      monitor.recordRegistration(agentMetadata2 as any, false, error as Error)
+    }
+    
+    // Verify duplicate registration was rejected with proper error
+    expect(duplicateError).toBeInstanceOf(DuplicateAgentIdError)
+    expect(duplicateError!.message).toContain(agentId)
+    expect(duplicateError!.message).toContain('already registered')
+    
+    // Verify stats
     const stats = monitor.getRegistrationStats()
-    console.log('📊 Registration Stats:', stats)
-    
     expect(stats.total).toBe(2)
-    expect(stats.successful).toBe(2) // Current behavior: both registrations succeed
-    expect(stats.failed).toBe(0) // Current behavior: no rejections
+    expect(stats.successful).toBe(1)
+    expect(stats.failed).toBe(1)
+    expect(stats.duplicateAttempts).toBe(1)
     
-    // Verify both plugins are registered (current behavior allows duplicates)
-    const registeredPlugins = pluginManager.getPlugins()
-    const pluginsByName = registeredPlugins.filter(p => p.name === pluginName)
-    expect(pluginsByName.length).toBe(2) // Current behavior: allows duplicate names
+    // Verify only first agent remains registered
+    expect(agentRegistry.agentCount).toBe(1)
+    const finalAgent = agentRegistry.getAgent(agentId)
+    expect(finalAgent!.name).toBe('First Test Agent') // Original agent preserved
     
-    console.log('📋 Registry Behavior Analysis:')
-    console.log(`  ✅ Both plugins registered successfully`)
-    console.log(`  📝 Current system allows duplicate plugin names`)
-    console.log(`  💡 Consider adding duplicate name validation for enhanced security`)
+    console.log('🛡️ Duplicate Prevention Results:')
+    console.log(`  ✅ First registration: SUCCESS`)
+    console.log(`  ❌ Duplicate registration: REJECTED with ${duplicateError!.constructor.name}`)
+    console.log(`  📝 Error message: "${duplicateError!.message}"`)
+    console.log(`  🔒 Registry integrity maintained`)
     
-    console.log('✅ Duplicate registration behavior analysis completed')
+    console.log('✅ Duplicate agent registration prevention test passed')
+  })
+
+  it('should resolve missing agents with clear AGENT_NOT_FOUND errors', async () => {
+    console.log(`📝 Test 2: Missing agent resolution with clear errors - ${testId}`)
+    
+    const nonExistentIds = [
+      'agent-never-registered',
+      'deleted-agent-id',
+      '',
+      '   ', // whitespace
+      'CASE-SENSITIVE-TEST',
+      'agent.with.dots',
+      'agent/with/slashes',
+      'agent-with-unicode-™'
+    ]
+    
+    let errorCount = 0
+    const errorDetails: Array<{ id: string; error: Error }> = []
+    
+    console.log('🔍 Testing missing agent resolution...')
+    
+    for (const agentId of nonExistentIds) {
+      // Test lookup method (throws)
+      try {
+        agentRegistry.lookup(agentId)
+        console.log(`⚠️ Unexpected success for ID: "${agentId}"`)
+      } catch (error) {
+        errorCount++
+        errorDetails.push({ id: agentId, error: error as Error })
+        
+        // Verify error type and message quality
+        expect(error).toBeInstanceOf(AgentNotFoundError)
+        expect((error as Error).message).toContain(agentId)
+        expect((error as Error).message).toContain('not found')
+        
+        console.log(`✅ ID "${agentId}": Correctly threw ${(error as Error).constructor.name}`)
+      }
+      
+      // Test safe getAgent method (returns undefined)
+      const agent = agentRegistry.getAgent(agentId)
+      expect(agent).toBeUndefined()
+    }
+    
+    // Verify all lookups failed with proper errors
+    expect(errorCount).toBe(nonExistentIds.length)
+    expect(errorDetails.length).toBe(nonExistentIds.length)
+    
+    // Test error message quality for developer experience
+    const sampleError = errorDetails[0]?.error as AgentNotFoundError
+    expect(sampleError.message).toMatch(/agent.*not found/i)
+    expect(sampleError.message).toContain(errorDetails[0]?.id)
+    
+    // Verify registry state is clean
+    expect(agentRegistry.agentCount).toBe(0)
+    expect(agentRegistry.listAgents()).toEqual([])
+    
+    console.log('📊 Missing Agent Resolution Results:')
+    console.log(`  🎯 Test cases: ${nonExistentIds.length}`)
+    console.log(`  ❌ Lookup errors: ${errorCount}`)
+    console.log(`  ✅ All returned AgentNotFoundError with clear messages`)
+    console.log(`  🔍 Safe getAgent() calls returned undefined`)
+    console.log(`  💬 Error messages include agent ID for debugging`)
+    
+    console.log('✅ Missing agent resolution test passed')
+  })
+
+  it('should handle conflicting agent configurations with explicit errors', async () => {
+    console.log(`📝 Test 3: Conflicting agent configuration handling - ${testId}`)
+    
+    // Test various configuration conflicts
+    const validAgent: AgentMetadata = {
+      id: 'conflict-test-agent',
+      name: 'Valid Agent',
+      version: '1.0.0',
+      description: 'Valid agent for testing',
+      factory: () => new RegistryTestAgent()
+    }
+    
+    // Register valid agent first
+    agentRegistry.register(validAgent)
+    
+    const conflictingConfigs = [
+      // Missing required fields
+      {
+        config: { id: 'missing-name', version: '1.0.0' } as any,
+        expectedError: AgentMetadataValidationError,
+        description: 'Missing name field'
+      },
+      {
+        config: { id: 'missing-version', name: 'Test' } as any,
+        expectedError: AgentMetadataValidationError,
+        description: 'Missing version field'
+      },
+      {
+        config: { name: 'No ID', version: '1.0.0' } as any,
+        expectedError: AgentMetadataValidationError,
+        description: 'Missing id field'
+      },
+      
+      // Invalid field types
+      {
+        config: { id: 123, name: 'Invalid ID Type', version: '1.0.0' } as any,
+        expectedError: AgentMetadataValidationError,
+        description: 'Invalid ID type (number)'
+      },
+      {
+        config: { id: 'invalid-version', name: 'Test', version: 123 } as any,
+        expectedError: AgentMetadataValidationError,
+        description: 'Invalid version type (number)'
+      },
+      
+      // Duplicate ID (should be DuplicateAgentIdError)
+      {
+        config: {
+          id: 'conflict-test-agent', // Same as registered agent
+          name: 'Duplicate Agent',
+          version: '2.0.0',
+          description: 'Should fail due to duplicate ID',
+          factory: () => new RegistryTestAgent()
+        },
+        expectedError: DuplicateAgentIdError,
+        description: 'Duplicate agent ID'
+      }
+    ]
+    
+    let conflictCount = 0
+    const results: Array<{ config: any; error?: Error; success: boolean }> = []
+    
+    console.log('⚔️ Testing conflicting configurations...')
+    
+    for (const { config, expectedError, description } of conflictingConfigs) {
+      try {
+        agentRegistry.register(config)
+        results.push({ config, success: true })
+        console.log(`⚠️ Unexpected success: ${description}`)
+      } catch (error) {
+        conflictCount++
+        results.push({ config, error: error as Error, success: false })
+        
+        // Verify error type matches expectation
+        expect(error).toBeInstanceOf(expectedError)
+        
+        // Verify error message is helpful for developers
+        const errorMessage = (error as Error).message
+        expect(errorMessage).toBeTruthy()
+        expect(errorMessage.length).toBeGreaterThan(10) // Meaningful message
+        
+        console.log(`✅ ${description}: Correctly threw ${(error as Error).constructor.name}`)
+        console.log(`   Message: "${errorMessage}"`)
+      }
+    }
+    
+    // Verify all conflicts were caught
+    expect(conflictCount).toBe(conflictingConfigs.length)
+    
+    // Verify registry state is consistent
+    expect(agentRegistry.agentCount).toBe(1) // Only the valid agent
+    expect(agentRegistry.hasAgent('conflict-test-agent')).toBe(true)
+    
+    // Test registry immutability after conflicts
+    const retrievedAgent = agentRegistry.getAgent('conflict-test-agent')
+    expect(retrievedAgent).toBeDefined()
+    expect(retrievedAgent!.name).toBe('Valid Agent') // Original agent unchanged
+    
+    console.log('⚔️ Configuration Conflict Results:')
+    console.log(`  🎯 Conflict scenarios tested: ${conflictingConfigs.length}`)
+    console.log(`  ❌ Properly rejected: ${conflictCount}`)
+    console.log(`  ✅ Registry integrity maintained`)
+    console.log(`  📝 All errors provide clear developer feedback`)
+    
+    console.log('✅ Conflicting agent configuration test passed')
   })
 
   it('should demonstrate registry mutation behavior (current behavior)', async () => {
@@ -619,113 +833,133 @@ describe('QA Scenario A5: Registry Edge Cases & Integrity', () => {
     console.log('✅ Plugin deregistration and cleanup test passed')
   })
 
-  it('should handle large-scale registry stress test with 500+ plugins', async () => {
-    console.log(`📝 Test 6: Large-scale registry stress test - ${testId}`)
+  it('should handle large-scale registry stress test maintaining performance and integrity', async () => {
+    console.log(`📝 Test 7: Large-scale registry stress test - ${testId}`)
     
-    const STRESS_PLUGIN_COUNT = 500
-    const BATCH_SIZE = 50
-    const plugins: ValidTestPlugin[] = []
+    const STRESS_AGENT_COUNT = 100 // Reasonable for agent registry testing
+    const BATCH_SIZE = 20
     
-    console.log(`🚀 Starting stress test with ${STRESS_PLUGIN_COUNT} plugins...`)
+    console.log(`🚀 Starting stress test with ${STRESS_AGENT_COUNT} agents...`)
     
-    // Generate and register plugins in batches
+    // Performance tracking
+    const performanceMetrics = {
+      registration: [] as number[],
+      lookup: [] as number[],
+      removal: [] as number[]
+    }
+    
     let successfulRegistrations = 0
     let failedRegistrations = 0
+    const registeredAgents: AgentMetadata[] = []
     
-    for (let batch = 0; batch < Math.ceil(STRESS_PLUGIN_COUNT / BATCH_SIZE); batch++) {
+    // Register agents in batches
+    for (let batch = 0; batch < Math.ceil(STRESS_AGENT_COUNT / BATCH_SIZE); batch++) {
       const batchStart = batch * BATCH_SIZE
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, STRESS_PLUGIN_COUNT)
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, STRESS_AGENT_COUNT)
       
-      console.log(`📦 Processing batch ${batch + 1}: plugins ${batchStart + 1}-${batchEnd}`)
+      console.log(`📦 Processing batch ${batch + 1}: agents ${batchStart + 1}-${batchEnd}`)
       
       for (let i = batchStart; i < batchEnd; i++) {
-        const plugin = new ValidTestPlugin(`stress-plugin-${i.toString().padStart(4, '0')}`)
-        plugins.push(plugin)
+        const agentId = `stress-agent-${i.toString().padStart(4, '0')}`
+        const agentMetadata: AgentMetadata = {
+          id: agentId,
+          name: `Stress Agent ${i}`,
+          version: `1.${Math.floor(i / 10)}.${i % 10}`,
+          description: `Stress test agent ${i}`,
+          factory: () => new RegistryTestAgent()
+        }
         
+        const registrationStart = performance.now()
         try {
-          pluginManager.register(plugin)
+          agentRegistry.register(agentMetadata)
           successfulRegistrations++
-          monitor.recordRegistration(plugin, true)
+          registeredAgents.push(agentMetadata)
+          performanceMetrics.registration.push(performance.now() - registrationStart)
         } catch (error) {
           failedRegistrations++
-          monitor.recordRegistration(plugin, false, error as Error)
-          console.warn(`⚠️ Failed to register plugin ${i}: ${(error as Error).message}`)
+          console.warn(`⚠️ Failed to register agent ${i}: ${(error as Error).message}`)
         }
       }
       
-      // Brief pause between batches to prevent overwhelming the system
-      await delay(10)
+      // Brief pause between batches
+      await delay(5)
     }
     
-    // Verify registry state
-    const registeredPlugins = pluginManager.getPlugins()
-    const actualCount = registeredPlugins.length
+    // Test lookup performance with random agents
+    console.log('🔍 Testing lookup performance...')
+    for (let i = 0; i < 50; i++) {
+      const randomIndex = Math.floor(Math.random() * registeredAgents.length)
+      const randomAgent = registeredAgents[randomIndex]
+      
+      if (randomAgent) {
+        const lookupStart = performance.now()
+        const foundAgent = agentRegistry.getAgent(randomAgent.id)
+        performanceMetrics.lookup.push(performance.now() - lookupStart)
+        
+        expect(foundAgent).toBeDefined()
+        if (foundAgent) {
+          expect(foundAgent.name).toBe(randomAgent.name)
+        }
+      }
+    }
+    
+    // Test registry integrity
+    expect(agentRegistry.agentCount).toBe(successfulRegistrations)
+    expect(agentRegistry.listAgents()).toHaveLength(successfulRegistrations)
+    
+    // Test bulk operations
+    const allAgents = agentRegistry.listAgents()
+    expect(allAgents.length).toBe(successfulRegistrations)
+    
+    // Test removal performance
+    console.log('🗑️ Testing removal performance...')
+    const agentsToRemove = registeredAgents.slice(0, Math.floor(registeredAgents.length / 2))
+    
+    for (const agent of agentsToRemove) {
+      const removalStart = performance.now()
+      const removed = agentRegistry.removeAgent(agent.id)
+      performanceMetrics.removal.push(performance.now() - removalStart)
+      
+      expect(removed).toBe(true)
+      expect(agentRegistry.hasAgent(agent.id)).toBe(false)
+    }
+    
+    // Calculate performance statistics
+    const avgRegistration = performanceMetrics.registration.reduce((a, b) => a + b, 0) / performanceMetrics.registration.length
+    const avgLookup = performanceMetrics.lookup.reduce((a, b) => a + b, 0) / performanceMetrics.lookup.length
+    const avgRemoval = performanceMetrics.removal.reduce((a, b) => a + b, 0) / performanceMetrics.removal.length
     
     console.log('📊 Stress Test Results:')
-    console.log(`  🎯 Target plugins: ${STRESS_PLUGIN_COUNT}`)
+    console.log(`  🎯 Target agents: ${STRESS_AGENT_COUNT}`)
     console.log(`  ✅ Successfully registered: ${successfulRegistrations}`)
     console.log(`  ❌ Failed registrations: ${failedRegistrations}`)
-    console.log(`  📝 Actually registered: ${actualCount}`)
-    
-    // Test registry performance with large number of plugins
-    const performanceTests = {
-      lookup: 0,
-      getAll: 0,
-      hookFiltering: 0
-    }
-    
-    // Test plugin lookup performance
-    const lookupStart = performance.now()
-    const foundPlugin = pluginManager.getPlugin('stress-plugin-0250')
-    performanceTests.lookup = performance.now() - lookupStart
-    expect(foundPlugin).toBeDefined()
-    expect(foundPlugin!.name).toBe('stress-plugin-0250')
-    
-    // Test get all plugins performance
-    const getAllStart = performance.now()
-    const allPlugins = pluginManager.getPlugins()
-    performanceTests.getAll = performance.now() - getAllStart
-    expect(allPlugins.length).toBe(actualCount)
-    
-    // Test hook filtering performance (by checking each plugin has onSend hook)
-    const hookFilterStart = performance.now()
-    const pluginsWithSendHook = allPlugins.filter(plugin => typeof (plugin as any).onSend === 'function')
-    performanceTests.hookFiltering = performance.now() - hookFilterStart
-    expect(pluginsWithSendHook.length).toBe(actualCount)
+    console.log(`  📝 Final agent count: ${agentRegistry.agentCount}`)
     
     console.log('⚡ Performance Metrics:')
-    console.log(`  🔍 Plugin lookup: ${performanceTests.lookup.toFixed(2)}ms`)
-    console.log(`  📋 Get all plugins: ${performanceTests.getAll.toFixed(2)}ms`)
-    console.log(`  🎣 Hook filtering: ${performanceTests.hookFiltering.toFixed(2)}ms`)
+    console.log(`  📝 Average registration: ${avgRegistration.toFixed(2)}ms`)
+    console.log(`  🔍 Average lookup: ${avgLookup.toFixed(2)}ms`)
+    console.log(`  🗑️ Average removal: ${avgRemoval.toFixed(2)}ms`)
     
-    // Verify performance is reasonable (should be sub-millisecond for most operations)
-    expect(performanceTests.lookup).toBeLessThan(100) // 100ms max for lookup
-    expect(performanceTests.getAll).toBeLessThan(100) // 100ms max for get all
-    expect(performanceTests.hookFiltering).toBeLessThan(200) // 200ms max for hook filtering
+    // Verify performance is reasonable
+    expect(avgRegistration).toBeLessThan(50) // 50ms max average registration
+    expect(avgLookup).toBeLessThan(10) // 10ms max average lookup
+    expect(avgRemoval).toBeLessThan(20) // 20ms max average removal
     
-    // Test stress cleanup
-    console.log('🧹 Testing large-scale cleanup...')
+    // Final cleanup and verification
     const cleanupStart = performance.now()
-    pluginManager.clear()
+    agentRegistry.clear()
     const cleanupTime = performance.now() - cleanupStart
     
-    const afterCleanup = pluginManager.getPlugins()
-    expect(afterCleanup.length).toBe(0)
+    expect(agentRegistry.agentCount).toBe(0)
+    expect(agentRegistry.listAgents()).toHaveLength(0)
     
-    console.log(`🧹 Cleanup completed in ${cleanupTime.toFixed(2)}ms`)
-    
-    // Final stress test validation
-    expect(successfulRegistrations).toBeGreaterThan(0)
-    expect(actualCount).toBe(successfulRegistrations)
-    expect(performanceTests.lookup).toBeGreaterThan(0)
-    expect(performanceTests.getAll).toBeGreaterThan(0)
-    expect(performanceTests.hookFiltering).toBeGreaterThan(0)
+    console.log(`🧹 Final cleanup completed in ${cleanupTime.toFixed(2)}ms`)
     
     console.log('🎯 Stress Test Summary:')
-    console.log(`  📈 Registration success rate: ${((successfulRegistrations / STRESS_PLUGIN_COUNT) * 100).toFixed(1)}%`)
-    console.log(`  ⚡ Average lookup time: ${performanceTests.lookup.toFixed(2)}ms`)
-    console.log(`  🧹 Cleanup time: ${cleanupTime.toFixed(2)}ms`)
-    console.log(`  ✅ Registry integrity maintained`)
+    console.log(`  📈 Registration success rate: ${((successfulRegistrations / STRESS_AGENT_COUNT) * 100).toFixed(1)}%`)
+    console.log(`  ⚡ Performance within acceptable limits: ✅`)
+    console.log(`  🧹 Registry cleanup successful: ✅`)
+    console.log(`  ✅ Registry integrity maintained throughout test`)
     
     console.log('✅ Large-scale registry stress test passed')
   })
