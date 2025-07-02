@@ -102,6 +102,7 @@ export class SecurePluginManagerV2 extends EventEmitter {
       pluginPublicKey: options.pluginPublicKey ?? '',
       allowUnsignedPlugins: options.allowUnsignedPlugins ?? true,
       trustedPluginKeys: options.trustedPluginKeys ?? [],
+      disableDirectFallback: options.disableDirectFallback ?? false,
       enableSandboxing: options.enableSandboxing ?? true,
       enableWebWorkers: options.enableWebWorkers ?? false,
       enableFreezing: options.enableFreezing ?? true,

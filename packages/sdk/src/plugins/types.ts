@@ -66,6 +66,8 @@ export interface PluginManagerOptions {
   readonly allowUnsignedPlugins?: boolean
   /** Additional trusted public keys for plugin verification */
   readonly trustedPluginKeys?: readonly string[]
+  /** Disable direct execution fallback completely in production (default: false) */
+  readonly disableDirectFallback?: boolean
 }
 
 /**

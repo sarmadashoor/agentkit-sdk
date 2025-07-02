@@ -20,6 +20,7 @@ export class PluginExecutor {
   private sandboxTimeout: number
   private allowedGlobals: string[]
   private enableDebugMode: boolean
+  private disableDirectFallback: boolean
 
   constructor(options: {
     platformEnv: PlatformEnvironment
@@ -31,6 +32,7 @@ export class PluginExecutor {
     sandboxTimeout?: number
     allowedGlobals?: string[]
     enableDebugMode?: boolean
+    disableDirectFallback?: boolean
   }) {
     this.platformEnv = options.platformEnv
     this.security = options.security
@@ -41,6 +43,7 @@ export class PluginExecutor {
     this.sandboxTimeout = options.sandboxTimeout ?? 2000
     this.allowedGlobals = options.allowedGlobals ?? ['Math', 'Date', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean']
     this.enableDebugMode = options.enableDebugMode ?? false
+    this.disableDirectFallback = options.disableDirectFallback ?? false
   }
 
   /**
@@ -66,6 +69,19 @@ export class PluginExecutor {
         return this.executePluginInSandbox(plugin, hookName, hook, args)
       case 'worker':
         return this.executePluginInWorker(plugin, hookName, hook, args)
+      case 'blocked':
+        throw new PluginSandboxError(
+          plugin.name,
+          hookName,
+          'Direct execution is disabled and no sandbox is available',
+          {
+            context: {
+              executionMode: 'blocked',
+              disableDirectFallback: this.disableDirectFallback,
+              isProduction: EnvironmentGuard.isProduction()
+            }
+          }
+        )
       default:
         return this.executePluginHookDirect(plugin, hookName, hook, args)
     }
@@ -74,7 +90,26 @@ export class PluginExecutor {
   /**
    * Get execution strategy based on platform capabilities
    */
-  private getExecutionStrategy(): 'vm' | 'worker' | 'direct' {
+  private getExecutionStrategy(): 'vm' | 'worker' | 'direct' | 'blocked' {
+    // Check if direct fallback is disabled in production
+    if (EnvironmentGuard.isProduction() && this.disableDirectFallback) {
+      const capabilities = this.platformEnv.getCapabilities()
+      
+      // Try VM first
+      if (capabilities.isNodeJS && capabilities.supportsVM) {
+        return 'vm'
+      }
+      
+      // Try worker if available
+      if (capabilities.isBrowser && capabilities.supportsWebWorkers && this.workerPool) {
+        return 'worker'
+      }
+      
+      // No sandbox available and direct is disabled - block execution
+      console.error('[AgentKit Security] Direct execution is disabled in production and no sandbox is available. Plugin execution blocked.')
+      return 'blocked'
+    }
+    
     // Security: Only allow direct execution in explicit dev mode
     if (!this.sandbox && EnvironmentGuard.canDisableSandbox()) {
       return 'direct'
@@ -108,6 +143,21 @@ export class PluginExecutor {
   ): Promise<any> {
     const capabilities = this.platformEnv.getCapabilities()
     if (!capabilities.supportsVM || !capabilities.vm) {
+      // Check if direct fallback is disabled
+      if (EnvironmentGuard.isProduction() && this.disableDirectFallback) {
+        throw new PluginSandboxError(
+          plugin.name,
+          hookName,
+          'VM sandbox not available and direct execution is disabled',
+          {
+            context: {
+              executionMode: 'blocked',
+              disableDirectFallback: this.disableDirectFallback,
+              isProduction: true
+            }
+          }
+        )
+      }
       return this.executePluginHookDirect(plugin, hookName, hook, args)
     }
     
@@ -354,9 +404,19 @@ export class PluginExecutor {
     hook: Function,
     args: unknown[]
   ): Promise<any> {
+    // Security warning for direct execution
+    const isProduction = EnvironmentGuard.isProduction()
+    const warningMessage = `[AgentKit Security] DIRECT EXECUTION of plugin '${plugin.name}.${hookName}' - ` +
+      (isProduction 
+        ? 'This is DANGEROUS in production! Plugin code is running without isolation.'
+        : 'Plugin running without sandbox isolation (development mode).')
+    
+    console.warn(warningMessage)
+    
     debugLog.operation('plugin hook executing (direct)', {
       plugin: plugin.name,
-      hook: hookName
+      hook: hookName,
+      warning: 'NO SANDBOX - Direct execution'
     }, this.debug)
 
     try {
@@ -370,7 +430,31 @@ export class PluginExecutor {
       
       return result
     } catch (err) {
-      throw new PluginHookError(plugin.name, hookName, `Hook execution failed: ${(err as Error).message}`)
+      // Log the error clearly
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      const errorStack = err instanceof Error ? err.stack : undefined
+      
+      console.error(`[AgentKit Security] Plugin '${plugin.name}.${hookName}' threw error during direct execution:`, {
+        error: errorMessage,
+        stack: errorStack,
+        plugin: plugin.name,
+        hook: hookName
+      })
+      
+      // Wrap and re-throw with context
+      throw new PluginHookError(
+        plugin.name, 
+        hookName, 
+        `Hook execution failed: ${errorMessage}`,
+        {
+          cause: err instanceof Error ? err : undefined,
+          context: {
+            executionMode: 'direct',
+            isProduction,
+            originalError: errorMessage
+          }
+        }
+      )
     }
   }
 

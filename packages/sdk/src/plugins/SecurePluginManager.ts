@@ -132,6 +132,7 @@ export class SecurePluginManager {
       pluginPublicKey: options.pluginPublicKey ?? '',
       allowUnsignedPlugins: options.allowUnsignedPlugins ?? true,
       trustedPluginKeys: options.trustedPluginKeys ?? [],
+      disableDirectFallback: options.disableDirectFallback ?? false,
       sdkVersion: options.sdkVersion ?? '1.0.0',
       executionOrder: {
         parallel: false,

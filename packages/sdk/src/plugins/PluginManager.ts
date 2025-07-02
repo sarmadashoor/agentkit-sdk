@@ -66,7 +66,8 @@ export class PluginManager {
       enableDebugMode: options.enableDebugMode ?? false,
       pluginPublicKey: options.pluginPublicKey ?? '',
       allowUnsignedPlugins: options.allowUnsignedPlugins ?? true,
-      trustedPluginKeys: Object.freeze(options.trustedPluginKeys ?? []) as string[]
+      trustedPluginKeys: Object.freeze(options.trustedPluginKeys ?? []) as string[],
+      disableDirectFallback: options.disableDirectFallback ?? false
     }
     
     // Warn if sandbox disabled in non-production
@@ -96,7 +97,8 @@ export class PluginManager {
       sandbox: this.options.sandbox,
       sandboxTimeout: this.options.sandboxTimeout,
       allowedGlobals: this.options.allowedGlobals ? [...this.options.allowedGlobals] : [],
-      enableDebugMode: this.options.enableDebugMode
+      enableDebugMode: this.options.enableDebugMode,
+      disableDirectFallback: this.options.disableDirectFallback
     })
 
     // Initialize observability with dependencies
