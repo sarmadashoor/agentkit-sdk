@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi, SpyInstance } from 'vi
 import { PluginManager } from '../../src/plugins/PluginManager'
 import { PluginSignature } from '../../src/security/PluginSignature'
 import { EnvironmentGuard } from '../../src/security/EnvironmentGuard'
-import { PluginValidationError, PluginSignatureError } from '../../src/errors'
+import { PluginValidationError, PluginSignatureError, PluginSignatureVerificationError } from '../../src/errors'
 import type { AgentKitPlugin, PluginSignatureManifest } from '@agentkit/types'
 import { createHash, createSign, createVerify, generateKeyPairSync } from 'crypto'
 
@@ -133,7 +133,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(unsignedPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
       
       expect(() => {
         manager.register(unsignedPlugin)
@@ -170,7 +170,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(invalidSignedPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
 
     it('should reject plugins signed with wrong key in production', () => {
@@ -186,7 +186,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(wrongKeyPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
 
     it('should enforce plugin signing even when allowUnsignedPlugins is true in production', () => {
@@ -201,7 +201,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(unsignedPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
 
     it('should respect AGENTKIT_ENV=production for signing enforcement', () => {
@@ -217,7 +217,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(unsignedPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
   })
 
@@ -267,7 +267,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(invalidSignedPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
 
     it('should enforce signatures in development when allowUnsignedPlugins is false', () => {
@@ -282,7 +282,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(unsignedPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
   })
 
@@ -372,7 +372,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(unknownKeyPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
   })
 
@@ -409,7 +409,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(signedPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
 
     it('should validate fingerprint hash in manifest', () => {
@@ -429,7 +429,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(signedPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
   })
 
@@ -448,8 +448,8 @@ describe('Plugin Signing Security Tests', () => {
         manager.register(unsignedPlugin)
         expect.fail('Should have thrown an error')
       } catch (error) {
-        expect(error).toBeInstanceOf(PluginSignatureError)
-        expect((error as Error).message).toContain('Plugin signature verification failed')
+        expect(error).toBeInstanceOf(PluginSignatureVerificationError)
+        expect((error as Error).message).toContain('failed signature verification')
       }
     })
 
@@ -470,8 +470,8 @@ describe('Plugin Signing Security Tests', () => {
         manager.register(invalidPlugin)
         expect.fail('Should have thrown an error')
       } catch (error) {
-        expect(error).toBeInstanceOf(PluginSignatureError)
-        expect((error as Error).message).toContain('Plugin signature verification failed')
+        expect(error).toBeInstanceOf(PluginSignatureVerificationError)
+        expect((error as Error).message).toContain('failed signature verification')
       }
     })
 
@@ -487,7 +487,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(signedPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
   })
 
@@ -519,7 +519,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(unsignedPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
 
     it('should handle environment variable overrides for plugin signing', () => {
@@ -575,7 +575,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(hookPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
     })
   })
 
@@ -616,7 +616,7 @@ describe('Plugin Signing Security Tests', () => {
       
       expect(() => {
         manager.register(unsignedPlugin)
-      }).toThrow(PluginSignatureError)
+      }).toThrow(PluginSignatureVerificationError)
       
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('[AgentKit Security] Attempted to disable sandbox in production')
@@ -644,6 +644,181 @@ describe('Plugin Signing Security Tests', () => {
       expect(consoleErrorSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('production')
       )
+    })
+  })
+
+  describe('Enhanced Error Messaging', () => {
+    it('should provide detailed error message for unsigned plugins in production', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const manager = new PluginManager({
+        pluginPublicKey: testKeyPair.publicKey,
+        allowUnsignedPlugins: false
+      })
+      
+      const unsignedPlugin = createUnsignedPlugin('test-plugin', '1.2.3')
+      
+      expect(() => {
+        manager.register(unsignedPlugin)
+      }).toThrow(PluginSignatureVerificationError)
+      
+      try {
+        manager.register(unsignedPlugin)
+      } catch (error) {
+        expect(error).toBeInstanceOf(PluginSignatureVerificationError)
+        expect((error as Error).message).toContain('[AgentKit Security]')
+        expect((error as Error).message).toContain('test-plugin')
+        expect((error as Error).message).toContain('v1.2.3')
+        expect((error as Error).message).toContain('failed signature verification')
+        expect((error as Error).message).toContain('https://docs.agentkit.com/security/plugin-signing')
+        expect((error as Error).message).toContain('AGENTKIT_ALLOW_UNSIGNED=true')
+        expect((error as Error).message).toContain('Plugin is unsigned but signatures are required')
+      }
+    })
+
+    it('should provide detailed error message for invalid signatures', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const manager = new PluginManager({
+        pluginPublicKey: testKeyPair.publicKey,
+        allowUnsignedPlugins: false
+      })
+      
+      const invalidPlugin = {
+        ...createUnsignedPlugin('invalid-plugin', '2.0.0'),
+        signature: 'invalid-signature-data'
+      }
+      
+      expect(() => {
+        manager.register(invalidPlugin)
+      }).toThrow(PluginSignatureVerificationError)
+      
+      try {
+        manager.register(invalidPlugin)
+      } catch (error) {
+        expect(error).toBeInstanceOf(PluginSignatureVerificationError)
+        expect((error as Error).message).toContain('[AgentKit Security]')
+        expect((error as Error).message).toContain('invalid-plugin')
+        expect((error as Error).message).toContain('v2.0.0')
+        expect((error as Error).message).toContain('failed signature verification')
+        expect((error as Error).message).toContain('https://docs.agentkit.com/security/plugin-signing')
+        expect((error as Error).message).toContain('AGENTKIT_ALLOW_UNSIGNED=true')
+        expect((error as Error).message).toContain('Invalid signature')
+      }
+    })
+
+    it('should provide detailed error message for plugins signed with wrong key', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const manager = new PluginManager({
+        pluginPublicKey: testKeyPair.publicKey,
+        allowUnsignedPlugins: false
+      })
+      
+      // Plugin signed with alternate key
+      const wrongKeyPlugin = createSignedPlugin('wrong-key-plugin', '3.1.4', alternateKeyPair.privateKey)
+      
+      expect(() => {
+        manager.register(wrongKeyPlugin)
+      }).toThrow(PluginSignatureVerificationError)
+      
+      try {
+        manager.register(wrongKeyPlugin)
+      } catch (error) {
+        expect(error).toBeInstanceOf(PluginSignatureVerificationError)
+        expect((error as Error).message).toContain('[AgentKit Security]')
+        expect((error as Error).message).toContain('wrong-key-plugin')
+        expect((error as Error).message).toContain('v3.1.4')
+        expect((error as Error).message).toContain('failed signature verification')
+        expect((error as Error).message).toContain('https://docs.agentkit.com/security/plugin-signing')
+        expect((error as Error).message).toContain('AGENTKIT_ALLOW_UNSIGNED=true')
+        expect((error as Error).message).toContain('Invalid signature')
+      }
+    })
+
+    it('should provide detailed error message for tampered plugin manifests', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const manager = new PluginManager({
+        pluginPublicKey: testKeyPair.publicKey,
+        allowUnsignedPlugins: false
+      })
+      
+      const tamperedPlugin = createSignedPlugin('tampered-plugin', '1.0.0')
+      
+      // Tamper with the manifest after signing
+      if (tamperedPlugin.signatureManifest) {
+        tamperedPlugin.signatureManifest.fingerprintHash = 'tampered-hash'
+      }
+      
+      expect(() => {
+        manager.register(tamperedPlugin)
+      }).toThrow(PluginSignatureVerificationError)
+      
+      try {
+        manager.register(tamperedPlugin)
+      } catch (error) {
+        expect(error).toBeInstanceOf(PluginSignatureVerificationError)
+        expect((error as Error).message).toContain('[AgentKit Security]')
+        expect((error as Error).message).toContain('tampered-plugin')
+        expect((error as Error).message).toContain('v1.0.0')
+        expect((error as Error).message).toContain('failed signature verification')
+        expect((error as Error).message).toContain('https://docs.agentkit.com/security/plugin-signing')
+        expect((error as Error).message).toContain('AGENTKIT_ALLOW_UNSIGNED=true')
+        expect((error as Error).message).toContain('Manifest verification failed')
+      }
+    })
+
+    it('should test direct PluginSignature error messages', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: false
+      })
+      
+      const unsignedPlugin = createUnsignedPlugin('direct-test', '1.0.0')
+      
+      expect(() => {
+        signature.verifyPlugin(unsignedPlugin)
+      }).toThrow(PluginSignatureVerificationError)
+      
+      try {
+        signature.verifyPlugin(unsignedPlugin)
+      } catch (error) {
+        expect(error).toBeInstanceOf(PluginSignatureVerificationError)
+        expect((error as Error).message).toMatch(/\[AgentKit Security\] Plugin "direct-test" \(v1\.0\.0\) failed signature verification\. .+ See: https:\/\/docs\.agentkit\.com\/security\/plugin-signing\. You can allow unsigned plugins in development by setting AGENTKIT_ALLOW_UNSIGNED=true\./)
+      }
+    })
+
+    it('should cache error messages for failed verifications', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: false
+      })
+      
+      const unsignedPlugin = createUnsignedPlugin('cached-error-test', '1.0.0')
+      
+      let firstErrorMessage = ''
+      
+      // First call should throw with detailed message
+      try {
+        signature.verifyPlugin(unsignedPlugin)
+      } catch (error) {
+        expect(error).toBeInstanceOf(PluginSignatureVerificationError)
+        firstErrorMessage = (error as Error).message
+        expect(firstErrorMessage).toContain('Plugin is unsigned but signatures are required')
+      }
+      
+      // Second call should throw the same cached error message
+      try {
+        signature.verifyPlugin(unsignedPlugin)
+      } catch (error) {
+        expect(error).toBeInstanceOf(PluginSignatureVerificationError)
+        expect((error as Error).message).toBe(firstErrorMessage)
+      }
     })
   })
 

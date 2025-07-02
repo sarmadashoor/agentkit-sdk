@@ -1,6 +1,6 @@
 import type { AgentKitPlugin, PluginHookName, PluginSignatureManifest } from '@agentkit/types'
 import { AgentKitPluginSchema } from '../types'
-import { PluginValidationError, PluginSignatureError } from '../../errors'
+import { PluginValidationError, PluginSignatureError, PluginSignatureVerificationError } from '../../errors'
 import { debugLog } from '../../log'
 import { PluginSignature, PluginSignatureConfig } from '../../security/PluginSignature'
 import { EnvironmentGuard } from '../../security/EnvironmentGuard'
@@ -43,8 +43,22 @@ export class PluginRegistry {
    */
   register(plugin: AgentKitPlugin): void {
     // Step 1: Verify plugin signature and manifest
-    if (this.signature && !this.signature.verifyPlugin(plugin as any)) {
-      throw new PluginSignatureError(plugin.name, 'signature', 'Plugin signature verification failed');
+    if (this.signature) {
+      try {
+        this.signature.verifyPlugin(plugin as any);
+      } catch (error) {
+        // Re-throw PluginSignatureVerificationError as-is (it has detailed messaging)
+        if (error instanceof PluginSignatureVerificationError) {
+          throw error;
+        }
+        
+        // Wrap other errors with fallback message
+        throw new PluginSignatureVerificationError(
+          plugin.name,
+          plugin.version,
+          error instanceof Error ? error.message : 'Unknown verification error'
+        );
+      }
     }
 
     // Step 2: Validate plugin schema

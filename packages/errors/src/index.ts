@@ -92,6 +92,7 @@ export {
   PluginRegistrationError,
   PluginTimeoutError,
   PluginSignatureError,
+  PluginSignatureVerificationError,
   RecursivePluginCallError,
   PluginSandboxError,
   PluginVerificationError,

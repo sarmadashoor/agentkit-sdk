@@ -77,6 +77,24 @@ export class PluginSignatureError extends AgentKitError {
 }
 
 /**
+ * Error thrown when plugin signature verification fails
+ */
+export class PluginSignatureVerificationError extends AgentKitError {
+  readonly code = 'PLUGIN_SIGNATURE_VERIFICATION_FAILED' as const
+  readonly category = 'security' as const
+
+  constructor(pluginName: string, version: string, reason: string, options?: AgentKitErrorOptions) {
+    const docsUrl = 'https://docs.agentkit.com/security/plugin-signing'
+    const devSolution = 'You can allow unsigned plugins in development by setting AGENTKIT_ALLOW_UNSIGNED=true'
+    
+    super(
+      `[AgentKit Security] Plugin "${pluginName}" (v${version}) failed signature verification. ${reason}. See: ${docsUrl}. ${devSolution}.`,
+      options
+    )
+  }
+}
+
+/**
  * Error thrown when plugin attempts recursive SDK calls
  */
 export class RecursivePluginCallError extends AgentKitError {

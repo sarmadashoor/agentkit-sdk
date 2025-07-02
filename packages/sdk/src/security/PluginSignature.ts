@@ -1,6 +1,7 @@
 import { createHash, createVerify } from 'crypto'
 import type { AgentKitPlugin, PluginSignatureManifest } from '@agentkit/types'
 import { EnvironmentGuard } from './EnvironmentGuard'
+import { PluginSignatureVerificationError } from '../errors'
 
 export interface PluginSignatureConfig {
   publicKey: string;
@@ -22,6 +23,8 @@ export class PluginSignature {
   private signatureCache = new Map<string, boolean>();
   // Manifest verification results cache
   private manifestCache = new Map<string, PluginSignatureManifest | null>();
+  // Error cache to preserve detailed error messages
+  private errorCache = new Map<string, PluginSignatureVerificationError>();
 
   constructor(private config: PluginSignatureConfig) {}
 
@@ -55,13 +58,29 @@ export class PluginSignature {
    * 2. Manifest integrity verification
    * 3. Hook capability validation
    * 4. Fingerprint consistency check
+   * 
+   * @throws {PluginSignatureVerificationError} When signature verification fails
    */
   verifyPlugin(plugin: AgentKitPlugin & { signature?: string }): boolean {
     const cacheKey = `${plugin.name}@${plugin.version}`;
     
     // Return cached result if available
     if (this.signatureCache.has(cacheKey)) {
-      return this.signatureCache.get(cacheKey)!;
+      const cachedResult = this.signatureCache.get(cacheKey)!;
+      if (!cachedResult) {
+        // Re-throw the cached error with detailed message
+        const cachedError = this.errorCache.get(cacheKey);
+        if (cachedError) {
+          throw cachedError;
+        }
+        // Fallback error if cache is inconsistent
+        throw new PluginSignatureVerificationError(
+          plugin.name,
+          plugin.version,
+          'Cached verification failure'
+        );
+      }
+      return cachedResult;
     }
 
     // Allow unsigned plugins in development mode only
@@ -72,34 +91,62 @@ export class PluginSignature {
 
     // Require signature in production or when configured
     if (!plugin.signature) {
-      console.warn(`[AgentKit Security] Plugin "${plugin.name}" is unsigned - rejected in production mode`);
+      const error = new PluginSignatureVerificationError(
+        plugin.name,
+        plugin.version,
+        'Plugin is unsigned but signatures are required'
+      );
       this.signatureCache.set(cacheKey, false);
-      return false;
+      this.errorCache.set(cacheKey, error);
+      throw error;
     }
 
     try {
       // Verify basic signature first
       const signatureValid = this.verifyBasicSignature(plugin);
       if (!signatureValid) {
+        const error = new PluginSignatureVerificationError(
+          plugin.name,
+          plugin.version,
+          'Invalid signature - signature does not match plugin content or was signed with an untrusted key'
+        );
         this.signatureCache.set(cacheKey, false);
-        return false;
+        this.errorCache.set(cacheKey, error);
+        throw error;
       }
 
       // Verify manifest if present
       if (plugin.signatureManifest) {
         const manifestValid = this.verifyManifest(plugin, plugin.signatureManifest);
         if (!manifestValid) {
+          const error = new PluginSignatureVerificationError(
+            plugin.name,
+            plugin.version,
+            'Manifest verification failed - plugin content may have been tampered with'
+          );
           this.signatureCache.set(cacheKey, false);
-          return false;
+          this.errorCache.set(cacheKey, error);
+          throw error;
         }
       }
 
       this.signatureCache.set(cacheKey, true);
       return true;
     } catch (error) {
-      console.error(`[AgentKit Security] Signature verification failed for plugin "${plugin.name}":`, error);
+      if (error instanceof PluginSignatureVerificationError) {
+        // Re-throw our custom errors
+        throw error;
+      }
+      
+      // Wrap unexpected errors
+      const wrappedError = new PluginSignatureVerificationError(
+        plugin.name,
+        plugin.version,
+        `Signature verification failed due to technical error: ${error instanceof Error ? error.message : String(error)}`
+      );
       this.signatureCache.set(cacheKey, false);
-      return false;
+      this.errorCache.set(cacheKey, wrappedError);
+      throw wrappedError;
     }
   }
 
@@ -209,15 +256,17 @@ export class PluginSignature {
   clearCache(): void {
     this.signatureCache.clear();
     this.manifestCache.clear();
+    this.errorCache.clear();
   }
 
   /**
    * Get cache statistics for monitoring
    */
-  getCacheStats(): { signatureCache: number; manifestCache: number } {
+  getCacheStats(): { signatureCache: number; manifestCache: number; errorCache: number } {
     return {
       signatureCache: this.signatureCache.size,
-      manifestCache: this.manifestCache.size
+      manifestCache: this.manifestCache.size,
+      errorCache: this.errorCache.size
     };
   }
 }
