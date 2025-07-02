@@ -646,4 +646,321 @@ describe('Plugin Signing Security Tests', () => {
       )
     })
   })
+
+  describe('Signature Verification Caching', () => {
+    it('should cache signature verification results for valid plugins', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: false
+      })
+      
+      const signedPlugin = createSignedPlugin('cache-test-valid')
+      
+      // Spy on the private verifyBasicSignature method
+      const verifyBasicSignatureSpy = vi.spyOn(signature as any, 'verifyBasicSignature')
+      
+      // First verification should call the verification method
+      const result1 = signature.verifyPlugin(signedPlugin)
+      expect(result1).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(1)
+      
+      // Second verification should use cache and not call verification method again
+      const result2 = signature.verifyPlugin(signedPlugin)
+      expect(result2).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(1) // Still 1, not 2
+      
+      // Third verification should also use cache
+      const result3 = signature.verifyPlugin(signedPlugin)
+      expect(result3).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(1) // Still 1
+      
+      verifyBasicSignatureSpy.mockRestore()
+    })
+
+    it('should cache signature verification results for invalid plugins', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: false
+      })
+      
+      const invalidPlugin = {
+        ...createUnsignedPlugin('cache-test-invalid'),
+        signature: 'invalid-signature-data'
+      }
+      
+      // Spy on the private verifyBasicSignature method
+      const verifyBasicSignatureSpy = vi.spyOn(signature as any, 'verifyBasicSignature')
+      
+      // First verification should call the verification method
+      const result1 = signature.verifyPlugin(invalidPlugin)
+      expect(result1).toBe(false)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(1)
+      
+      // Second verification should use cache and not call verification method again
+      const result2 = signature.verifyPlugin(invalidPlugin)
+      expect(result2).toBe(false)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(1) // Still 1, not 2
+      
+      verifyBasicSignatureSpy.mockRestore()
+    })
+
+    it('should cache unsigned plugin results in development mode', () => {
+      process.env.NODE_ENV = 'development'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: true
+      })
+      
+      const unsignedPlugin = createUnsignedPlugin('cache-test-unsigned')
+      
+      // Spy on the private verifyBasicSignature method to ensure it's not called for unsigned plugins
+      const verifyBasicSignatureSpy = vi.spyOn(signature as any, 'verifyBasicSignature')
+      
+      // First verification should not call signature verification (allowed unsigned)
+      const result1 = signature.verifyPlugin(unsignedPlugin)
+      expect(result1).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(0)
+      
+      // Second verification should use cache
+      const result2 = signature.verifyPlugin(unsignedPlugin)
+      expect(result2).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(0)
+      
+      verifyBasicSignatureSpy.mockRestore()
+    })
+
+    it('should maintain separate cache entries for different plugin versions', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: false
+      })
+      
+      const pluginV1 = createSignedPlugin('version-test', '1.0.0')
+      const pluginV2 = createSignedPlugin('version-test', '2.0.0')
+      
+      const verifyBasicSignatureSpy = vi.spyOn(signature as any, 'verifyBasicSignature')
+      
+      // Verify v1.0.0
+      const result1 = signature.verifyPlugin(pluginV1)
+      expect(result1).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(1)
+      
+      // Verify v2.0.0 - should call verification method since it's a different version
+      const result2 = signature.verifyPlugin(pluginV2)
+      expect(result2).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(2)
+      
+      // Verify v1.0.0 again - should use cache
+      const result3 = signature.verifyPlugin(pluginV1)
+      expect(result3).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(2)
+      
+      // Verify v2.0.0 again - should use cache
+      const result4 = signature.verifyPlugin(pluginV2)
+      expect(result4).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(2)
+      
+      verifyBasicSignatureSpy.mockRestore()
+    })
+
+    it('should maintain separate cache entries for different plugins with same version', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: false
+      })
+      
+      const pluginA = createSignedPlugin('plugin-a', '1.0.0')
+      const pluginB = createSignedPlugin('plugin-b', '1.0.0')
+      
+      const verifyBasicSignatureSpy = vi.spyOn(signature as any, 'verifyBasicSignature')
+      
+      // Verify plugin A
+      const resultA1 = signature.verifyPlugin(pluginA)
+      expect(resultA1).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(1)
+      
+      // Verify plugin B - should call verification method since it's a different plugin
+      const resultB1 = signature.verifyPlugin(pluginB)
+      expect(resultB1).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(2)
+      
+      // Verify plugin A again - should use cache
+      const resultA2 = signature.verifyPlugin(pluginA)
+      expect(resultA2).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(2)
+      
+      // Verify plugin B again - should use cache
+      const resultB2 = signature.verifyPlugin(pluginB)
+      expect(resultB2).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(2)
+      
+      verifyBasicSignatureSpy.mockRestore()
+    })
+
+    it('should cache manifest verification results separately', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: false
+      })
+      
+      const pluginWithManifest = createSignedPlugin('manifest-cache-test', '1.0.0')
+      
+      const verifyManifestSpy = vi.spyOn(signature as any, 'verifyManifest')
+      
+      // First verification should call manifest verification
+      const result1 = signature.verifyPlugin(pluginWithManifest)
+      expect(result1).toBe(true)
+      expect(verifyManifestSpy).toHaveBeenCalledTimes(1)
+      
+      // Second verification should use cached results
+      const result2 = signature.verifyPlugin(pluginWithManifest)
+      expect(result2).toBe(true)
+      expect(verifyManifestSpy).toHaveBeenCalledTimes(1) // Still 1, not 2
+      
+      verifyManifestSpy.mockRestore()
+    })
+
+    it('should provide cache statistics', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: false
+      })
+      
+      // Initially empty cache
+      let stats = signature.getCacheStats()
+      expect(stats.signatureCache).toBe(0)
+      expect(stats.manifestCache).toBe(0)
+      
+      // Verify one plugin
+      const plugin1 = createSignedPlugin('stats-test-1')
+      signature.verifyPlugin(plugin1)
+      
+      stats = signature.getCacheStats()
+      expect(stats.signatureCache).toBe(1)
+      expect(stats.manifestCache).toBe(1) // Has manifest
+      
+      // Verify another plugin
+      const plugin2 = createSignedPlugin('stats-test-2')
+      signature.verifyPlugin(plugin2)
+      
+      stats = signature.getCacheStats()
+      expect(stats.signatureCache).toBe(2)
+      expect(stats.manifestCache).toBe(2)
+      
+      // Verify unsigned plugin in development
+      process.env.NODE_ENV = 'development'
+      const unsignedPlugin = createUnsignedPlugin('stats-test-unsigned')
+      signature.verifyPlugin(unsignedPlugin)
+      
+      stats = signature.getCacheStats()
+      expect(stats.signatureCache).toBe(3) // Unsigned also cached
+      expect(stats.manifestCache).toBe(2) // No manifest for unsigned
+    })
+
+    it('should clear all caches when clearCache is called', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: false
+      })
+      
+      // Add entries to cache
+      const plugin1 = createSignedPlugin('clear-test-1')
+      const plugin2 = createSignedPlugin('clear-test-2')
+      
+      signature.verifyPlugin(plugin1)
+      signature.verifyPlugin(plugin2)
+      
+      // Verify cache has entries
+      let stats = signature.getCacheStats()
+      expect(stats.signatureCache).toBe(2)
+      expect(stats.manifestCache).toBe(2)
+      
+      // Clear cache
+      signature.clearCache()
+      
+      // Verify cache is empty
+      stats = signature.getCacheStats()
+      expect(stats.signatureCache).toBe(0)
+      expect(stats.manifestCache).toBe(0)
+      
+      // Verify that verification still works (will rebuild cache)
+      const verifyBasicSignatureSpy = vi.spyOn(signature as any, 'verifyBasicSignature')
+      
+      const result = signature.verifyPlugin(plugin1)
+      expect(result).toBe(true)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(1) // Called again since cache was cleared
+      
+      verifyBasicSignatureSpy.mockRestore()
+    })
+
+    it('should cache verification failures consistently', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: false
+      })
+      
+      // Create plugin with tampered manifest
+      const tamperedPlugin = createSignedPlugin('tampered-cache-test')
+      if (tamperedPlugin.signatureManifest) {
+        tamperedPlugin.signatureManifest.fingerprintHash = 'tampered-hash'
+      }
+      
+      const verifyManifestSpy = vi.spyOn(signature as any, 'verifyManifest')
+      
+      // First verification should fail and cache the failure
+      const result1 = signature.verifyPlugin(tamperedPlugin)
+      expect(result1).toBe(false)
+      expect(verifyManifestSpy).toHaveBeenCalledTimes(1)
+      
+      // Second verification should use cached failure
+      const result2 = signature.verifyPlugin(tamperedPlugin)
+      expect(result2).toBe(false)
+      expect(verifyManifestSpy).toHaveBeenCalledTimes(1) // Should not be called again
+      
+      verifyManifestSpy.mockRestore()
+    })
+
+    it('should handle cache key generation consistently', () => {
+      process.env.NODE_ENV = 'production'
+      
+      const signature = new PluginSignature({
+        publicKey: testKeyPair.publicKey,
+        allowUnsigned: false
+      })
+      
+      const plugin = createSignedPlugin('key-generation-test', '1.2.3')
+      
+      // Verify that the cache key follows the expected format
+      const verifyBasicSignatureSpy = vi.spyOn(signature as any, 'verifyBasicSignature')
+      
+      signature.verifyPlugin(plugin)
+      
+      // Check cache stats to confirm entry was created
+      const stats = signature.getCacheStats()
+      expect(stats.signatureCache).toBe(1)
+      
+      // Verify the same plugin again should use cache
+      signature.verifyPlugin(plugin)
+      expect(verifyBasicSignatureSpy).toHaveBeenCalledTimes(1) // Should only be called once
+      
+      verifyBasicSignatureSpy.mockRestore()
+    })
+  })
 })
