@@ -1,79 +1,355 @@
 import { z } from 'zod'
 
 /**
- * Configuration object for agent initialization
+ * Configuration object passed to an agent during initialization.
+ * 
+ * @example
+ * ```typescript
+ * const config: AgentConfig = {
+ *   scope: ['chat', 'analysis'],
+ *   techStack: 'node',
+ *   apiKey: process.env.API_KEY,
+ *   maxTokens: 1000
+ * }
+ * await agent.init(config)
+ * ```
+ * 
+ * @public
+ * @category Types
  */
 export interface AgentConfig {
+  /** Capability scopes that the agent should enable */
   scope?: string[]
+  /** Technology stack identifier for environment-specific configuration */
   techStack?: string
+  /** Additional configuration properties specific to the agent implementation */
   [key: string]: unknown
 }
 
 /**
- * Input data for agent processing
+ * Input data structure for agent processing operations.
+ * 
+ * This flexible interface allows agents to accept any structured data while maintaining type safety.
+ * Agent implementations should define their own specific input schemas.
+ * 
+ * @example
+ * ```typescript
+ * // Text processing
+ * const textInput: AgentInput = {
+ *   message: 'Analyze this text',
+ *   options: { sentiment: true }
+ * }
+ * 
+ * // Multi-modal input
+ * const multiModalInput: AgentInput = {
+ *   text: 'Describe this image',
+ *   image: imageBuffer,
+ *   format: 'detailed'
+ * }
+ * ```
+ * 
+ * @public
+ * @category Types
  */
 export interface AgentInput {
+  /** Flexible key-value structure for agent-specific input data */
   [key: string]: unknown
 }
 
 /**
- * Output data from agent processing
+ * Output data structure returned by agent processing operations.
+ * 
+ * This flexible interface allows agents to return any structured data while maintaining type safety.
+ * Agent implementations should define their own specific output schemas.
+ * 
+ * @example
+ * ```typescript
+ * // Simple text response
+ * const textOutput: AgentOutput = {
+ *   response: 'Analysis complete',
+ *   confidence: 0.95
+ * }
+ * 
+ * // Structured analysis result
+ * const analysisOutput: AgentOutput = {
+ *   sentiment: 'positive',
+ *   topics: ['technology', 'innovation'],
+ *   summary: 'The text discusses recent advances...',
+ *   metadata: { processingTime: 150 }
+ * }
+ * ```
+ * 
+ * @public
+ * @category Types
  */
 export interface AgentOutput {
+  /** Flexible key-value structure for agent-specific output data */
   [key: string]: unknown
 }
 
+/**
+ * Core interface that all AI agents must implement to work with AgentKit SDK.
+ * 
+ * This interface defines the standard lifecycle and communication contract for agents,
+ * ensuring they can be managed consistently regardless of their underlying implementation.
+ * 
+ * @example Implementing a simple agent:
+ * ```typescript
+ * class MyAgent implements Agent {
+ *   id = 'my-agent'
+ *   name = 'My Custom Agent'
+ *   version = '1.0.0'
+ *   
+ *   async init(config?: AgentConfig): Promise<void> {
+ *     // Initialize resources, validate config, set up connections
+ *     console.log('Agent initialized with config:', config)
+ *   }
+ *   
+ *   async handle(input: AgentInput): Promise<AgentOutput> {
+ *     // Process the input and return structured output
+ *     return {
+ *       result: `Processed: ${JSON.stringify(input)}`,
+ *       timestamp: new Date().toISOString()
+ *     }
+ *   }
+ *   
+ *   async shutdown(): Promise<void> {
+ *     // Clean up resources, close connections
+ *     console.log('Agent shutdown complete')
+ *   }
+ * }
+ * ```
+ * 
+ * @public
+ * @category Types
+ */
 export interface Agent {
+  /** Unique identifier for the agent instance */
   id: string
+  /** Human-readable name for the agent */
   name: string
+  /** Semantic version string for the agent */
   version: string
+  
+  /**
+   * Initialize the agent with optional configuration.
+   * 
+   * This method is called once when the agent is first connected, before any processing begins.
+   * Use this to set up resources, validate configuration, and prepare for operation.
+   * 
+   * @param config - Optional configuration object with agent-specific settings
+   * @throws Should throw descriptive errors if initialization fails
+   */
   init: (config?: AgentConfig) => Promise<void>
+  
+  /**
+   * Process input data and return output.
+   * 
+   * This is the core processing method where the agent performs its main functionality.
+   * It should be idempotent and handle errors gracefully.
+   * 
+   * @param input - Input data to process
+   * @returns Promise resolving to the processing result
+   * @throws Should throw descriptive errors if processing fails
+   */
   handle: (input: AgentInput) => Promise<AgentOutput>
+  
+  /**
+   * Clean up resources and prepare for termination.
+   * 
+   * This method is called when the agent connection is being closed.
+   * Use this to release resources, close connections, and ensure clean termination.
+   * 
+   * @throws Should throw descriptive errors if shutdown fails
+   */
   shutdown: () => Promise<void>
 }
 
 /**
- * Configuration object for transport initialization
+ * Configuration object passed to a transport during initialization.
+ * 
+ * @example
+ * ```typescript
+ * const httpConfig: TransportConfig = {
+ *   baseUrl: 'https://api.example.com',
+ *   timeout: 30000,
+ *   retries: 3,
+ *   headers: { 'Authorization': 'Bearer token' }
+ * }
+ * await transport.init(httpConfig)
+ * ```
+ * 
+ * @public
+ * @category Types
  */
 export interface TransportConfig {
+  /** Transport-specific configuration properties */
   [key: string]: unknown
 }
 
 /**
- * Message data for transport operations
+ * Message data structure for transport operations.
+ * 
+ * This flexible interface allows transports to handle any structured message data
+ * while maintaining type safety across different transport implementations.
+ * 
+ * @example
+ * ```typescript
+ * // HTTP transport message
+ * const httpMessage: TransportMessage = {
+ *   method: 'POST',
+ *   url: '/agents/process',
+ *   body: { input: 'Hello, agent!' },
+ *   headers: { 'Content-Type': 'application/json' }
+ * }
+ * 
+ * // WebSocket transport message
+ * const wsMessage: TransportMessage = {
+ *   type: 'agent_request',
+ *   payload: { message: 'Process this' },
+ *   requestId: 'req-123'
+ * }
+ * ```
+ * 
+ * @public
+ * @category Types
  */
 export interface TransportMessage {
+  /** Flexible key-value structure for transport-specific message data */
   [key: string]: unknown
 }
 
 /**
- * Transport capacity and health status
+ * Transport capacity and health status information.
+ * 
+ * Provides real-time information about transport health, capacity, and backpressure state
+ * to enable intelligent load balancing and circuit breaker decisions.
+ * 
+ * @example
+ * ```typescript
+ * const status = transport.getStatus?.()
+ * if (status && !status.canAcceptMore) {
+ *   console.log(`Transport overloaded: ${status.queueSize}/${status.maxQueueSize}`)
+ *   // Implement backpressure handling
+ * }
+ * ```
+ * 
+ * @public
+ * @category Types
  */
 export interface TransportStatus {
-  /** Whether the transport can accept more messages */
+  /** Whether the transport can accept more messages without degradation */
   canAcceptMore: boolean
-  /** Current number of pending/queued messages */
+  /** Current number of pending/queued messages awaiting processing */
   queueSize: number
-  /** Maximum queue capacity (undefined = unlimited) */
+  /** Maximum queue capacity (undefined indicates unlimited capacity) */
   maxQueueSize?: number
   /** Whether the transport is healthy and operational */
   isHealthy: boolean
-  /** Optional health details or error message */
+  /** Optional health details, error message, or diagnostic information */
   healthMessage?: string
 }
 
+/**
+ * Core interface that all transports must implement to work with AgentKit SDK.
+ * 
+ * Transports provide the communication layer between the SDK and agents, abstracting
+ * different protocols (HTTP, WebSocket, message queues, etc.) behind a unified interface.
+ * 
+ * @example Implementing a simple HTTP transport:
+ * ```typescript
+ * class HttpTransport implements Transport {
+ *   id = 'http'
+ *   name = 'HTTP Transport'
+ *   config?: TransportConfig
+ *   
+ *   async init(config?: TransportConfig): Promise<void> {
+ *     this.config = config
+ *     // Set up HTTP client, validate endpoints
+ *   }
+ *   
+ *   async send(message: TransportMessage): Promise<void> {
+ *     // Send HTTP request to agent endpoint
+ *     const response = await fetch(this.config.baseUrl, {
+ *       method: 'POST',
+ *       body: JSON.stringify(message)
+ *     })
+ *     if (!response.ok) throw new Error(`HTTP ${response.status}`)
+ *   }
+ *   
+ *   async receive(): Promise<TransportMessage> {
+ *     // Poll for or receive response from agent
+ *     return await this.pollForResponse()
+ *   }
+ *   
+ *   canAcceptMore(): boolean {
+ *     return this.currentRequests < this.maxConcurrent
+ *   }
+ * }
+ * ```
+ * 
+ * @public
+ * @category Types
+ */
 export interface Transport {
+  /** Unique identifier for the transport instance */
   id: string
+  /** Human-readable name for the transport */
   name: string
-  init: (config?: TransportConfig) => Promise<void>
-  send: (message: TransportMessage) => Promise<void>
-  receive: () => Promise<TransportMessage>
+  /** Current transport configuration (set during init) */
   config?: TransportConfig
   
-  // Backpressure API
-  /** Check if transport can accept more messages (backpressure indicator) */
+  /**
+   * Initialize the transport with optional configuration.
+   * 
+   * Called once when the transport is first used. Use this to set up connections,
+   * validate configuration, and prepare for message handling.
+   * 
+   * @param config - Optional configuration object with transport-specific settings
+   * @throws Should throw descriptive errors if initialization fails
+   */
+  init: (config?: TransportConfig) => Promise<void>
+  
+  /**
+   * Send a message through the transport.
+   * 
+   * This method should handle the actual transmission of data to the agent,
+   * including any protocol-specific formatting, headers, or metadata.
+   * 
+   * @param message - Message data to send
+   * @throws Should throw descriptive errors if sending fails
+   */
+  send: (message: TransportMessage) => Promise<void>
+  
+  /**
+   * Receive a message from the transport.
+   * 
+   * This method should handle receiving responses or events from the agent,
+   * including any protocol-specific parsing or error handling.
+   * 
+   * @returns Promise resolving to the received message
+   * @throws Should throw descriptive errors if receiving fails
+   */
+  receive: () => Promise<TransportMessage>
+  
+  /**
+   * Check if the transport can accept more messages (backpressure indicator).
+   * 
+   * This method enables backpressure detection and load balancing by indicating
+   * whether additional requests would degrade performance or cause failures.
+   * 
+   * @returns true if the transport can handle more messages, false if overloaded
+   */
   canAcceptMore: () => boolean
-  /** Get detailed transport status including capacity and health */
+  
+  /**
+   * Get detailed transport status including capacity and health information.
+   * 
+   * Optional method that provides comprehensive status information for monitoring,
+   * debugging, and intelligent routing decisions.
+   * 
+   * @returns Current transport status or undefined if not implemented
+   */
   getStatus?: () => TransportStatus
 }
 

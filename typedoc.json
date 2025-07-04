@@ -1,0 +1,53 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "AgentKit SDK",
+  "version": "0.1.0-alpha",
+  "entryPoints": [
+    "packages/sdk/src/index.ts",
+    "packages/types/src/index.ts", 
+    "packages/registry/src/index.ts",
+    "packages/errors/src/index.ts"
+  ],
+  "entryPointStrategy": "packages",
+  "out": "docs/api",
+  "readme": "README.md",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "excludeProtected": false,
+  "includeVersion": true,
+  "sort": [
+    "source-order",
+    "alphabetical"
+  ],
+  "categorizeByGroup": true,
+  "defaultCategory": "Other",
+  "categoryOrder": [
+    "Core",
+    "Types",
+    "Registry", 
+    "Errors",
+    "Plugins",
+    "Observability",
+    "Security",
+    "Utilities",
+    "*"
+  ],
+  "searchInComments": true,
+  "validation": {
+    "notExported": false,
+    "invalidLink": true,
+    "notDocumented": false
+  },
+  "treatWarningsAsErrors": false,
+  "intentionallyNotExported": [],
+  "theme": "default",
+  "hideGenerator": false,
+  "githubPages": false,
+  "gitRevision": "master",
+  "gitRemote": "origin",
+  "includeHierarchySummary": true,
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  }
+}

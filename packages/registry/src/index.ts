@@ -10,12 +10,72 @@ import {
 import { z } from 'zod'
 import { createFrozenCopy } from './utils/deepFreeze'
 
+/**
+ * Central registry for managing agent and transport registrations with immutability protection.
+ * 
+ * The AgentRegistry provides dynamic registration and lookup of agents and transports,
+ * ensuring data immutability and preventing runtime mutations that could cause instability.
+ * 
+ * @example Basic registry usage:
+ * ```typescript
+ * import { AgentRegistry } from '@agentkit/registry'
+ * import { DummyAgent } from '@agentkit/test-agent'
+ * import { DummyTransport } from '@agentkit/transports-dummy'
+ * 
+ * const registry = new AgentRegistry()
+ * 
+ * // Register an agent
+ * registry.register({
+ *   id: 'my-agent',
+ *   name: 'My Agent',
+ *   version: '1.0.0',
+ *   supportedScopes: ['chat', 'analysis'],
+ *   factory: () => new DummyAgent()
+ * })
+ * 
+ * // Register a transport
+ * registry.registerTransport(new DummyTransport())
+ * 
+ * // Lookup registered components
+ * const agentMetadata = registry.lookup('my-agent')
+ * const transport = registry.lookupTransport('dummy')
+ * ```
+ * 
+ * @example Registry with validation:
+ * ```typescript
+ * try {
+ *   registry.register({
+ *     id: 'invalid-agent',
+ *     // Missing required fields
+ *   })
+ * } catch (error) {
+ *   if (error instanceof AgentMetadataValidationError) {
+ *     console.log('Validation failed:', error.message)
+ *   }
+ * }
+ * ```
+ * 
+ * @public
+ * @category Registry
+ */
 export class AgentRegistry implements AgentRegistryInterface {
   private agents = new Map<string, Readonly<AgentMetadata>>()
   private transports = new Map<string, Readonly<Transport>>()
   private frozen = false // Track if registry has been frozen
   private sealed = false // Track if registry has been sealed
 
+  /**
+   * Register an agent with the registry for dynamic lookup.
+   * 
+   * The metadata is validated against the AgentMetadata schema and deeply frozen
+   * to prevent runtime mutations. Factory functions are preserved to enable
+   * lazy instantiation.
+   * 
+   * @param metadata - Agent metadata including ID, name, version, and factory
+   * @throws {@link DuplicateAgentIdError} When an agent with the same ID is already registered
+   * @throws {@link AgentMetadataValidationError} When metadata fails schema validation
+   * @throws {@link RegistryError} When registry is frozen or sealed
+   */
   register(metadata: AgentMetadata): void {
     this.checkNotSealed('register agent')
     this.checkNotFrozen('register agent')

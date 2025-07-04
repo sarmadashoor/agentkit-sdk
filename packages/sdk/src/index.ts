@@ -24,6 +24,86 @@ import { debugLog } from './log'
 import { validateSchema, validateScope } from './validation'
 import { guardAgainstRecursivePluginCalls } from './plugins/PluginExecutionContext'
 
+/**
+ * Connects to an AI agent through a transport layer, providing a unified interface for agent interaction.
+ * 
+ * This is the primary entry point for the AgentKit SDK. It handles agent and transport resolution,
+ * initialization, compatibility validation, and returns a runtime handle for interaction.
+ * 
+ * @example
+ * ```typescript
+ * import { connectAgent, AgentRegistry } from '@agentkit/sdk'
+ * import { DummyAgent } from '@agentkit/test-agent'
+ * import { DummyTransport } from '@agentkit/transports-dummy'
+ * 
+ * // Register components
+ * AgentRegistry.register({
+ *   id: 'my-agent',
+ *   name: 'My Agent',
+ *   version: '1.0.0',
+ *   factory: () => new DummyAgent()
+ * })
+ * AgentRegistry.registerTransport(new DummyTransport())
+ * 
+ * // Connect and use
+ * const handle = await connectAgent({
+ *   agent: 'my-agent',
+ *   transport: 'dummy',
+ *   onOutput: (msg) => console.log('Response:', msg)
+ * })
+ * 
+ * await handle.send({ message: 'Hello!' })
+ * await handle.shutdown()
+ * ```
+ * 
+ * @example Production usage with observability:
+ * ```typescript
+ * const handle = await connectAgent({
+ *   agent: 'production-agent',
+ *   transport: 'http',
+ *   resourceLimits: {
+ *     maxConcurrentRequests: 10,
+ *     maxQueueSize: 50,
+ *     requestTimeoutMs: 30000
+ *   },
+ *   circuitBreaker: {
+ *     failureThreshold: 5,
+ *     timeout: 60000
+ *   },
+ *   observability: {
+ *     onRequestStart: (metadata) => console.log('Request started:', metadata.requestId),
+ *     onRequestEnd: (metadata, duration) => console.log('Request completed in', duration, 'ms'),
+ *     onCircuitBreakerStateChange: (event) => console.log('Circuit breaker:', event.toState)
+ *   }
+ * })
+ * ```
+ * 
+ * @param options - Configuration options for the agent connection
+ * @param options.agent - Agent ID (string) or Agent instance to connect to
+ * @param options.transport - Transport ID (string) or Transport instance for communication
+ * @param options.scope - Optional array of capability scopes to request from the agent
+ * @param options.debug - Enable detailed debug logging throughout the connection lifecycle
+ * @param options.onOutput - Callback function invoked when the agent produces output
+ * @param options.onInit - Lifecycle hook called after successful agent initialization
+ * @param options.onShutdown - Lifecycle hook called after agent shutdown completes
+ * @param options.onError - Error handler for agent and transport errors
+ * @param options.resourceLimits - Concurrency and resource constraints for the connection
+ * @param options.circuitBreaker - Fault tolerance configuration to prevent cascade failures
+ * @param options.observability - Advanced monitoring and metrics collection hooks
+ * @param options.plugins - Array of plugins to extend agent functionality
+ * @param options.features - Feature flags to enable/disable experimental functionality
+ * @param options.registry - Custom registry instance (defaults to global registry)
+ * 
+ * @returns Promise resolving to an AgentRuntimeHandle for interacting with the connected agent
+ * 
+ * @throws {@link AgentNotFoundError} When the specified agent ID is not found in the registry
+ * @throws {@link TransportNotFoundError} When the specified transport ID is not found in the registry  
+ * @throws {@link AgentCompatibilityError} When agent and transport are incompatible
+ * @throws {@link InvalidInputError} When the provided options fail validation
+ * 
+ * @public
+ * @category Core
+ */
 export async function connectAgent(options: ConnectAgentOptions): Promise<AgentRuntimeHandle> {
   // Guard against recursive plugin calls
   guardAgainstRecursivePluginCalls('connectAgent')
@@ -172,7 +252,22 @@ export async function connectAgent(options: ConnectAgentOptions): Promise<AgentR
 }
 
 /**
- * Validate compatibility between agent and transport
+ * Validates compatibility between an agent and transport to ensure they can work together.
+ * 
+ * Performs comprehensive validation including:
+ * - Agent and transport have valid string IDs
+ * - Agent implements required lifecycle methods (init, handle, shutdown)
+ * - Transport implements required communication methods (init, send)
+ * - Scope compatibility (when applicable)
+ * 
+ * @param agent - The agent instance to validate
+ * @param transport - The transport instance to validate  
+ * @param options - Connection options for additional validation context
+ * 
+ * @throws {@link AgentCompatibilityError} When validation fails for any reason
+ * 
+ * @internal
+ * @category Core
  */
 function validateCompatibility(agent: Agent, transport: Transport, options: ConnectAgentOptions): void {
   // Check that both components have required IDs

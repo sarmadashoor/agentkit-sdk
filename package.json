@@ -55,7 +55,8 @@
     "claude": "tsx claude/cli.ts",
     "claude:daemon": "tsx claude/daemon.ts",
     "claude:tdd": "tsx claude/tddLoop.ts",
-    "claude:runtime": "tsx claude/runtimeObserver.ts"
+    "claude:runtime": "tsx claude/runtimeObserver.ts",
+    "docs:api": "typedoc --out docs/api packages/sdk/src/index.ts --name \"AgentKit SDK\" --includeVersion"
   },
   "devDependencies": {
     "@eslint/js": "^8.56.0",
@@ -73,6 +74,7 @@
     "madge": "^7.0.0",
     "tsup": "^8.0.1",
     "tsx": "4.20.3",
+    "typedoc": "0.28.7",
     "typescript": "^5.3.3",
     "vitest": "^1.2.0",
     "zod": "^3.22.4"

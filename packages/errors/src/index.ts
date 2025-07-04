@@ -1,8 +1,44 @@
 /**
  * AgentKit SDK Unified Error System
  * 
- * Export all error classes and utilities for consistent error handling
- * across the AgentKit SDK ecosystem.
+ * Provides a comprehensive, structured error hierarchy for consistent error handling
+ * across the AgentKit SDK ecosystem. All errors extend the base AgentKitError class
+ * and include contextual information for debugging and error recovery.
+ * 
+ * @example Basic error handling:
+ * ```typescript
+ * import { connectAgent, AgentNotFoundError, TransportError } from '@agentkit/sdk'
+ * 
+ * try {
+ *   const handle = await connectAgent({
+ *     agent: 'nonexistent-agent',
+ *     transport: 'dummy'
+ *   })
+ * } catch (error) {
+ *   if (error instanceof AgentNotFoundError) {
+ *     console.log('Agent not found:', error.agentId)
+ *     console.log('Available agents:', error.context?.availableAgents)
+ *   } else if (error instanceof TransportError) {
+ *     console.log('Transport error:', error.message)
+ *   }
+ * }
+ * ```
+ * 
+ * @example Error serialization for logging:
+ * ```typescript
+ * import { isAgentKitError } from '@agentkit/errors'
+ * 
+ * try {
+ *   // SDK operation
+ * } catch (error) {
+ *   if (isAgentKitError(error)) {
+ *     console.log('Structured error:', JSON.stringify(error.toJSON(), null, 2))
+ *   }
+ * }
+ * ```
+ * 
+ * @packageDocumentation
+ * @category Errors
  */
 
 // Base error system
