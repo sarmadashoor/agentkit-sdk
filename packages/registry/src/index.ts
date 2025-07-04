@@ -297,7 +297,8 @@ export class LegacyAgentRegistry {
 }
 
 // Export for convenience
-export { AgentMetadata, AgentMetadataSchema } from '@agentkit/types'
+export { AgentMetadataSchema } from '@agentkit/types'
+export type { AgentMetadata } from '@agentkit/types'
 
 // Export deep freeze utilities for external use
 export { deepFreeze, isDeeplyFrozen, createFrozenCopy } from './utils/deepFreeze'

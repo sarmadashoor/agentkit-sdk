@@ -1,0 +1,47 @@
+{
+  "name": "hello-world-app",
+  "version": "1.0.0",
+  "description": "Complete example application demonstrating AgentKit SDK usage with plugins, error handling, and concurrency",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --fix",
+    "demo:echo": "AGENT_MODE=echo tsx src/index.ts",
+    "demo:metrics": "AGENT_MODE=metrics tsx src/index.ts",
+    "demo:fail": "AGENT_MODE=fail tsx src/index.ts",
+    "demo:recursive": "AGENT_MODE=recursive tsx src/index.ts",
+    "demo:validation": "AGENT_MODE=validation tsx src/index.ts",
+    "demo:concurrent": "CONCURRENT_DEMO=true tsx src/index.ts"
+  },
+  "keywords": [
+    "agentkit",
+    "sdk",
+    "example",
+    "typescript",
+    "agent",
+    "plugins",
+    "demo"
+  ],
+  "author": "AgentKit SDK Team",
+  "license": "MIT",
+  "dependencies": {
+    "@agentkit/sdk": "workspace:*",
+    "@agentkit/types": "workspace:*",
+    "@agentkit/test-agent": "workspace:*",
+    "@agentkit/transports-dummy": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
