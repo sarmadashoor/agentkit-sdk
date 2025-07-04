@@ -154,7 +154,7 @@ export class PluginSignature {
    * Verify basic plugin signature using RSA with SHA256
    */
   private verifyBasicSignature(plugin: AgentKitPlugin & { signature?: string }): boolean {
-    if (!plugin.signature) return false;
+    if (!plugin.signature) {return false;}
 
     const fingerprint = this.getPluginFingerprint(plugin);
 
@@ -242,10 +242,10 @@ export class PluginSignature {
   private getImplementedHooks(plugin: AgentKitPlugin): string[] {
     const hooks: string[] = [];
     
-    if (typeof plugin.onInit === 'function') hooks.push('onInit');
-    if (typeof plugin.onSend === 'function') hooks.push('onSend');
-    if (typeof plugin.onError === 'function') hooks.push('onError');
-    if (typeof plugin.onShutdown === 'function') hooks.push('onShutdown');
+    if (typeof plugin.onInit === 'function') {hooks.push('onInit');}
+    if (typeof plugin.onSend === 'function') {hooks.push('onSend');}
+    if (typeof plugin.onError === 'function') {hooks.push('onError');}
+    if (typeof plugin.onShutdown === 'function') {hooks.push('onShutdown');}
     
     return hooks;
   }

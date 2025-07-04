@@ -5,7 +5,7 @@ export class EnvironmentGuard {
   private static _isProduction: boolean | null = null;
 
   static isProduction(): boolean {
-    if (this._isProduction !== null) return this._isProduction;
+    if (this._isProduction !== null) {return this._isProduction;}
 
     this._isProduction =
       process.env.NODE_ENV === 'production' ||

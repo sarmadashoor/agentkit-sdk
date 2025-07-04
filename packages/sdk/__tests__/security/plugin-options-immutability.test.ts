@@ -24,7 +24,7 @@ describe('PluginManager Security - Options Immutability', () => {
     
     // TypeScript will prevent this at compile time, but we test runtime behavior
     expect(() => {
-      ;(manager as any).options.sandbox = true
+      (manager as any).options.sandbox = true
     }).toThrow()
   })
 
@@ -33,7 +33,7 @@ describe('PluginManager Security - Options Immutability', () => {
     const manager = new PluginManager({ allowedGlobals: customGlobals })
     
     expect(() => {
-      ;(manager as any).options.allowedGlobals.push('eval')
+      (manager as any).options.allowedGlobals.push('eval')
     }).toThrow()
   })
 
@@ -42,7 +42,7 @@ describe('PluginManager Security - Options Immutability', () => {
     const manager = new PluginManager({ trustedPluginKeys: trustedKeys })
     
     expect(() => {
-      ;(manager as any).options.trustedPluginKeys.push('malicious-key')
+      (manager as any).options.trustedPluginKeys.push('malicious-key')
     }).toThrow()
   })
 
@@ -51,11 +51,11 @@ describe('PluginManager Security - Options Immutability', () => {
     const manager2 = new PluginManager({ debug: false })
     
     expect(() => {
-      ;(manager1 as any).options.debug = false
+      (manager1 as any).options.debug = false
     }).toThrow()
     
     expect(() => {
-      ;(manager2 as any).options.debug = true
+      (manager2 as any).options.debug = true
     }).toThrow()
   })
 
@@ -69,12 +69,12 @@ describe('PluginManager Security - Options Immutability', () => {
     
     // Main options object should be frozen
     expect(() => {
-      ;(manager as any).options.hookTimeout = 10000
+      (manager as any).options.hookTimeout = 10000
     }).toThrow()
     
     // Nested observabilityHooks should also be deeply frozen
     expect(() => {
-      ;(manager as any).options.observabilityHooks.onPluginSuccess = () => { console.log('compromised') }
+      (manager as any).options.observabilityHooks.onPluginSuccess = () => { console.log('compromised') }
     }).toThrow()
   })
 
@@ -87,11 +87,11 @@ describe('PluginManager Security - Options Immutability', () => {
     
     // Verify that security-critical options cannot be changed
     expect(() => {
-      ;(manager as any).options.allowUnsignedPlugins = true
+      (manager as any).options.allowUnsignedPlugins = true
     }).toThrow()
     
     expect(() => {
-      ;(manager as any).options.pluginPublicKey = 'compromised-key'
+      (manager as any).options.pluginPublicKey = 'compromised-key'
     }).toThrow()
   })
 
@@ -129,7 +129,7 @@ describe('PluginManager Security - Options Immutability', () => {
     
     // Attempt to modify deep nested properties should fail
     expect(() => {
-      ;((manager as any).options.observabilityHooks.nestedConfig.level1.level2.value = 'compromised')
+      ((manager as any).options.observabilityHooks.nestedConfig.level1.level2.value = 'compromised')
     }).toThrow()
   })
 })
