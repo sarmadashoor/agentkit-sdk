@@ -25,7 +25,7 @@
     "test:sdk": "node scripts/sdk-test-runner.js",
     "test:fast": "node scripts/fast-test-runner.js",
     "test:tier1": "node scripts/tier-test-runner.js tier1",
-    "test:tier2": "node scripts/tier-test-runner.js tier2", 
+    "test:tier2": "node scripts/tier-test-runner.js tier2",
     "test:tier3": "node scripts/tier-test-runner.js tier3",
     "test:tiers": "node scripts/tier-test-runner.js all",
     "test:all": "pnpm test",
@@ -72,6 +72,7 @@
     "glob": "11.0.3",
     "madge": "^7.0.0",
     "tsup": "^8.0.1",
+    "tsx": "4.20.3",
     "typescript": "^5.3.3",
     "vitest": "^1.2.0",
     "zod": "^3.22.4"
