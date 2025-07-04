@@ -316,7 +316,7 @@ import { Agent } from '../../types/src/index'
 
 ### **Documentation**
 - `README.md` - Repository overview
-- `AgentKit_SDK_Developer_Guide.md` - Complete usage guide
+- `docs/developer-guide.md` - Complete usage guide
 - `TESTING_GUIDE.md` - Testing strategy and commands
 - `docs/architecture.md` - System design
 
