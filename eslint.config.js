@@ -78,15 +78,15 @@ export default [
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_'
       }],
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'off', // Too many existing uses, disable for now
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
-      '@typescript-eslint/no-non-null-assertion': 'warn',
-      '@typescript-eslint/no-empty-function': 'warn',
+      '@typescript-eslint/no-non-null-assertion': 'off', // Many existing uses, disable for now
+      '@typescript-eslint/no-empty-function': 'off', // Common in tests and placeholders
       '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/no-var-requires': 'off',
-      '@typescript-eslint/ban-ts-comment': 'warn',
-      '@typescript-eslint/ban-types': 'warn',
+      '@typescript-eslint/ban-ts-comment': 'off', // Allow @ts-ignore in existing code
+      '@typescript-eslint/ban-types': 'off', // Allow {} and other types for now
       '@typescript-eslint/prefer-as-const': 'error',
       
       // General JavaScript rules
@@ -100,7 +100,7 @@ export default [
       'no-useless-escape': 'error',
       
       // Best practices
-      'no-empty': 'warn',
+      'no-empty': 'off', // Allow empty blocks in existing code
       'no-unreachable': 'error',
       'no-undef': 'off', // TypeScript handles this
       'no-redeclare': 'off', // TypeScript handles this

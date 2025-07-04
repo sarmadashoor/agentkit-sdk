@@ -269,7 +269,7 @@ describe('QA Scenario A11: Multi-Transport & Hybrid Execution', () => {
   let testId: string
   let handles: AgentRuntimeHandle[] = []
   let transports: Transport[] = []
-  let metricsPerTransport: Map<string, TransportMetrics> = new Map()
+  const metricsPerTransport: Map<string, TransportMetrics> = new Map()
   let capturedEvents: any[] = []
 
   beforeEach(async () => {

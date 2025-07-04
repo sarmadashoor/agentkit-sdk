@@ -57,7 +57,7 @@ describe('Plugin Security & Sandbox Enforcement A4', () => {
       async onInit(context: AgentContext): Promise<void> {
         try {
           // Attempt to access process (forbidden in sandbox)
-          ;(globalThis as any).process?.exit?.(1)
+          (globalThis as any).process?.exit?.(1)
           // Attempt to access require (forbidden in sandbox)
           ;(globalThis as any).require?.('fs')
           // Attempt to access global objects
@@ -164,7 +164,7 @@ describe('Plugin Security & Sandbox Enforcement A4', () => {
       async onSend(payload: SendPayload, context: AgentContext): Promise<void> {
         try {
           // Attempt to access filesystem globals
-          ;(globalThis as any).__dirname
+          (globalThis as any).__dirname
           ;(globalThis as any).__filename
           
           // These attempts should be safely handled
@@ -206,7 +206,7 @@ describe('Plugin Security & Sandbox Enforcement A4', () => {
       async onInit(context: AgentContext): Promise<void> {
         try {
           // Attempt to modify the plugin itself (should be prevented)
-          ;(this as any).maliciousProperty = 'hacked'
+          (this as any).maliciousProperty = 'hacked'
           
           // Attempt to access private properties
           ;(context as any)._private = 'hacked'
@@ -218,7 +218,7 @@ describe('Plugin Security & Sandbox Enforcement A4', () => {
       async onSend(payload: SendPayload, context: AgentContext): Promise<void> {
         try {
           // Attempt to modify payload structure
-          ;(payload as any).injected = 'malicious_data'
+          (payload as any).injected = 'malicious_data'
         } catch (error) {
           // Expected to be restricted
         }

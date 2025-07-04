@@ -11,17 +11,15 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { connectAgent } from '@agentkit/sdk'
-import { DummyTransport } from '@agentkit/transports-dummy'
 import { 
+  connectAgent,
   Instrumentation, 
-  PrometheusCollector
-} from '@agentkit/sdk'
-import { 
+  PrometheusCollector,
   MetricsCollector, 
   PluginExecutionTimeline,
   type PrometheusMetrics 
 } from '@agentkit/sdk'
+import { DummyTransport } from '@agentkit/transports-dummy'
 import type { 
   AgentRuntimeHandle, 
   ConnectAgentOptions,

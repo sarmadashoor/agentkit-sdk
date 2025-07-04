@@ -11,12 +11,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { connectAgent } from '@agentkit/sdk'
-import { DummyTransport } from '@agentkit/transports-dummy'
 import { 
+  connectAgent,
   SecurePluginManagerV2,
   PluginManager
 } from '@agentkit/sdk'
+import { DummyTransport } from '@agentkit/transports-dummy'
 import { AgentRegistry } from '@agentkit/registry'
 import { 
   DuplicateAgentIdError,
@@ -612,7 +612,7 @@ describe('QA Scenario A5: Registry Edge Cases & Integrity', () => {
     ]
     
     let validationErrors = 0
-    let validationResults: Array<{ config: any; error?: Error }> = []
+    const validationResults: Array<{ config: any; error?: Error }> = []
     
     console.log('🧪 Testing malformed plugin configurations...')
     

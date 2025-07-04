@@ -8,6 +8,13 @@ set -e
 
 echo "🔍 Running pre-commit checks..."
 
+# Run linting with auto-fix
+echo "🔧 Linting and fixing code..."
+npm run lint || {
+  echo "❌ Linting failed"
+  exit 1
+}
+
 # Check if TypeScript compiles
 echo "📝 Type checking..."
 npm run typecheck || {

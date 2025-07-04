@@ -15,15 +15,15 @@ export class LoggingPlugin implements AgentKitPlugin {
   
   public logs: string[] = []
 
-  async onInit(context: AgentContext): Promise<void> {
+  async onInit(_context: AgentContext): Promise<void> {
     this.logs.push(`${Date.now()}: onInit called`)
   }
 
-  async onSend(payload: SendPayload, context: AgentContext): Promise<void> {
+  async onSend(payload: SendPayload, _context: AgentContext): Promise<void> {
     this.logs.push(`${Date.now()}: onSend called with ${JSON.stringify(payload)}`)
   }
 
-  async onShutdown(context: AgentContext): Promise<void> {
+  async onShutdown(_context: AgentContext): Promise<void> {
     this.logs.push(`${Date.now()}: onShutdown called`)
   }
 
@@ -41,11 +41,11 @@ export class TransformPlugin implements AgentKitPlugin {
 
   constructor(private transformer: (data: unknown) => unknown) {}
 
-  async onInit(context: AgentContext): Promise<void> {
+  async onInit(_context: AgentContext): Promise<void> {
     // Plugin initialization
   }
 
-  async onSend(payload: SendPayload, context: AgentContext): Promise<void> {
+  async onSend(payload: SendPayload, _context: AgentContext): Promise<void> {
     // Transform the payload in place (modifying the context or payload as needed)
     // Note: In a real implementation, this would modify the payload or context
     const transformed = this.transformer(payload)
@@ -53,7 +53,7 @@ export class TransformPlugin implements AgentKitPlugin {
     console.log('Transformed payload:', transformed)
   }
 
-  async onShutdown(context: AgentContext): Promise<void> {
+  async onShutdown(_context: AgentContext): Promise<void> {
     // Plugin cleanup
   }
 }
@@ -67,17 +67,17 @@ export class ValidationPlugin implements AgentKitPlugin {
 
   constructor(private validator: (data: unknown) => boolean) {}
 
-  async onInit(context: AgentContext): Promise<void> {
+  async onInit(_context: AgentContext): Promise<void> {
     // Plugin initialization
   }
 
-  async onSend(payload: SendPayload, context: AgentContext): Promise<void> {
+  async onSend(payload: SendPayload, _context: AgentContext): Promise<void> {
     if (!this.validator(payload)) {
       throw new Error('Validation failed')
     }
   }
 
-  async onShutdown(context: AgentContext): Promise<void> {
+  async onShutdown(_context: AgentContext): Promise<void> {
     // Plugin cleanup
   }
 }
@@ -91,15 +91,15 @@ export class AsyncPlugin implements AgentKitPlugin {
 
   constructor(private delayMs: number = 50) {}
 
-  async onInit(context: AgentContext): Promise<void> {
+  async onInit(_context: AgentContext): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, this.delayMs))
   }
 
-  async onSend(payload: unknown): Promise<void> {
+  async onSend(_payload: unknown): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, this.delayMs))
   }
 
-  async onShutdown(context: AgentContext): Promise<void> {
+  async onShutdown(_context: AgentContext): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, this.delayMs))
   }
 }
@@ -115,15 +115,15 @@ export class CounterPlugin implements AgentKitPlugin {
   public sendCount = 0
   public shutdownCount = 0
 
-  async onInit(context: AgentContext): Promise<void> {
+  async onInit(_context: AgentContext): Promise<void> {
     this.initCount++
   }
 
-  async onSend(payload: SendPayload, context: AgentContext): Promise<void> {
+  async onSend(_payload: SendPayload, _context: AgentContext): Promise<void> {
     this.sendCount++
   }
 
-  async onShutdown(context: AgentContext): Promise<void> {
+  async onShutdown(_context: AgentContext): Promise<void> {
     this.shutdownCount++
   }
 

@@ -13,12 +13,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { connectAgent } from '@agentkit/sdk'
+import { connectAgent, BoundedExecutor, Instrumentation } from '@agentkit/sdk'
 import { DummyTransport } from '@agentkit/transports-dummy'
-import { 
-  BoundedExecutor,
-  Instrumentation
-} from '@agentkit/sdk'
 import { 
   QueueFullError,
   ResourceExhaustedError,
