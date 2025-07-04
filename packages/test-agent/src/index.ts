@@ -160,3 +160,17 @@ export const createDummyAgent = (config?: DummyAgentConfig): Agent => {
   }
   return agent
 }
+
+// Export new comprehensive test agent
+export {
+  DummyTestAgent,
+  createDummyTestAgent,
+  createAllModeAgents,
+  DummyTestAgentConfigSchema,
+  type DummyTestAgentConfig,
+  type DummyTestAgentMode
+} from './DummyTestAgent'
+
+export {
+  type DummyTestAgentTestResult
+} from './types'
