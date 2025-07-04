@@ -11,6 +11,7 @@ Welcome to the comprehensive documentation for AgentKit SDK - a modular, secure,
 | **Get started quickly** | [🚀 Quick Start](#quick-start) |
 | **Learn core concepts** | [📚 Developer Guide](./developer-guide.md) |
 | **Find specific APIs** | [📋 API Reference](./api-reference.md) |
+| **Understand architecture** | [🏗️ Visual Diagrams](./diagrams/) |
 | **Solve a problem** | [🔧 Troubleshooting](./troubleshooting.md) |
 | **Run tests** | [🧪 Testing Strategy](./development/testing-strategy.md) |
 | **Build plugins** | [🔌 Plugin Development](./architecture/plugins/) |
@@ -52,12 +53,13 @@ Welcome to the comprehensive documentation for AgentKit SDK - a modular, secure,
 ### 🔧 **Platform Engineer** → *"I need to understand the system architecture"*
 **Goal:** Deploy, monitor, and maintain AgentKit in production
 ```
-1. 🏗️ [Architecture Overview](./architecture/overview.md)
-2. 🛡️ [Design Decisions & Constraints](./architecture/design-decisions.md)
-3. 📊 [Observability Framework](./architecture/observability.md)
-4. 🐛 [Debugging Guide](./development/debugging.md)
-5. 🚀 [Migration Guide](./migration.md)
-6. 📋 [Changelog](./CHANGELOG.md)
+1. 🏗️ [Visual Architecture Diagrams](./diagrams/) ← START HERE
+2. 🏗️ [Architecture Overview](./architecture/overview.md)
+3. 🛡️ [Design Decisions & Constraints](./architecture/design-decisions.md)
+4. 📊 [Observability Framework](./architecture/observability.md)
+5. 🐛 [Debugging Guide](./development/debugging.md)
+6. 🚀 [Migration Guide](./migration.md)
+7. 📋 [Changelog](./CHANGELOG.md)
 ```
 
 ### 🧪 **Contributor/Maintainer** → *"I want to contribute to AgentKit"*
