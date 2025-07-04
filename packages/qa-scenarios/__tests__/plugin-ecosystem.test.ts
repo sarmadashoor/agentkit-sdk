@@ -841,7 +841,7 @@ describe('QA Scenario A12: Plugin Ecosystem Simulation', () => {
     console.log(`🔍 Global tracker entries: ${globalTrackerSize}`)
     console.log(`🔍 Global tracker init count: ${totalGlobalInits}`)
     if (allTrackedExecutions.length > 0) {
-      console.log(`🔍 First execution: ${allTrackedExecutions[0].pluginName}.${allTrackedExecutions[0].hookName}`)
+      console.log(`🔍 First execution: ${allTrackedExecutions[0]!.pluginName}.${allTrackedExecutions[0]!.hookName}`)
     }
     
     // Send test message to trigger plugin hooks
